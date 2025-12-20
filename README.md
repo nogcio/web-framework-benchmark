@@ -217,4 +217,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with [Rust](https://www.rust-lang.org/), [React](https://reactjs.org/), and [Vite](https://vitejs.dev/)
 - Load testing powered by [wrk](https://github.com/wg/wrk)
-- UI components from [Radix UI](https://www.radix-ui.com/) and [Tailwind CSS](https://tailwindcss.com/)
+- UI components from [shadcn/ui](https://ui.shadcn.com/) (built on Radix UI and Tailwind CSS)
+- State management with [Zustand](https://zustand-demo.pmnd.rs/)

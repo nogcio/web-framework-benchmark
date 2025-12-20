@@ -1,66 +1,227 @@
-# Web Framework Benchmark
+# Web Framework Benchmark (WFB)
 
-A collection of benchmarks and tools for comparing web frameworks and simple HTTP services.
+A comprehensive benchmarking tool for comparing the performance of web frameworks and HTTP services across different programming languages. This project provides automated benchmarking infrastructure, result visualization, and extensible framework support.
+
+## Features
+
+- **Multi-language Support**: Benchmark frameworks written in different languages (currently Go, extensible to others)
+- **Comprehensive Test Suite**: Includes tests for:
+  - Hello World responses
+  - JSON serialization/deserialization
+  - Database read operations (single and paginated)
+  - Database write operations
+  - Static file serving
+- **Automated Benchmarking**: Uses `wrk` for high-performance HTTP load testing
+- **Result Visualization**: Web dashboard built with React/TypeScript for viewing and comparing results
+- **Result Storage**: Local filesystem storage of benchmark results in YAML format
+- **Database Integration**: PostgreSQL test database for benchmark workloads
+- **Docker Support**: Containerized environments for consistent benchmarking
+- **Local and Remote Environments**: Support for both local development and remote deployment
+
+## Architecture
+
+The project consists of several components:
+
+- **Rust CLI (`src/`)**: Core benchmarking engine and command-line interface
+- **Web Dashboard (`web-app/`)**: React application for result visualization
+- **Framework Implementations (`benchmarks/`)**: Example web services in different languages/frameworks
+- **Database (`benchmarks_db/`)**: PostgreSQL setup with initialization scripts for test data
+- **Configuration (`config/`)**: Language and environment configurations
+- **Scripts (`scripts/`)**: Lua scripts for `wrk` load testing
+- **Test Data (`benchmarks_data/`)**: Static files for benchmarking
 
 ## Quick Start
 
-1) Build and run the Rust CLI benchmarks:
+### Prerequisites
+
+- Rust (2024 edition or later)
+- Node.js (18+)
+- Docker
+
+### 1. Build the Rust CLI
 
 ```bash
-# from the repository root
+# Clone the repository
+git clone https://github.com/nogcio/web-framework-benchmark.git
+cd web-framework-benchmark
+
+# Build the CLI tool
 cargo build --release
-# view CLI options
+```
+
+### 2. View CLI Help
+
+```bash
 cargo run --release -- --help
 ```
 
-2) Frontend web application (in `web-app`):
+### 3. Run a Benchmark
+
+```bash
+# Benchmark a specific framework
+cargo run --release -- benchmark benchmarks/go/std --environment local
+
+# Run all benchmarks and save to database
+cargo run --release -- run 1 --environment local
+```
+
+### 4. Start the Web Dashboard
 
 ```bash
 cd web-app
 npm install
-npm run dev    # development
-npm run build  # production build
+npm run dev
 ```
 
-3) Benchmark database (Docker image in `benchmarks_db`):
+Open http://localhost:5173 to view the dashboard.
+
+### 5. Database Setup (Optional - for database benchmarks)
 
 ```bash
 cd benchmarks_db
 docker build -t wfb-db .
-# then run the container with appropriate ports and volumes
+docker run -d -p 5432:5432 --name wfb-db wfb-db
 ```
 
-## Repository layout
+## Usage
 
-- `src/` — Rust CLI and benchmark code
-- `benchmarks/` — example services implemented in different languages
-- `web-app/` — frontend for demonstrating results
-- `benchmarks_db/` — DB image and initialization scripts
+### CLI Commands
 
-## Formatting and linting
+#### Benchmark Command
+Run benchmarks for a specific framework implementation:
 
 ```bash
-# Rust
+cargo run --release -- benchmark <path> [--environment <type>]
+```
+
+- `path`: Path to the framework implementation directory
+- `environment`: `local` (default) or `remote`
+
+#### Run Command
+Execute all configured benchmarks and store results:
+
+```bash
+cargo run --release -- run <id> [--environment <type>]
+```
+
+- `id`: Unique run identifier
+- `environment`: `local` (default) or `remote`
+
+### Adding New Frameworks
+
+1. Create a new directory under `benchmarks/<language>/<framework>/`
+2. Implement the required endpoints (see existing implementations for reference)
+3. Add configuration to `config/languages.yaml`
+4. Ensure Docker support if needed
+
+### Required Endpoints
+
+Framework implementations must provide these endpoints:
+
+- `GET /` - Hello World response
+- `GET /info` - Server version and supported tests information (returns plain text: `version,test1,test2,...` where version is a string and tests are from: hello_world, json, db_read_one, db_read_paging, db_write, static_files)
+- `GET /json` - JSON serialization
+- `GET /db` - Single database read
+- `GET /db/paging?page=1&limit=10` - Paginated database read
+- `POST /db` - Database write
+- `GET /static/*` - Static file serving
+
+## Configuration
+
+### Languages Configuration (`config/languages.yaml`)
+
+Define supported languages and frameworks:
+
+```yaml
+- name: Go
+  url: https://golang.org
+  frameworks:
+    - name: stdlib
+      path: benchmarks/go/std
+      url: https://golang.org/pkg/net/http/
+      tags:
+        go: "1.21"
+        platform: go
+```
+
+### Environment Configuration (`config/environment.local.yaml`)
+
+Configure local benchmarking parameters:
+
+```yaml
+# Local environment settings
+docker_network: wfb-network
+database:
+  host: db
+  port: 5432
+  user: benchmark
+  password: benchmark
+  name: benchmark
+wrk:
+  duration: 10s
+  threads: 4
+  connections: 100
+```
+
+## Development
+
+### Code Quality
+
+```bash
+# Rust formatting and linting
 cargo fmt --all
 cargo clippy --all-targets -- -D warnings
 
-# Frontend
+# Frontend linting
 cd web-app
 npm run lint
 ```
 
-## Contribution
+### Testing
 
-Please read `CONTRIBUTING.md` before opening a PR.
+```bash
+# Run Rust tests
+cargo test
+
+# Run frontend tests (if configured)
+cd web-app
+npm test
+```
+
+### Building for Production
+
+```bash
+# Build Rust CLI
+cargo build --release
+
+# Build web app
+cd web-app
+npm run build
+```
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+### Adding Support for New Languages/Frameworks
+
+1. Fork the repository
+2. Create a new framework implementation in `benchmarks/<language>/<framework>/`
+3. Update `config/languages.yaml`
+4. Add Docker configuration if needed
+5. Test locally
+6. Submit a pull request
 
 ## License
 
-Add a `LICENSE` file with the chosen license (for example, MIT or Apache-2.0).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Contacts
+## Authors
 
-Maintainers: list authors in `Cargo.toml` and `package.json`.
+- **Andrew Sumskoy** - *Initial work* - [getansum@nogc.io](mailto:getansum@nogc.io)
 
----
+## Acknowledgments
 
-If you want, I can also add a `CONTRIBUTING.md` template, set up CI (GitHub Actions) for build/tests/linting, or populate the `LICENSE` file — tell me which task to do next.
+- Built with [Rust](https://www.rust-lang.org/), [React](https://reactjs.org/), and [Vite](https://vitejs.dev/)
+- Load testing powered by [wrk](https://github.com/wg/wrk)
+- UI components from [Radix UI](https://www.radix-ui.com/) and [Tailwind CSS](https://tailwindcss.com/)

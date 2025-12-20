@@ -57,7 +57,7 @@ pub struct FrameworkWithLanguage {
     pub framework: languages::Framework,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[allow(dead_code)]
 pub struct RunResult {
     pub language: String,

@@ -5,6 +5,7 @@ mod db;
 mod docker;
 mod error;
 mod exec_utils;
+mod http;
 mod http_probe;
 mod parsers;
 mod wrk;
@@ -65,6 +66,14 @@ async fn main() -> Result<()> {
                     db.save_run(id, &environment, &lang, framework, &benchmark_results)?;
                 }
             }
+        }
+        cli::Commands::Serve { host, port } => {
+            let db = db::Db::open()?;
+            let app = http::create_router(db);
+            let addr: std::net::SocketAddr = format!("{}:{}", host, port).parse().unwrap();
+            info!("Starting server on {}", addr);
+            let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+            axum::serve(listener, app.into_make_service()).await.unwrap();
         }
     }
 

@@ -26,4 +26,11 @@ pub enum Commands {
         #[arg(short, long, default_value = "local")]
         environment: BenchmarkEnvironmentType,
     },
+
+    Serve {
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(short, long, default_value = "8080")]
+        port: u16,
+    }
 }

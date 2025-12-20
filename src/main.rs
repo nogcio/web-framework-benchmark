@@ -6,6 +6,7 @@ mod exec_utils;
 mod http_probe;
 mod parsers;
 mod wrk;
+mod benchmark_environment;
 
 pub mod prelude {
     pub use crate::error::*;
@@ -40,9 +41,20 @@ async fn main() -> Result<()> {
 
     let cli = cli::Cli::parse();
     match cli.command {
-        cli::Commands::Benchmark { path } => {
-            let result = benchmark::run_benchmark(&path).await?;
-            dbg!(result);
+        cli::Commands::Benchmark { path, environment } => {
+            match environment {
+                cli::BenchmarkEnvironmentType::Local => {
+                    let settings = crate::benchmark_environment::local::LocalConfig::from_file("config/environment.local.yaml")?;
+                    let mut env = crate::benchmark_environment::local::LocalBenchmarkEnvironment::new(settings);
+                    let result = benchmark::run_benchmark(&mut env, &path).await?;
+                    info!("Benchmark completed: {:?}", result);
+                }
+                cli::BenchmarkEnvironmentType::Remote => {
+                    let mut env = crate::benchmark_environment::remote::RemoteBenchmarkEnvironment::new();
+                    let result = benchmark::run_benchmark(&mut env, &path).await?;
+                    info!("Benchmark completed: {:?}", result);
+                }
+            }
         }
     }
 

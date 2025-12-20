@@ -35,33 +35,45 @@ pub async fn exec_stats(container_id: &str) -> Result<DockerStatsResult> {
     Ok(DockerStatsResult { memory_usage })
 }
 
+pub struct ContainerOptions {
+    pub ports: Option<String>,
+    pub cpus: Option<u32>,
+    pub memory: Option<u32>,
+    pub link: Option<String>,
+    pub mount: Option<String>,
+    pub envs: Option<Vec<(String, String)>>,
+}
+
 pub async fn exec_run_container(
     container_id: &str,
     tag: &str,
-    ports: Option<impl Into<String>>,
-    cpus: u32,
-    memory: u32,
-    link: Option<impl Into<String>>,
-    mount: Option<impl Into<String>>,
+    options: ContainerOptions,
 ) -> Result<()> {
     let mut cmd = Command::new("docker");
     cmd.arg("run")
         .arg("--rm")
-        .arg("--cpus")
-        .arg(cpus.to_string())
-        .arg("--memory")
-        .arg(format!("{}m", memory))
         .arg("--name")
         .arg(container_id)
         .arg("-d");
-    if let Some(ports_str) = ports {
-        cmd.arg("-p").arg(ports_str.into());
+    if let Some(cpus) = options.cpus {
+        cmd.arg("--cpus").arg(cpus.to_string());
     }
-    if let Some(link_str) = link {
-        cmd.arg("--link").arg(link_str.into());
+    if let Some(memory) = options.memory {
+        cmd.arg("--memory").arg(format!("{}m", memory));
     }
-    if let Some(mount_str) = mount {
-        cmd.arg("-v").arg(mount_str.into());
+    if let Some(ports_str) = options.ports {
+        cmd.arg("-p").arg(ports_str);
+    }
+    if let Some(link_str) = options.link {
+        cmd.arg("--link").arg(link_str);
+    }
+    if let Some(mount_str) = options.mount {
+        cmd.arg("-v").arg(mount_str);
+    }
+    if let Some(env_vars) = options.envs {
+        for (key, value) in env_vars {
+            cmd.arg("-e").arg(format!("{}={}", key, value));
+        }
     }
     cmd.arg(tag);
     exec(&mut cmd).await?;

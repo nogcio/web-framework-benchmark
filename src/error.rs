@@ -29,4 +29,6 @@ pub enum Error {
     YamlError(#[from] serde_yaml::Error),
     #[error("Task join error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
+    #[error("Benchmark environment not prepared")]
+    EnvironmentNotPrepared,
 }

@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     fs,
     path::PathBuf,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock}, time::Duration,
 };
 
 use crate::{
@@ -186,7 +186,25 @@ impl Db {
                     results.push(runs::RunResult {
                         language: fw_run.language.clone(),
                         framework: fw_run.framework.clone(),
-                        result: result.clone(),
+                        version: fw_run.manifest.version.clone(),
+                        rps: result.requests_per_sec,
+                        tps: result.transfer_per_sec,
+                        latency_avg: result.latency_avg,
+                        latency_stdev: result.latency_stdev,
+                        latency_max: result.latency_max,
+                        latency50: result.latency_distribution.iter().find(|(p, _)| *p == 50).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
+                        latency75: result.latency_distribution.iter().find(|(p, _)| *p == 75).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
+                        latency90: result.latency_distribution.iter().find(|(p, _)| *p == 90).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
+                        latency99: result.latency_distribution.iter().find(|(p, _)| *p == 99).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
+                        latency_stdev_pct: result.latency_stdev_pct,
+                        latency_distribution: result.latency_distribution.clone(),
+                        req_per_sec_avg: result.req_per_sec_avg,
+                        req_per_sec_stdev: result.req_per_sec_stdev,
+                        req_per_sec_max: result.req_per_sec_max,
+                        req_per_sec_stdev_pct: result.req_per_sec_stdev_pct,
+                        errors: result.errors,
+                        memory_usage: result.memory_usage,
+                        tags: fw_run.manifest.tags.clone(),
                     });
                 }
             }

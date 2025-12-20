@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import axios from 'axios'
-import type { Run, Benchmark, Language, Framework } from '../types'
+import type { Run, Benchmark, Language, Framework, Environment, Test } from '../types'
 
 const API_BASE = '/api'
 
@@ -17,6 +17,16 @@ export type AppState = {
   benchmarks: Benchmark[]
   benchmarksLoading: boolean
   fetchBenchmarks: (runId: number | null) => Promise<void>
+  environments: Environment[]
+  environmentsLoading: boolean
+  fetchEnvironments: () => Promise<void>
+  selectedEnvironment: string | null
+  setSelectedEnvironment: (env: string | null) => void
+  tests: Test[]
+  testsLoading: boolean
+  fetchTests: () => Promise<void>
+  selectedTest: string | null
+  setSelectedTest: (test: string | null) => void
   theme: 'light' | 'dark'
   toggleTheme: () => void
 }
@@ -27,13 +37,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   languages: [],
   frameworks: [],
   languagesLoading: false,
+  environments: [],
+  environmentsLoading: false,
+  selectedEnvironment: null,
+  tests: [],
+  testsLoading: false,
+  selectedTest: null,
   fetchLanguages: async (): Promise<void> => {
     set({ languagesLoading: true })
     try {
-      const [langsRes, fwRes] = await Promise.all([
-        axios.get<Language[]>(`${API_BASE}/languages`),
-        axios.get<Framework[]>(`${API_BASE}/frameworks`),
-      ])
+      const langsRes = await axios.get<Language[]>(`${API_BASE}/languages`)
+      const fwRes = await axios.get<Framework[]>(`${API_BASE}/frameworks`)
       set({ languages: langsRes.data || [], frameworks: fwRes.data || [], languagesLoading: false })
     } catch {
       set({ languages: [], frameworks: [], languagesLoading: false })
@@ -50,7 +64,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const currentSelected = get().selectedRunId
       if (!currentSelected && runs.length > 0) {
         const latest = runs.reduce((latest, current) =>
-          new Date(current.started_at) > new Date(latest.started_at) ? current : latest
+          new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
         ).id
         get().setSelectedRunId(latest)
       }
@@ -71,12 +85,82 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ benchmarks: [], benchmarksLoading: false })
       return
     }
+    const selectedEnv = get().selectedEnvironment
+    const selectedTest = get().selectedTest
+    if (!selectedEnv || !selectedTest) {
+      // filters not loaded yet, skip
+      set({ benchmarks: [], benchmarksLoading: false })
+      return
+    }
     set({ benchmarksLoading: true })
     try {
-      const res = await axios.get<Benchmark[]>(`${API_BASE}/runs/${runId}/benchmarks`)
-      set({ benchmarks: res.data || [], benchmarksLoading: false })
+      const url = `${API_BASE}/runs/${runId}/environments/${selectedEnv}/tests/${selectedTest}`
+      const res = await axios.get(url)
+      const benchmarks = res.data.map((item: any) => ({
+        language: item.language,
+        framework: item.framework,
+        version: item.version,
+        timestamp: item.timestamp,
+        rps: item.rps,
+        tps: item.tps,
+        latencyAvg: item.latencyAvg,
+        latencyMax: item.latencyMax,
+        latency50: item.latency50,
+        latency75: item.latency75,
+        latency90: item.latency90,
+        latency99: item.latency99,
+        errors: item.errors,
+        memoryUsage: item.memoryUsage,
+        tags: item.tags || {},
+      }))
+      set({ benchmarks, benchmarksLoading: false })
     } catch {
       set({ benchmarks: [], benchmarksLoading: false })
+    }
+  },
+  fetchEnvironments: async (): Promise<void> => {
+    set({ environmentsLoading: true })
+    try {
+      const res = await axios.get<Environment[]>(`${API_BASE}/environments`)
+      const environments = res.data
+      set({ environments, environmentsLoading: false })
+      // auto-select first if none
+      const currentSelected = get().selectedEnvironment
+      if (!currentSelected && environments.length > 0) {
+        get().setSelectedEnvironment(environments[0].name)
+      }
+    } catch {
+      set({ environments: [], environmentsLoading: false })
+    }
+  },
+  fetchTests: async (): Promise<void> => {
+    set({ testsLoading: true })
+    try {
+      const res = await axios.get<Test[]>(`${API_BASE}/tests`)
+      set({ tests: res.data || [], testsLoading: false })
+      // auto-select first if none
+      const currentSelected = get().selectedTest
+      if (!currentSelected && res.data && res.data.length > 0) {
+        get().setSelectedTest(res.data[0].id)
+      }
+    } catch {
+      set({ tests: [], testsLoading: false })
+    }
+  },
+  setSelectedEnvironment: (env: string | null) => {
+    set({ selectedEnvironment: env })
+    // refetch benchmarks if run selected
+    const runId = get().selectedRunId
+    if (runId) {
+      get().fetchBenchmarks(runId)
+    }
+  },
+  setSelectedTest: (test: string | null) => {
+    set({ selectedTest: test })
+    // refetch benchmarks if run selected
+    const runId = get().selectedRunId
+    if (runId) {
+      get().fetchBenchmarks(runId)
     }
   },
   theme: (localStorage.getItem('theme') as 'light' | 'dark' | null) || 'dark',

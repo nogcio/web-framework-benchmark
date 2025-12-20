@@ -15,29 +15,10 @@ use crate::{
 };
 
 #[derive(Serialize)]
-struct TagsResponse {
-    tags: Vec<String>,
-}
-
-#[derive(Serialize)]
-struct EnvironmentsResponse {
-    environments: Vec<String>,
-}
-
-#[derive(Serialize)]
-struct TestsResponse {
-    tests: Vec<TestInfo>,
-}
-
-#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct TestInfo {
     id: String,
     name: String,
-}
-
-#[derive(Serialize)]
-struct LanguagesResponse {
-    languages: Vec<LanguageInfo>,
 }
 
 #[derive(Serialize)]
@@ -47,11 +28,7 @@ struct LanguageInfo {
 }
 
 #[derive(Serialize)]
-struct FrameworksResponse {
-    frameworks: Vec<FrameworkInfo>,
-}
-
-#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FrameworkInfo {
     language: String,
     name: String,
@@ -60,52 +37,62 @@ struct FrameworkInfo {
 }
 
 #[derive(Serialize)]
-struct RunsResponse {
-    runs: Vec<RunInfo>,
-}
-
-#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RunInfo {
     id: u32,
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Serialize)]
-struct RunResultsResponse {
-    results: Vec<RunResult>,
+#[serde(rename_all = "camelCase")]
+struct EnvironmentInfo {
+    name: String,
+    display_name: String,
+    icon: String,
 }
 
 pub fn create_router(db: db::Db) -> Router {
     Router::new()
-        .route("/tags", get(get_tags))
-        .route("/environments", get(get_environments))
-        .route("/tests", get(get_tests))
-        .route("/languages", get(get_languages))
-        .route("/frameworks", get(get_frameworks))
-        .route("/runs", get(get_runs))
+        .route("/api/tags", get(get_tags))
+        .route("/api/environments", get(get_environments))
+        .route("/api/tests", get(get_tests))
+        .route("/api/languages", get(get_languages))
+        .route("/api/frameworks", get(get_frameworks))
+        .route("/api/runs", get(get_runs))
         .route(
-            "/runs/{run_id}/environments/{env}/tests/{test}",
+            "/api/runs/{run_id}/environments/{env}/tests/{test}",
             get(get_run_results),
         )
         .with_state(db)
 }
 
-async fn get_tags(State(db): State<db::Db>) -> Result<Json<TagsResponse>, StatusCode> {
+async fn get_tags(State(db): State<db::Db>) -> Result<Json<Vec<String>>, StatusCode> {
     let tags = db.get_tag_keys().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(TagsResponse { tags }))
+    Ok(Json(tags))
 }
 
-async fn get_environments(State(db): State<db::Db>) -> Result<Json<EnvironmentsResponse>, StatusCode> {
+async fn get_environments(State(db): State<db::Db>) -> Result<Json<Vec<EnvironmentInfo>>, StatusCode> {
     let environments = db
         .get_environments()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .into_iter()
-        .map(|e| e.to_string())
+        .map(|e| match e {
+            BenchmarkEnvironmentType::Local => EnvironmentInfo {
+                name: e.to_string(),
+                display_name: "Local".to_string(),
+                icon: "home".to_string(),
+            },
+            BenchmarkEnvironmentType::Remote => EnvironmentInfo {
+                name: e.to_string(),
+                display_name: "XG6254 32CPU".to_string(),
+                icon: "server".to_string(),
+            },
+        })
         .collect();
-    Ok(Json(EnvironmentsResponse { environments }))
+    Ok(Json(environments))
 }
 
-async fn get_tests(State(_db): State<db::Db>) -> Result<Json<TestsResponse>, StatusCode> {
+async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, StatusCode> {
     let tests = vec![
         BenchmarkTests::HelloWorld,
         BenchmarkTests::Json,
@@ -120,7 +107,7 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<TestsResponse>, Sta
         name: readable_test_name(&t),
     })
     .collect();
-    Ok(Json(TestsResponse { tests }))
+    Ok(Json(tests))
 }
 
 fn readable_test_name(test: &BenchmarkTests) -> String {
@@ -134,7 +121,7 @@ fn readable_test_name(test: &BenchmarkTests) -> String {
     }
 }
 
-async fn get_languages(State(db): State<db::Db>) -> Result<Json<LanguagesResponse>, StatusCode> {
+async fn get_languages(State(db): State<db::Db>) -> Result<Json<Vec<LanguageInfo>>, StatusCode> {
     let languages = db
         .get_languages()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -144,10 +131,10 @@ async fn get_languages(State(db): State<db::Db>) -> Result<Json<LanguagesRespons
             url: l.url,
         })
         .collect();
-    Ok(Json(LanguagesResponse { languages }))
+    Ok(Json(languages))
 }
 
-async fn get_frameworks(State(db): State<db::Db>) -> Result<Json<FrameworksResponse>, StatusCode> {
+async fn get_frameworks(State(db): State<db::Db>) -> Result<Json<Vec<FrameworkInfo>>, StatusCode> {
     let frameworks = db
         .get_frameworks()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -159,10 +146,10 @@ async fn get_frameworks(State(db): State<db::Db>) -> Result<Json<FrameworksRespo
             tags: f.framework.tags,
         })
         .collect();
-    Ok(Json(FrameworksResponse { frameworks }))
+    Ok(Json(frameworks))
 }
 
-async fn get_runs(State(db): State<db::Db>) -> Result<Json<RunsResponse>, StatusCode> {
+async fn get_runs(State(db): State<db::Db>) -> Result<Json<Vec<RunInfo>>, StatusCode> {
     let runs = db
         .get_runs()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -172,13 +159,13 @@ async fn get_runs(State(db): State<db::Db>) -> Result<Json<RunsResponse>, Status
             created_at: r.manifest.created_at,
         })
         .collect();
-    Ok(Json(RunsResponse { runs }))
+    Ok(Json(runs))
 }
 
 async fn get_run_results(
     State(db): State<db::Db>,
     Path((run_id, env_str, test_str)): Path<(u32, String, String)>,
-) -> Result<Json<RunResultsResponse>, StatusCode> {
+) -> Result<Json<Vec<RunResult>>, StatusCode> {
     let environment = BenchmarkEnvironmentType::from_str(&env_str, true)
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let test = test_str
@@ -188,5 +175,5 @@ async fn get_run_results(
     let results = db
         .get_run_results(run_id, environment, test)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(RunResultsResponse { results }))
+    Ok(Json(results))
 }

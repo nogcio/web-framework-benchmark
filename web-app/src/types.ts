@@ -1,33 +1,49 @@
 export interface Run {
   id: number
-  started_at: string
+  createdAt: string
+}
+
+export interface Environment {
+  name: string
+  displayName: string
+  icon: string
 }
 
 export interface Benchmark {
-  id: number
-  run_id: number
-  language_id: string
-  framework_id: string
+  language: string
+  framework: string
   version: string
-  timestamp: string
-  requests_per_second: number
-  latency_avg_ms: number
-  latency_max_ms: number
-  latency_95th_ms: number
+  rps: number
+  tps: number
+  latencyAvg: number
+  latencyMax: number
+  latency50: number
+  latency75: number
+  latency90: number
+  latency99: number
   errors: number
-  memory_usage: number
+  memoryUsage: number
   tags: Record<string, string>
 }
 
 export interface Language {
-  id: string
   name: string
-  link: string
+  url: string
 }
 
 export interface Framework {
+  language: string
+  name: string
+  url: string
+  tags: Record<string, string>
+}
+
+export interface Environment {
   id: string
   name: string
-  language_id: string
-  repo_link: string
+}
+
+export interface Test {
+  id: string
+  name: string
 }

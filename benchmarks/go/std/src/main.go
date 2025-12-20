@@ -92,7 +92,7 @@ func main() {
 	// Format expected by the benchmark harness: "version,comma-separated-tests"
 	mux.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "1.0.0,hello_world,json,db_read_one,db_read_paging,db_write,static_files")
+		fmt.Fprint(w, "1.21,hello_world,json,db_read_one,db_read_paging,db_write,static_files")
 	})
 
 

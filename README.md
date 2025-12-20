@@ -75,14 +75,6 @@ npm run dev
 
 Open http://localhost:5173 to view the dashboard.
 
-### 5. Database Setup (Optional - for database benchmarks)
-
-```bash
-cd benchmarks_db
-docker build -t wfb-db .
-docker run -d -p 5432:5432 --name wfb-db wfb-db
-```
-
 ## Usage
 
 ### CLI Commands
@@ -149,18 +141,19 @@ Define supported languages and frameworks:
 Configure local benchmarking parameters:
 
 ```yaml
-# Local environment settings
-docker_network: wfb-network
-database:
-  host: db
-  port: 5432
-  user: benchmark
-  password: benchmark
-  name: benchmark
+# Local environment config
 wrk:
-  duration: 10s
-  threads: 4
-  connections: 100
+  duration_secs: 15
+  threads: 2
+  connections: 32
+
+limits:
+  db:
+    cpus: 2
+    memory_mb: 1024
+  app:
+    cpus: 4
+    memory_mb: 1024
 ```
 
 ## Development

@@ -1,0 +1,311 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	_ "github.com/lib/pq"
+)
+
+var db *sql.DB
+
+func initDB() error {
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "db"
+	}
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "benchmark"
+	}
+	pass := os.Getenv("DB_PASSWORD")
+	if pass == "" {
+		pass = "benchmark"
+	}
+	name := os.Getenv("DB_NAME")
+	if name == "" {
+		name = "benchmark"
+	}
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		port = "5432"
+	}
+	conn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port, name)
+	var err error
+	db, err = sql.Open("postgres", conn)
+	if err != nil {
+		return err
+	}
+	db.SetMaxOpenConns(25)
+	db.SetConnMaxIdleTime(5 * time.Minute)
+	return db.Ping()
+}
+
+func main() {
+	// try to init DB but don't fail server start if DB isn't ready yet
+	go func() {
+		for i := 0; i < 10; i++ {
+			if err := initDB(); err == nil {
+				return
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		// Return OK only when DB is ready
+		dbReady := false
+		if db == nil {
+			if err := initDB(); err == nil {
+				dbReady = true
+			}
+		} else {
+			if err := db.Ping(); err == nil {
+				dbReady = true
+			}
+		}
+		if dbReady {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "OK")
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, "DB unavailable")
+	})
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Hello, World!")
+	})
+
+
+	// Info endpoint: comma-separated supported tests, then version as last element.
+	// Format expected by the benchmark harness: "version,comma-separated-tests"
+	mux.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "1.0.0,hello_world,json,db_read_one,db_read_paging,db_write")
+	})
+
+
+	// JSON endpoint: /json/{r1}/{r2}
+	mux.HandleFunc("/json/", func(w http.ResponseWriter, r *http.Request) {
+		// path after /json/
+		tail := r.URL.Path[len("/json/"):]
+		parts := strings.SplitN(tail, "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "invalid path")
+			return
+		}
+		aStr := parts[0]
+		bStr := parts[1]
+		// parse as integers
+		aInt, err := strconv.Atoi(aStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "invalid numeric segment")
+			return
+		}
+		bInt, err := strconv.Atoi(bStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "invalid numeric segment")
+			return
+		}
+		// try to echo x-request-id header back
+		reqid := r.Header.Get("x-request-id")
+		if reqid != "" {
+			w.Header().Set("x-request-id", reqid)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		// structured response using encoding/json
+		resp := struct {
+			Field1    int    `json:"field1"`
+			Field2    int    `json:"field2"`
+		}{
+			Field1:    aInt,
+			Field2:    bInt,
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	// DB read one: /db/read/one?id=N
+	mux.HandleFunc("/db/read/one", func(w http.ResponseWriter, r *http.Request) {
+		// echo request id header
+		reqid := r.Header.Get("x-request-id")
+		if reqid != "" {
+			w.Header().Set("x-request-id", reqid)
+		}
+		idStr := r.URL.Query().Get("id")
+		if idStr == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "missing id")
+			return
+		}
+		id, err := strconv.Atoi(idStr)
+		if err != nil || id <= 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "invalid id")
+			return
+		}
+		// ensure DB is initialized
+		if db == nil {
+			if err := initDB(); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "db not available")
+				return
+			}
+		}
+		var name string
+		var createdAt time.Time
+		var updatedAt time.Time
+		row := db.QueryRow("SELECT name, created_at, updated_at FROM hello_world WHERE id = $1", id)
+		if err := row.Scan(&name, &createdAt, &updatedAt); err != nil {
+			if err == sql.ErrNoRows {
+				w.WriteHeader(http.StatusNotFound)
+				fmt.Fprint(w, "not found")
+				return
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "db error")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		resp := struct {
+			ID        int    `json:"id"`
+			Name      string `json:"name"`
+			CreatedAt string `json:"created_at"`
+			UpdatedAt string `json:"updated_at"`
+		}{
+			ID:        id,
+			Name:      name,
+			CreatedAt: createdAt.Format(time.RFC3339),
+			UpdatedAt: updatedAt.Format(time.RFC3339),
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	// DB read many: /db/read/many?offset=N&limit=M
+	mux.HandleFunc("/db/read/many", func(w http.ResponseWriter, r *http.Request) {
+		reqid := r.Header.Get("x-request-id")
+		if reqid != "" {
+			w.Header().Set("x-request-id", reqid)
+		}
+		offsetStr := r.URL.Query().Get("offset")
+		limitStr := r.URL.Query().Get("limit")
+		if offsetStr == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "missing offset")
+			return
+		}
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil || offset < 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "invalid offset")
+			return
+		}
+		limit := 50
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+				limit = l
+			}
+		}
+		if db == nil {
+			if err := initDB(); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "db not available")
+				return
+			}
+		}
+		rows, err := db.Query("SELECT id, name, created_at, updated_at FROM hello_world ORDER BY id ASC LIMIT $1 OFFSET $2", limit, offset)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "db error")
+			return
+		}
+		defer rows.Close()
+		type Item struct {
+			ID        int    `json:"id"`
+			Name      string `json:"name"`
+			CreatedAt string `json:"created_at"`
+			UpdatedAt string `json:"updated_at"`
+		}
+		items := make([]Item, 0, limit)
+		for rows.Next() {
+			var id int
+			var name string
+			var createdAt time.Time
+			var updatedAt time.Time
+			if err := rows.Scan(&id, &name, &createdAt, &updatedAt); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "db error")
+				return
+			}
+			items = append(items, Item{
+				ID:        id,
+				Name:      name,
+				CreatedAt: createdAt.Format(time.RFC3339),
+				UpdatedAt: updatedAt.Format(time.RFC3339),
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(items)
+	})
+
+	// DB write/insert: /db/write/insert?name=N
+	mux.HandleFunc("/db/write/insert", func(w http.ResponseWriter, r *http.Request) {
+		reqid := r.Header.Get("x-request-id")
+		if reqid != "" {
+			w.Header().Set("x-request-id", reqid)
+		}
+		name := r.URL.Query().Get("name")
+		if name == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "missing name")
+			return
+		}
+		if db == nil {
+			if err := initDB(); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "db not available")
+				return
+			}
+		}
+		var id int
+		var createdAt time.Time
+		var updatedAt time.Time
+		err := db.QueryRow("INSERT INTO hello_world (name, created_at, updated_at) VALUES ($1, NOW(), NOW()) RETURNING id, created_at, updated_at", name).Scan(&id, &createdAt, &updatedAt)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "db error")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		resp := struct {
+			ID        int    `json:"id"`
+			Name      string `json:"name"`
+			CreatedAt string `json:"created_at"`
+			UpdatedAt string `json:"updated_at"`
+		}{
+			ID:        id,
+			Name:      name,
+			CreatedAt: createdAt.Format(time.RFC3339),
+			UpdatedAt: updatedAt.Format(time.RFC3339),
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	http.ListenAndServe(":8000", mux)
+}

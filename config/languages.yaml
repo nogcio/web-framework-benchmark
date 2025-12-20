@@ -1,0 +1,9 @@
+- name: Go
+  url: https://golang.org
+  frameworks:
+    - name: stdlib
+      path: benchmarks/go/std
+      url: https://golang.org/pkg/net/http/
+      tags:
+        go: "1.21"
+        platform: go

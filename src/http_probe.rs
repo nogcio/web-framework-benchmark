@@ -12,9 +12,11 @@ pub async fn wait_server_ready(host: &str, timeout: Duration) -> Result<()> {
     let start = tokio::time::Instant::now();
     loop {
         if let Ok(resp) = client.get(format!("http://{}/health", host)).send().await
-            && resp.status().is_success() && resp.text().await.unwrap_or_default() == "OK" {
-                return Ok(());
-            }
+            && resp.status().is_success()
+            && resp.text().await.unwrap_or_default() == "OK"
+        {
+            return Ok(());
+        }
         if start.elapsed() > timeout {
             return Err(Error::ServerStartTimeoutError);
         }
@@ -33,10 +35,7 @@ pub async fn get_server_version(host: &str) -> Result<ServerInfo> {
         version = v.to_string();
     }
     for test in parts {
-        supported_tests.push(
-            test.try_into()
-                .map_err(Error::ServerInfoParseError)?,
-        );
+        supported_tests.push(test.try_into().map_err(Error::ServerInfoParseError)?);
     }
     Ok(ServerInfo {
         version,

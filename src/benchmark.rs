@@ -5,8 +5,8 @@ use std::time::Duration;
 use humanize_bytes::humanize_bytes_binary;
 
 use crate::benchmark_environment::BenchmarkEnvironment;
-use crate::wrk::WrkResult;
 use crate::prelude::*;
+use crate::wrk::WrkResult;
 
 const BENCHMARK_WARMUP_COOL_DOWN_SECS: u64 = 2;
 
@@ -24,7 +24,7 @@ pub struct BenchmarkResult {
     pub memory_usage: u64,
 }
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum BenchmarkTests {
     HelloWorld,
     Json,
@@ -45,7 +45,10 @@ where
     let db_ep = env.start_db().await?;
     let app_ep = env.start_app(&db_ep).await?;
     let server_info = env.get_app_info(&app_ep).await?;
-    info!("Version: {}, Tests: {:?}", server_info.version, server_info.supported_tests);
+    info!(
+        "Version: {}, Tests: {:?}",
+        server_info.version, server_info.supported_tests
+    );
     let version = server_info.version.clone();
     // stop the temporary run
     let _ = env.stop_app().await?;
@@ -82,7 +85,13 @@ where
             wrk_result.requests_per_sec,
             humanize_bytes_binary!(usage.memory_usage_bytes)
         );
-        results.insert(test, BenchmarkResult { wrk_result, memory_usage: usage.memory_usage_bytes });
+        results.insert(
+            test,
+            BenchmarkResult {
+                wrk_result,
+                memory_usage: usage.memory_usage_bytes,
+            },
+        );
     }
 
     Ok(BenchmarkResults { version, results })
@@ -101,5 +110,19 @@ impl TryFrom<&str> for BenchmarkTests {
             "static_files" => Ok(BenchmarkTests::StaticFiles),
             _ => Err(format!("Unknown benchmark test: {}", value)),
         }
+    }
+}
+
+impl std::fmt::Display for BenchmarkTests {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            BenchmarkTests::HelloWorld => "hello_world",
+            BenchmarkTests::Json => "json",
+            BenchmarkTests::DbReadOne => "db_read_one",
+            BenchmarkTests::DbReadPaging => "db_read_paging",
+            BenchmarkTests::DbWrite => "db_write",
+            BenchmarkTests::StaticFiles => "static_files",
+        };
+        write!(f, "{}", s)
     }
 }

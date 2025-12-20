@@ -2,7 +2,7 @@ use regex::Regex;
 use tokio::process::Command;
 
 use crate::{
-    parsers::{parse_latency, parse_metric},
+    parsers::{parse_latency, parse_metric, parse_transfer},
     prelude::*,
 };
 
@@ -10,7 +10,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct WrkResult {
     pub requests_per_sec: f64,
-    pub transfer_per_sec: String,
+    pub transfer_per_sec: u64,
     pub latency_avg: std::time::Duration,
     pub latency_stdev: std::time::Duration,
     pub latency_max: std::time::Duration,
@@ -101,7 +101,7 @@ fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
         } else if let Some(cap) = re_rps.captures(line) {
             requests_per_sec = cap.get(1).and_then(|m| m.as_str().parse::<f64>().ok());
         } else if let Some(cap) = re_tps.captures(line) {
-            transfer_per_sec = cap.get(1).map(|m| m.as_str().to_string());
+            transfer_per_sec = cap.get(1).and_then(|m| parse_transfer(m.as_str()));
         } else if let Some(cap) = re_latency_full.captures(line) {
             latency_avg = cap.get(1).and_then(|m| parse_latency(m.as_str()));
             latency_stdev = cap.get(2).and_then(|m| parse_latency(m.as_str()));

@@ -58,7 +58,10 @@ pub struct LocalState {
 
 impl LocalBenchmarkEnvironment {
     pub fn new(config: LocalConfig) -> Self {
-        LocalBenchmarkEnvironment { inner: tokio::sync::Mutex::new(None), config }
+        LocalBenchmarkEnvironment {
+            inner: tokio::sync::Mutex::new(None),
+            config,
+        }
     }
 
     fn find_free_port() -> u16 {
@@ -91,9 +94,9 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
             app_container,
             db_container,
             app_host_port: port,
-            monitor: None
+            monitor: None,
         };
-        
+
         let mut guard = self.inner.lock().await;
         *guard = Some(state);
         Ok(())
@@ -101,8 +104,10 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
 
     async fn start_db(&mut self) -> Result<Endpoint> {
         let guard = self.inner.lock().await;
-        let state = guard.as_ref().ok_or_else(|| Error::EnvironmentNotPrepared)?;
-        
+        let state = guard
+            .as_ref()
+            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
+
         docker::exec_run_container(
             &state.db_container,
             &state.db_image,
@@ -117,24 +122,31 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                     ("POSTGRES_USER".to_string(), "benchmark".to_string()),
                     ("POSTGRES_PASSWORD".to_string(), "benchmark".to_string()),
                 ]),
-            }
+            },
         )
         .await?;
 
-        Ok(Endpoint { address: DB_LINK_NAME.to_string(), port: 5432 })
+        Ok(Endpoint {
+            address: DB_LINK_NAME.to_string(),
+            port: 5432,
+        })
     }
 
     async fn stop_db(&mut self) -> Result<()> {
         let guard = self.inner.lock().await;
-        let state = guard.as_ref().ok_or_else(|| Error::EnvironmentNotPrepared)?;
+        let state = guard
+            .as_ref()
+            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
         let _ = docker::exec_stop_container(&state.db_container).await?;
         Ok(())
     }
 
     async fn start_app(&mut self, db_endpoint: &Endpoint) -> Result<Endpoint> {
         let mut guard = self.inner.lock().await;
-        let state = guard.as_mut().ok_or_else(|| Error::EnvironmentNotPrepared)?;
-        
+        let state = guard
+            .as_mut()
+            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
+
         docker::exec_run_container(
             &state.app_container,
             &state.app_image,
@@ -144,28 +156,36 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                 memory: self.config.limits.app.as_ref().and_then(|l| l.memory_mb),
                 link: Some(format!("{}:{}", state.db_container, DB_LINK_NAME)),
                 mount: Some("./benchmarks_data:/app/benchmarks_data".to_string()),
-                envs:
-            Some(vec![
-                ("DB_HOST".to_string(), db_endpoint.address.clone()),
-                ("DB_PORT".to_string(), db_endpoint.port.to_string()),
-                ("DB_USER".to_string(), "benchmark".to_string()),
-                ("DB_PASSWORD".to_string(), "benchmark".to_string()),
-                ("DB_NAME".to_string(), "benchmark".to_string()),
-            ])
-            }
+                envs: Some(vec![
+                    ("DB_HOST".to_string(), db_endpoint.address.clone()),
+                    ("DB_PORT".to_string(), db_endpoint.port.to_string()),
+                    ("DB_USER".to_string(), "benchmark".to_string()),
+                    ("DB_PASSWORD".to_string(), "benchmark".to_string()),
+                    ("DB_NAME".to_string(), "benchmark".to_string()),
+                ]),
+            },
         )
         .await?;
 
         state.monitor = Some(Monitor::new(state.app_container.clone()));
 
-        crate::http_probe::wait_server_ready(&format!("{}:{}", "localhost", state.app_host_port), Duration::from_secs(60)).await?;
+        crate::http_probe::wait_server_ready(
+            &format!("{}:{}", "localhost", state.app_host_port),
+            Duration::from_secs(60),
+        )
+        .await?;
 
-        Ok(Endpoint { address: "localhost".to_string(), port: state.app_host_port })
+        Ok(Endpoint {
+            address: "localhost".to_string(),
+            port: state.app_host_port,
+        })
     }
 
     async fn stop_app(&mut self) -> Result<ServerUsage> {
         let mut guard = self.inner.lock().await;
-        let state = guard.as_mut().ok_or_else(|| Error::EnvironmentNotPrepared)?;
+        let state = guard
+            .as_mut()
+            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
 
         let mem = if let Some(monitor) = state.monitor.take() {
             monitor.stop().await
@@ -174,19 +194,32 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         };
         let _ = crate::docker::exec_stop_container(&state.app_container).await?;
 
-        Ok(ServerUsage { memory_usage_bytes: mem })
+        Ok(ServerUsage {
+            memory_usage_bytes: mem,
+        })
     }
 
-    async fn get_app_info(&self, _app_endpoint: &Endpoint) -> Result<crate::http_probe::ServerInfo> {
+    async fn get_app_info(
+        &self,
+        _app_endpoint: &Endpoint,
+    ) -> Result<crate::http_probe::ServerInfo> {
         let guard = self.inner.lock().await;
-        let state = guard.as_ref().ok_or_else(|| Error::EnvironmentNotPrepared)?;
+        let state = guard
+            .as_ref()
+            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
         let target = format!("{}:{}", "localhost", state.app_host_port);
         crate::http_probe::get_server_version(&target).await
     }
 
-    async fn exec_wrk(&self, _app_endpoint: &Endpoint, script: Option<String>) -> Result<WrkResult> {
+    async fn exec_wrk(
+        &self,
+        _app_endpoint: &Endpoint,
+        script: Option<String>,
+    ) -> Result<WrkResult> {
         let guard = self.inner.lock().await;
-        let state = guard.as_ref().ok_or_else(|| Error::EnvironmentNotPrepared)?;
+        let state = guard
+            .as_ref()
+            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
         let url = format!("http://localhost:{}", state.app_host_port);
         let res = wrk::start_wrk(
             &url,
@@ -234,7 +267,10 @@ impl Monitor {
             }
             peak.load(Ordering::Relaxed)
         });
-        Monitor { token, handler: metrics_handler }
+        Monitor {
+            token,
+            handler: metrics_handler,
+        }
     }
 
     async fn stop(self) -> u64 {

@@ -45,3 +45,38 @@ pub fn parse_mem(s: &str) -> Option<u64> {
     };
     Some((value * multiplier) as u64)
 }
+
+pub fn parse_transfer(s: &str) -> Option<u64> {
+    let s = s.trim();
+    let re = regex::Regex::new(r"([\d.]+)([KMGT]?)B/?s?").unwrap();
+    re.captures(s).and_then(|cap| {
+        let value: f64 = cap.get(1)?.as_str().parse().ok()?;
+        let unit = cap.get(2)?.as_str();
+        let multiplier = match unit {
+            "" => 1.0,                                // B/s
+            "K" => 1024.0,                            // KB/s
+            "M" => 1024.0 * 1024.0,                   // MB/s
+            "G" => 1024.0 * 1024.0 * 1024.0,          // GB/s
+            "T" => 1024.0 * 1024.0 * 1024.0 * 1024.0, // TB/s
+            _ => return None,
+        };
+        Some((value * multiplier) as u64)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_transfer() {
+        assert_eq!(parse_transfer("1.5B"), Some(1));
+        assert_eq!(parse_transfer("1.5B/s"), Some(1));
+        assert_eq!(parse_transfer("1.5KB"), Some(1536));
+        assert_eq!(parse_transfer("2MB"), Some(2 * 1024 * 1024));
+        assert_eq!(
+            parse_transfer("1.5GB/s"),
+            Some((1.5 * 1024.0 * 1024.0 * 1024.0) as u64)
+        );
+    }
+}

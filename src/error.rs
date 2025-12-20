@@ -31,4 +31,10 @@ pub enum Error {
     JoinError(#[from] tokio::task::JoinError),
     #[error("Benchmark environment not prepared")]
     EnvironmentNotPrepared,
+    #[error("Lock poisoned")]
+    PoisonError,
+    #[error("Invalid environment type: {0}")]
+    InvalidEnvironment(String),
+    #[error("Invalid test type: {0}")]
+    InvalidTest(String),
 }

@@ -34,12 +34,6 @@ target/
 .#*
 .tmp*
 
-## Tags
-tags
-tags.*
-TAGS
-TAGS.*
-
 ## Node
 node_modules
 
@@ -68,3 +62,5 @@ secrets.yml
 
 # Benchmark static files directory (created at runtime)
 benchmarks_data/*.bin
+
+data/**/*.yaml

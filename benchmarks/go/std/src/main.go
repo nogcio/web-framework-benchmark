@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"io"
 
 	_ "github.com/lib/pq"
 )
@@ -91,7 +92,7 @@ func main() {
 	// Format expected by the benchmark harness: "version,comma-separated-tests"
 	mux.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "1.0.0,hello_world,json,db_read_one,db_read_paging,db_write")
+		fmt.Fprint(w, "1.0.0,hello_world,json,db_read_one,db_read_paging,db_write,static_files")
 	})
 
 
@@ -263,18 +264,37 @@ func main() {
 		_ = json.NewEncoder(w).Encode(items)
 	})
 
-	// DB write/insert: /db/write/insert?name=N
+	// DB write/insert: supports either POST JSON body {"name":"..."}
 	mux.HandleFunc("/db/write/insert", func(w http.ResponseWriter, r *http.Request) {
 		reqid := r.Header.Get("x-request-id")
 		if reqid != "" {
 			w.Header().Set("x-request-id", reqid)
 		}
-		name := r.URL.Query().Get("name")
+
+		var name string
+
+		// attempt to decode JSON body if Content-Type indicates JSON
+		if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+			var payload struct {
+				Name string `json:"name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+				name = payload.Name
+			}
+			// ensure body is closed (http server does that), but keep defensive
+			_ = r.Body.Close()
+		}
+		// fallback to query param if body didn't include name
+		if name == "" {
+			name = r.URL.Query().Get("name")
+		}
+
 		if name == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprint(w, "missing name")
 			return
 		}
+
 		if db == nil {
 			if err := initDB(); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -282,6 +302,7 @@ func main() {
 				return
 			}
 		}
+
 		var id int
 		var createdAt time.Time
 		var updatedAt time.Time
@@ -307,5 +328,44 @@ func main() {
 		_ = json.NewEncoder(w).Encode(resp)
 	})
 
+	// Serve files from disk: /files/{filename}
+	mux.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
+		// path after /files/
+		tail := r.URL.Path[len("/files/"):]
+		if tail == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "missing filename")
+			return
+		}
+		// only allow specific filenames for safety
+		allowed := map[string]bool{
+			"15kb.bin": true,
+			"1mb.bin":  true,
+			"10mb.bin": true,
+		}
+		if !allowed[tail] {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, "not found")
+			return
+		}
+		// file path under benchmarks_data
+		fpath := fmt.Sprintf("benchmarks_data/%s", tail)
+		f, err := os.Open(fpath)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "file open error")
+			return
+		}
+		defer f.Close()
+		// set headers
+		fi, err := f.Stat()
+		if err == nil {
+			w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		// stream file
+		_, _ = io.Copy(w, f)
+	})
 	http.ListenAndServe(":8000", mux)
 }

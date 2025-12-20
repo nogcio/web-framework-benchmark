@@ -1,28 +1,25 @@
 version: "0.2"
 ignorePaths:
-  [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/build/**",
-    "**/.git/**",
-    "**/target/**",
-    "Cargo.toml",
-    ".gitignore",
-    ".gitattributes",
-  ]
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/.git/**"
+  - "**/target/**"
+  - Cargo.toml
+  - .gitignore
+  - .gitattributes
 dictionaryDefinitions: []
 dictionaries: []
 words:
-  [
-    "chrono",
-    "clippy",
-    "cpus",
-    "Deque",
-    "dotenv",
-    "dotenvy",
-    "serde",
-    "stdev",
-    "thiserror",
-  ]
+  - chrono
+  - clippy
+  - cpus
+  - Deque
+  - dotenv
+  - dotenvy
+  - rngs
+  - serde
+  - stdev
+  - thiserror
 ignoreWords: []
 import: []

@@ -24,17 +24,21 @@ function request()
   seq = seq + 1
   local name = rand_name()
   local thread_id = 0
-  if wrk.thread and wrk.thread.id then
+    if wrk.thread and wrk.thread.id then
     thread_id = tonumber(wrk.thread.id) or 0
   end
-  local reqid = string.format("%d-%d", thread_id, seq)
-  -- encode name as query param (simple, names avoid special chars)
-  local path = string.format("/db/write/insert?name=%s", name)
-  local hdrs = { ["x-request-id"] = reqid }
-  -- store expected name in headers table so response() can validate by matching reqid->name mapping
+    local reqid = string.format("%d-%d", thread_id, seq)
+    -- send name as JSON in the POST body
+    local path = "/db/write/insert"
+    local body = string.format('{"name":"%s"}', name)
+    local hdrs = {
+      ["x-request-id"] = reqid,
+      ["content-type"] = "application/json"
+    }
+    -- store expected name in headers table so response() can validate by matching reqid->name mapping
   pending = pending or {}
   pending[reqid] = name
-  return wrk.format("GET", path, hdrs)
+    return wrk.format("POST", path, hdrs, body)
 end
 
 function response(status, headers, body)

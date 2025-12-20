@@ -65,3 +65,6 @@ secrets.yml
 *.secret
 .ssh/
 .aws/
+
+# Benchmark static files directory (created at runtime)
+benchmarks_data/*.bin

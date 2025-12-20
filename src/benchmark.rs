@@ -41,9 +41,11 @@ pub enum BenchmarkTests {
     DbReadOne,
     DbReadPaging,
     DbWrite,
+    StaticFiles,
 }
 
 pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
+    let app_benchmark_port = find_free_port();
     info!("Running benchmark for path: {:?}", path);
     let docker_tag = uuid::Uuid::new_v4().to_string();
     let container_name = uuid::Uuid::new_v4().to_string();
@@ -62,19 +64,21 @@ pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
         DB_CPUS,
         DB_MEMORY_MB,
         None::<String>,
+        None::<String>,
     )
     .await?;
     docker::exec_run_container(
         &container_name,
         &docker_tag,
-        Some("8000:8000"),
+        Some(&format!("{}:8000", app_benchmark_port)),
         BENCHMARK_CPUS,
         BENCHMARK_MEMORY_MB,
         Some("db:db"),
+        Some("./benchmarks_data:/app/benchmarks_data"),
     )
     .await?;
-    http_probe::wait_server_ready("localhost:8000", Duration::from_secs(60)).await?;
-    let server_info = http_probe::get_server_version("localhost:8000").await?;
+    http_probe::wait_server_ready(&format!("localhost:{}", app_benchmark_port), Duration::from_secs(60)).await?;
+    let server_info = http_probe::get_server_version(&format!("localhost:{}", app_benchmark_port)).await?;
     info!(
         "Version: {}, Tests: {:?}",
         server_info.version, server_info.supported_tests
@@ -93,27 +97,24 @@ pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
             DB_CPUS,
             DB_MEMORY_MB,
             None::<String>,
+            None::<String>,
         )
         .await?;
         docker::exec_run_container(
             &container_name,
             &docker_tag,
-            Some("8000:8000"),
+            Some(&format!("{}:8000", app_benchmark_port)),
             BENCHMARK_CPUS,
             BENCHMARK_MEMORY_MB,
             Some("db:db"),
+            Some("./benchmarks_data:/app/benchmarks_data"),
         )
         .await?;
-        http_probe::wait_server_ready("localhost:8000", Duration::from_secs(60)).await?;
-        let server_info = http_probe::get_server_version("localhost:8000").await?;
-        info!(
-            "Version: {}, Tests: {:?}",
-            server_info.version, server_info.supported_tests
-        );
+        http_probe::wait_server_ready(&format!("localhost:{}", app_benchmark_port), Duration::from_secs(60)).await?;
 
         info!("Warmup run");
         let _ = wrk::start_wrk(
-            "http://localhost:8000",
+            &format!("http://localhost:{}", app_benchmark_port),
             BENCHMARK_WARMUP_SECS,
             BENCHMARK_THREADS,
             BENCHMARK_CONNECTIONS,
@@ -129,7 +130,7 @@ pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
         let wrk_result = match test {
             BenchmarkTests::HelloWorld => {
                 wrk::start_wrk(
-                    "http://localhost:8000",
+                    &format!("http://localhost:{}", app_benchmark_port),
                     BENCHMARK_DURATION_SECS,
                     BENCHMARK_THREADS,
                     BENCHMARK_CONNECTIONS,
@@ -139,7 +140,7 @@ pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
             }
             BenchmarkTests::Json => {
                 wrk::start_wrk(
-                    "http://localhost:8000",
+                    &format!("http://localhost:{}", app_benchmark_port),
                     BENCHMARK_DURATION_SECS,
                     BENCHMARK_THREADS,
                     BENCHMARK_CONNECTIONS,
@@ -149,7 +150,7 @@ pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
             }
             BenchmarkTests::DbReadOne => {
                 wrk::start_wrk(
-                    "http://localhost:8000",
+                    &format!("http://localhost:{}", app_benchmark_port),
                     BENCHMARK_DURATION_SECS,
                     BENCHMARK_THREADS,
                     BENCHMARK_CONNECTIONS,
@@ -159,7 +160,7 @@ pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
             }
             BenchmarkTests::DbReadPaging => {
                 wrk::start_wrk(
-                    "http://localhost:8000",
+                    &format!("http://localhost:{}", app_benchmark_port),
                     BENCHMARK_DURATION_SECS,
                     BENCHMARK_THREADS,
                     BENCHMARK_CONNECTIONS,
@@ -169,11 +170,21 @@ pub async fn run_benchmark(path: &Path) -> Result<BenchmarkResults> {
             }
             BenchmarkTests::DbWrite => {
                 wrk::start_wrk(
-                    "http://localhost:8000",
+                    &format!("http://localhost:{}", app_benchmark_port),
                     BENCHMARK_DURATION_SECS,
                     BENCHMARK_THREADS,
                     BENCHMARK_CONNECTIONS,
                     Some("scripts/wrk_db_write.lua"),
+                )
+                .await?
+            }
+            BenchmarkTests::StaticFiles => {
+                wrk::start_wrk(
+                    &format!("http://localhost:{}", app_benchmark_port),
+                    BENCHMARK_DURATION_SECS,
+                    BENCHMARK_THREADS,
+                    BENCHMARK_CONNECTIONS,
+                    Some("scripts/wrk_static_files.lua"),
                 )
                 .await?
             }
@@ -230,6 +241,14 @@ fn monitor_docker_memory_usage(
     })
 }
 
+fn find_free_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("Failed to bind to address")
+        .local_addr()
+        .unwrap()
+        .port()
+}
+
 impl TryFrom<&str> for BenchmarkTests {
     type Error = String;
 
@@ -240,6 +259,7 @@ impl TryFrom<&str> for BenchmarkTests {
             "db_read_one" => Ok(BenchmarkTests::DbReadOne),
             "db_read_paging" => Ok(BenchmarkTests::DbReadPaging),
             "db_write" => Ok(BenchmarkTests::DbWrite),
+            "static_files" => Ok(BenchmarkTests::StaticFiles),
             _ => Err(format!("Unknown benchmark test: {}", value)),
         }
     }

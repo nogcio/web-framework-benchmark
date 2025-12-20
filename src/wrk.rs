@@ -30,8 +30,17 @@ pub async fn start_wrk(
     connections: u32,
     script: Option<&str>,
 ) -> Result<WrkResult> {
-    let mut cmd = Command::new("wrk");
-    cmd.arg("-t")
+    let url = url.replace("localhost", "host.docker.internal");
+
+    let mut cmd = Command::new("docker");
+    cmd.arg("run")
+        .arg("--rm")
+        .arg("-v")
+        .arg("./scripts:/work/scripts")
+        .arg("-w")
+        .arg("/work")
+        .arg("williamyeh/wrk")
+        .arg("-t")
         .arg(threads.to_string())
         .arg("-c")
         .arg(connections.to_string())
@@ -41,7 +50,7 @@ pub async fn start_wrk(
     if let Some(s) = script {
         cmd.arg("-s").arg(s);
     }
-    cmd.arg(url);
+    cmd.arg(&url);
     let output_str = exec(&mut cmd).await?;
     let wrk_output_vec: Vec<String> = output_str.lines().map(|s| s.to_string()).collect();
     let wrk_result = parse_wrk_output(&wrk_output_vec)?;

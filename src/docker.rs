@@ -42,6 +42,7 @@ pub async fn exec_run_container(
     cpus: u32,
     memory: u32,
     link: Option<impl Into<String>>,
+    mount: Option<impl Into<String>>,
 ) -> Result<()> {
     let mut cmd = Command::new("docker");
     cmd.arg("run")
@@ -58,6 +59,9 @@ pub async fn exec_run_container(
     }
     if let Some(link_str) = link {
         cmd.arg("--link").arg(link_str.into());
+    }
+    if let Some(mount_str) = mount {
+        cmd.arg("-v").arg(mount_str.into());
     }
     cmd.arg(tag);
     exec(&mut cmd).await?;

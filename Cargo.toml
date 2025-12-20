@@ -30,3 +30,4 @@ regex = "1.12.2"
 humanize-bytes = "1.0.6"
 chrono = { version = "0.4.42", features = ["serde"] }
 axum = "0.8.7"
+rand = "0.8"

@@ -1,5 +1,4 @@
 pub mod local;
-pub mod remote;
 
 use crate::{http_probe::ServerInfo, prelude::*, wrk::WrkResult};
 use serde::Deserialize;

@@ -50,9 +50,7 @@ async fn main() -> Result<()> {
                     info!("Benchmark completed: {:?}", result);
                 }
                 cli::BenchmarkEnvironmentType::Remote => {
-                    let mut env = crate::benchmark_environment::remote::RemoteBenchmarkEnvironment::new();
-                    let result = benchmark::run_benchmark(&mut env, &path).await?;
-                    info!("Benchmark completed: {:?}", result);
+                    unimplemented!()
                 }
             }
         }

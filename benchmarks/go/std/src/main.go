@@ -96,47 +96,76 @@ func main() {
 	})
 
 
-	// JSON endpoint: /json/{r1}/{r2}
+	// JSON endpoint: supports GET /json/{r1}/{r2} (original numeric echo)
+	// and POST /json/{from}/{to} which replaces servlet-name occurrences
 	mux.HandleFunc("/json/", func(w http.ResponseWriter, r *http.Request) {
 		// path after /json/
 		tail := r.URL.Path[len("/json/"):]
 		parts := strings.SplitN(tail, "/", 2)
+		// expect /json/{from}/{to}
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprint(w, "invalid path")
 			return
 		}
-		aStr := parts[0]
-		bStr := parts[1]
-		// parse as integers
-		aInt, err := strconv.Atoi(aStr)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "invalid numeric segment")
-			return
-		}
-		bInt, err := strconv.Atoi(bStr)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "invalid numeric segment")
-			return
-		}
-		// try to echo x-request-id header back
+		from := parts[0]
+		to := parts[1]
+		// echo request id header
 		reqid := r.Header.Get("x-request-id")
 		if reqid != "" {
 			w.Header().Set("x-request-id", reqid)
 		}
+		defer r.Body.Close()
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "failed read body")
+			return
+		}
+		var data interface{}
+		if err := json.Unmarshal(body, &data); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "invalid json")
+			return
+		}
+		// recursive replace function
+		var replace func(interface{}) int
+		replace = func(v interface{}) int {
+			switch x := v.(type) {
+			case map[string]interface{}:
+				count := 0
+				for k, val := range x {
+					if k == "servlet-name" {
+						if s, ok := val.(string); ok && s == from {
+							x[k] = to
+							count++
+						}
+					} else {
+						count += replace(val)
+					}
+				}
+				return count
+			case []interface{}:
+				count := 0
+				for _, e := range x {
+					count += replace(e)
+				}
+				return count
+			default:
+				return 0
+			}
+		}
+		_ = replace(data)
+		out, err := json.Marshal(data)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "encode error")
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		// structured response using encoding/json
-		resp := struct {
-			Field1    int    `json:"field1"`
-			Field2    int    `json:"field2"`
-		}{
-			Field1:    aInt,
-			Field2:    bInt,
-		}
-		_ = json.NewEncoder(w).Encode(resp)
+		w.Write(out)
+		return
 	})
 
 	// DB read one: /db/read/one?id=N

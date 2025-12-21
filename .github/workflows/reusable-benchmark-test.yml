@@ -101,7 +101,7 @@ jobs:
         
         # Test JSON Endpoint
         echo "Testing /json/..."
-        curl -v -f -X POST -d '{"servlet-name": "old", "other": "val"}' http://localhost:8000/json/old/new
+        curl -v -f -X POST -H "Content-Type: application/json" -d '{"servlet-name": "old", "other": "val"}' http://localhost:8000/json/old/new
         
         # Test DB Read One
         echo "Testing /db/read/one..."

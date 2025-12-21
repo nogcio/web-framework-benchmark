@@ -7,6 +7,8 @@
       tags:
         go: "1.21"
         platform: go
+        db: pq
+        db_version: "1.10.7"
 
 - name: JS
   url: https://nodejs.org
@@ -17,3 +19,30 @@
       tags:
         node: "25.2.1"
         platform: node
+        db: pg
+        db_version: "8.11.3"
+
+
+- name: Rust
+  url: https://www.rust-lang.org
+  frameworks:
+    - name: axum
+      path: benchmarks/rust/axum
+      url: https://github.com/tokio-rs/axum
+      tags:
+        rust: "1.92"
+        platform: rust
+        db: sqlx
+        db_version: "0.8.6"
+
+- name: C#
+  url: https://dotnet.microsoft.com/
+  frameworks:
+    - name: aspnetcore
+      path: benchmarks/csharp/aspnetcore
+      url: https://dotnet.microsoft.com/apps/aspnet
+      tags:
+        dotnet: "10.0"
+        platform: dotnet
+        db: npgsql
+        db_version: "10.0.1"

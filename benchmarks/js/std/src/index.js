@@ -20,7 +20,7 @@ const pool = new Pool({
   user: DB_USER,
   password: DB_PASSWORD,
   database: DB_NAME,
-  max: 20, // Adjust based on load
+  max: 128,
 });
 
 // Helper to send JSON response

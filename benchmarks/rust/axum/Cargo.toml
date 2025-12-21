@@ -13,3 +13,10 @@ sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-native-tls", 
 chrono = { version = "0.4.42", features = ["serde"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.8", features = ["request-id", "util"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+strip = true

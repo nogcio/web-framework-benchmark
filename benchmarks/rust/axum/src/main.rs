@@ -1,5 +1,4 @@
 use axum::{
-    body::Body,
     extract::{Path, Query, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
@@ -8,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::{PgPool, PgPoolOptions};
-use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{env, net::SocketAddr, path::PathBuf};
 use tokio::fs;
 
 #[derive(Clone)]
@@ -184,21 +183,11 @@ struct InsertQuery {
 
 async fn db_write_insert(
     State(state): State<AppState>,
-    query: Option<Query<InsertQuery>>,
+    Query(query): Query<InsertQuery>,
     body: Option<Json<InsertBody>>,
 ) -> impl IntoResponse {
-    let name = if let Some(Query(q)) = query {
-        if let Some(n) = q.name {
-            Some(n)
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    let name = if name.is_some() {
-        name
+    let name = if let Some(n) = query.name {
+        Some(n)
     } else if let Some(Json(b)) = body {
         Some(b.name)
     } else {

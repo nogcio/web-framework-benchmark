@@ -68,7 +68,7 @@ async fn main() {
         .route("/db/read/one", get(db_read_one))
         .route("/db/read/many", get(db_read_many))
         .route("/db/write/insert", post(db_write_insert))
-        .route("/files/*filename", get(static_files))
+        .route("/files/{*filename}", get(static_files))
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(state);
 

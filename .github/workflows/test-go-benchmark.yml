@@ -1,0 +1,109 @@
+name: Test Go Benchmark
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: benchmark
+          POSTGRES_PASSWORD: benchmark
+          POSTGRES_DB: benchmark
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Initialize Database
+      run: |
+        sudo apt-get install -y postgresql-client
+        PGPASSWORD=benchmark psql -h localhost -U benchmark -d benchmark -f benchmarks_db/init.sql
+
+    - name: Run Unit Tests
+      working-directory: ./benchmarks/go/std
+      run: |
+        go mod download
+        go test -v ./src/...
+
+    - name: Build
+      working-directory: ./benchmarks/go/std
+      run: |
+        go build -v -o wfb_go_std ./src
+
+    - name: Run and Test
+      working-directory: ./benchmarks/go/std
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: benchmark
+        DB_PASSWORD: benchmark
+        DB_NAME: benchmark
+        PORT: 8000
+        DATA_DIR: ${{ github.workspace }}/benchmarks_data
+      run: |
+        # Start the server in the background
+        ./wfb_go_std &
+        PID=$!
+        
+        # Wait for server to start (retry for 30s)
+        echo "Waiting for server to start..."
+        for i in {1..30}; do
+          if curl -s http://localhost:8000/health > /dev/null; then
+            echo "Server is up!"
+            break
+          fi
+          sleep 1
+        done
+        
+        # Test Health Endpoint
+        echo "Testing /health..."
+        curl -v -f http://localhost:8000/health
+
+        # Test Root Endpoint
+        echo "Testing /..."
+        curl -v -f http://localhost:8000/
+
+        # Test Info Endpoint
+        echo "Testing /info..."
+        curl -v -f http://localhost:8000/info
+        
+        # Test JSON Endpoint
+        echo "Testing /json/..."
+        curl -v -f -X POST -d '{"servlet-name": "old", "other": "val"}' http://localhost:8000/json/old/new
+        
+        # Test DB Read One
+        echo "Testing /db/read/one..."
+        curl -v -f "http://localhost:8000/db/read/one?id=1"
+
+        # Test DB Read Many
+        echo "Testing /db/read/many..."
+        curl -v -f "http://localhost:8000/db/read/many?offset=0&limit=10"
+
+        # Test DB Write Insert
+        echo "Testing /db/write/insert..."
+        curl -v -f -X POST "http://localhost:8000/db/write/insert?name=test_insert"
+
+        # Test Static Files
+        echo "Testing /files/15kb.bin..."
+        curl -v -f http://localhost:8000/files/15kb.bin > /dev/null
+        
+        # Kill the server
+        kill $PID

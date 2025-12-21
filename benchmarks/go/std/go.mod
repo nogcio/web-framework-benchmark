@@ -1,4 +1,4 @@
-module wfb_go_gin
+module wfb_go_std
 
 go 1.21
 

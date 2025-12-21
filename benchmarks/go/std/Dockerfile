@@ -6,10 +6,10 @@ COPY go.mod ./
 RUN go mod download
 COPY src/ ./src/
 RUN go mod tidy
-RUN go build -o wfb_go_gin ./src
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o wfb_go_std ./src
 
 FROM debian:bookworm-slim
 WORKDIR /app
-COPY --from=builder /app/wfb_go_gin /app/wfb_go_gin
+COPY --from=builder /app/wfb_go_std /app/wfb_go_std
 EXPOSE 8000
-CMD ["/app/wfb_go_gin"]
+CMD ["/app/wfb_go_std"]

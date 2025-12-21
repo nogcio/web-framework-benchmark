@@ -12,7 +12,7 @@ function setup(thread)
 end
 
 function init(args)
-  math.randomseed(os.time())
+  math.randomseed(os.time() + math.floor(os.clock() * 100000))
   pending = {}
   seq = 0
   errors = 0
@@ -65,10 +65,10 @@ function response(status, headers, body)
 end
 
 function done(summary, latency, requests)
-   local total_errors = 0
-   for index, thread in ipairs(threads) do
-      local errors    = thread:get("errors")
-      total_errors = total_errors + errors
-   end
-   print("Errors: " .. total_errors)
+  local total_errors = 0
+  for _, thread in ipairs(threads) do
+    local thread_errors = thread:get("errors") or 0
+    total_errors = total_errors + thread_errors
+  end
+  print("Errors: " .. total_errors)
 end

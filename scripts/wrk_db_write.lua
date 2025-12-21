@@ -11,9 +11,10 @@ function setup(thread)
 end
 
 function init(args)
-  math.randomseed(os.time())
+  math.randomseed(os.time() + math.floor(os.clock() * 100000))
   seq = 0
   errors = 0
+  pending = {}
 end
 
 local function rand_name()
@@ -24,21 +25,20 @@ function request()
   seq = seq + 1
   local name = rand_name()
   local thread_id = 0
-    if wrk.thread and wrk.thread.id then
+  if wrk.thread and wrk.thread.id then
     thread_id = tonumber(wrk.thread.id) or 0
   end
-    local reqid = string.format("%d-%d", thread_id, seq)
-    -- send name as JSON in the POST body
-    local path = "/db/write/insert"
-    local body = string.format('{"name":"%s"}', name)
-    local hdrs = {
-      ["x-request-id"] = reqid,
-      ["content-type"] = "application/json"
-    }
-    -- store expected name in headers table so response() can validate by matching reqid->name mapping
-  pending = pending or {}
+  local reqid = string.format("%d-%d", thread_id, seq)
+  -- send name as JSON in the POST body
+  local path = "/db/write/insert"
+  local body = string.format('{"name":"%s"}', name)
+  local hdrs = {
+    ["x-request-id"] = reqid,
+    ["content-type"] = "application/json"
+  }
+  -- store expected name in headers table so response() can validate by matching reqid->name mapping
   pending[reqid] = name
-    return wrk.format("POST", path, hdrs, body)
+  return wrk.format("POST", path, hdrs, body)
 end
 
 function response(status, headers, body)
@@ -74,9 +74,9 @@ end
 
 function done(summary, latency, requests)
   local total_errors = 0
-  for index, thread in ipairs(threads) do
-    local e = thread:get("errors") or 0
-    total_errors = total_errors + e
+  for _, thread in ipairs(threads) do
+    local thread_errors = thread:get("errors") or 0
+    total_errors = total_errors + thread_errors
   end
   print("Errors: " .. total_errors)
 end

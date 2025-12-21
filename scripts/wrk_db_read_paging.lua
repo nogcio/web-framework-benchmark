@@ -13,17 +13,15 @@ function setup(thread)
 end
 
 function init(args)
-  math.randomseed(os.time())
+  math.randomseed(os.time() + math.floor(os.clock() * 100000))
   pending = {}
   seq = 0
   errors = 0
 end
 
-local function min(a,b) if a<b then return a end return b end
-
 function request()
-  local maxOffset = math.max(0, max_id - 1)
-  local offset = math.random(0, maxOffset)
+  local max_offset = math.max(0, max_id - 1)
+  local offset = math.random(0, max_offset)
   seq = seq + 1
   local thread_id = 0
   if wrk.thread and wrk.thread.id then
@@ -78,10 +76,10 @@ function response(status, headers, body)
 end
 
 function done(summary, latency, requests)
-   local total_errors = 0
-   for index, thread in ipairs(threads) do
-      local e = thread:get("errors") or 0
-      total_errors = total_errors + e
-   end
-   print("Errors: " .. total_errors)
+  local total_errors = 0
+  for _, thread in ipairs(threads) do
+    local thread_errors = thread:get("errors") or 0
+    total_errors = total_errors + thread_errors
+  end
+  print("Errors: " .. total_errors)
 end

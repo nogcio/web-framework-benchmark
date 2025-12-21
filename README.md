@@ -198,12 +198,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 ### Adding Support for New Languages/Frameworks
 
-1. Fork the repository
-2. Create a new framework implementation in `benchmarks/<language>/<framework>/`
-3. Update `config/languages.yaml`
-4. Add Docker configuration if needed
-5. Test locally
-6. Submit a pull request
+See [ADDING_FRAMEWORK.md](ADDING_FRAMEWORK.md) for detailed instructions on how to add a new framework benchmark.
 
 ## License
 

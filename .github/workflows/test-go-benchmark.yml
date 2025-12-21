@@ -32,6 +32,13 @@ jobs:
         sudo apt-get install -y postgresql-client
         PGPASSWORD=benchmark psql -h localhost -U benchmark -d benchmark -f benchmarks_db/init.sql
 
+    - name: Create Test Data
+      run: |
+        mkdir -p benchmarks_data
+        dd if=/dev/zero of=benchmarks_data/15kb.bin bs=1024 count=15
+        dd if=/dev/zero of=benchmarks_data/1mb.bin bs=1024 count=1024
+        dd if=/dev/zero of=benchmarks_data/10mb.bin bs=1024 count=10240
+
     - name: Build Docker Image
       working-directory: ./benchmarks/go/std
       run: |
@@ -49,7 +56,7 @@ jobs:
           -e DB_NAME=benchmark \
           -e PORT=8000 \
           -e DATA_DIR=/benchmarks_data \
-          -v ${{ github.workspace }}/benchmarks_data:/benchmarks_data \
+          -v $(pwd)/benchmarks_data:/benchmarks_data \
           wfb-go-std
 
     - name: Test Endpoints

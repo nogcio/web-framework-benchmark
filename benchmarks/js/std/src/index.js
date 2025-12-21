@@ -167,7 +167,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = await pool.query(
-        'INSERT INTO hello_world (name) VALUES ($1) RETURNING *',
+        'INSERT INTO hello_world (name, created_at, updated_at) VALUES ($1, NOW(), NOW()) RETURNING *',
         [name]
       );
       return sendJSON(res, result.rows[0], 200, reqId);

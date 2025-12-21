@@ -122,7 +122,7 @@ Your application must implement the following endpoints. All JSON responses shou
 ### 5.7. Database: Write (Insert)
 *   **Path**: `POST /db/write/insert`
 *   **Input**: JSON `{"name": "..."}` OR Query Param `name`.
-*   **Logic**: Insert a new row into `hello_world` with the provided name and current timestamp.
+*   **Logic**: Insert a new row into `hello_world` with the provided name and current timestamp for `created_at` and `updated_at`.
 *   **Response JSON**: The created object (including the generated ID).
 *   **Status**: 200 OK
 
@@ -141,8 +141,8 @@ The PostgreSQL database has the following schema:
 CREATE TABLE hello_world (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
 );
 ```
 

@@ -87,7 +87,9 @@ pub async fn run_adaptive_connections(
     app_endpoint: &Endpoint,
     script: String,
 ) -> Result<WrkResult> {
-    const CONNECTION_COUNTS: &[u32] = &[32, 64, 128, 256, 512, 1024, 2048, 4096, 8192];
+    const CONNECTION_COUNTS: &[u32] = &[
+        32, 64, 128, 256, 512, 1024, 1536, 2048, 3072, 4096, 6144, 8192,
+    ];
     
     let mut best_result: Option<WrkResult> = None;
     let mut best_rps = 0.0;
@@ -103,17 +105,19 @@ pub async fn run_adaptive_connections(
             connections, result.requests_per_sec
         );
         
-        // Check if RPS increased
-        if result.requests_per_sec <= best_rps {
+        // Check if RPS dropped significantly (more than 1%)
+        if result.requests_per_sec < best_rps * 0.99 {
             info!(
-                "RPS did not increase ({:.2} <= {:.2}), stopping",
+                "RPS dropped significantly ({:.2} < {:.2} * 0.99), stopping",
                 result.requests_per_sec, best_rps
             );
             break;
         }
         
-        best_rps = result.requests_per_sec;
-        best_result = Some(result);
+        if result.requests_per_sec > best_rps {
+            best_rps = result.requests_per_sec;
+            best_result = Some(result);
+        }
     }
     
     best_result.ok_or_else(|| Error::System("No valid benchmark results".to_string()))

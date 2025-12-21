@@ -41,11 +41,19 @@ async fn main() {
     let db_name = env::var("DB_NAME").unwrap_or_else(|_| "benchmark".to_string());
     let db_url = format!("postgres://{}:{}@{}:{}/{}", db_user, db_pass, db_host, db_port, db_name);
 
-    let pool = PgPoolOptions::new()
-        .max_connections(128)
-        .connect(&db_url)
-        .await
-        .expect("Failed to connect to DB");
+    let pool = loop {
+        match PgPoolOptions::new()
+            .max_connections(128)
+            .connect(&db_url)
+            .await
+        {
+            Ok(pool) => break pool,
+            Err(e) => {
+                eprintln!("Failed to connect to DB: {}, retrying in 1s...", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
+        }
+    };
 
     let data_dir = env::var("DATA_DIR").unwrap_or_else(|_| "benchmarks_data".to_string());
     let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());

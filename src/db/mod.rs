@@ -5,7 +5,8 @@ use std::{
     collections::HashMap,
     fs,
     path::PathBuf,
-    sync::{Arc, RwLock}, time::Duration,
+    sync::{Arc, RwLock},
+    time::Duration,
 };
 
 use crate::{
@@ -184,10 +185,30 @@ impl Db {
                         latency_avg: result.latency_avg,
                         latency_stdev: result.latency_stdev,
                         latency_max: result.latency_max,
-                        latency50: result.latency_distribution.iter().find(|(p, _)| *p == 50).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
-                        latency75: result.latency_distribution.iter().find(|(p, _)| *p == 75).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
-                        latency90: result.latency_distribution.iter().find(|(p, _)| *p == 90).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
-                        latency99: result.latency_distribution.iter().find(|(p, _)| *p == 99).map(|(_, d)| *d).unwrap_or(Duration::ZERO),
+                        latency50: result
+                            .latency_distribution
+                            .iter()
+                            .find(|(p, _)| *p == 50)
+                            .map(|(_, d)| *d)
+                            .unwrap_or(Duration::ZERO),
+                        latency75: result
+                            .latency_distribution
+                            .iter()
+                            .find(|(p, _)| *p == 75)
+                            .map(|(_, d)| *d)
+                            .unwrap_or(Duration::ZERO),
+                        latency90: result
+                            .latency_distribution
+                            .iter()
+                            .find(|(p, _)| *p == 90)
+                            .map(|(_, d)| *d)
+                            .unwrap_or(Duration::ZERO),
+                        latency99: result
+                            .latency_distribution
+                            .iter()
+                            .find(|(p, _)| *p == 99)
+                            .map(|(_, d)| *d)
+                            .unwrap_or(Duration::ZERO),
                         latency_stdev_pct: result.latency_stdev_pct,
                         latency_distribution: result.latency_distribution.clone(),
                         req_per_sec_avg: result.req_per_sec_avg,
@@ -204,6 +225,26 @@ impl Db {
         Ok(results)
     }
 
+    pub fn has_framework_results(
+        &self,
+        run_id: u32,
+        environment: &str,
+        language: &str,
+        framework: &str,
+    ) -> Result<bool> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        if let Some(run) = inner.runs.iter().find(|r| r.id == run_id)
+            && let Some(fw_run) = run.frameworks.iter().find(|fw| {
+                fw.environment == environment
+                    && fw.language == language
+                    && fw.framework == framework
+            })
+        {
+            return Ok(!fw_run.results.is_empty());
+        }
+        Ok(false)
+    }
+
     pub fn save_run(
         &self,
         run_id: u32,
@@ -214,9 +255,9 @@ impl Db {
     ) -> Result<()> {
         let mut path = PathBuf::new();
         path.push("data");
-        path.push(format!("{}", run_id));
+        path.push(run_id.to_string());
         let run_manifest_path = path.join("manifest.yaml");
-        path.push(format!("{}", environment));
+        path.push(environment);
         path.push(&lang.name);
         path.push(&framework.name);
         let framework_manifest_path = path.join("manifest.yaml");

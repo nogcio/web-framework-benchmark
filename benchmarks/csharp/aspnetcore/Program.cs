@@ -3,8 +3,6 @@ using System.Text.Json.Nodes;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Configuration
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8000";
 var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "db";
 var dbPort = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
@@ -13,7 +11,7 @@ var dbPass = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "benchmark";
 var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "benchmark";
 var dataDir = Environment.GetEnvironmentVariable("DATA_DIR") ?? "benchmarks_data";
 
-var connectionString = $"Host={dbHost};Port={dbPort};Username={dbUser};Password={dbPass};Database={dbName}";
+var connectionString = $"Host={dbHost};Port={dbPort};Username={dbUser};Password={dbPass};Database={dbName};MaxPoolSize=128";
 
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
 var dataSource = dataSourceBuilder.Build();
@@ -22,7 +20,6 @@ builder.Services.AddSingleton(dataSource);
 
 var app = builder.Build();
 
-// Middleware for x-request-id
 app.Use(async (context, next) =>
 {
     if (context.Request.Headers.TryGetValue("x-request-id", out var requestId))
@@ -32,10 +29,8 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// 5.1. Root / Hello World
 app.MapGet("/", () => "Hello, World!");
 
-// 5.2. Health Check
 app.MapGet("/health", async (NpgsqlDataSource db) =>
 {
     try
@@ -50,10 +45,8 @@ app.MapGet("/health", async (NpgsqlDataSource db) =>
     }
 });
 
-// 5.3. Info
 app.MapGet("/info", () => "10.0,hello_world,json,db_read_one,db_read_paging,db_write,static_files");
 
-// 5.4. JSON Processing
 app.MapPost("/json/{from}/{to}", async (string from, string to, HttpRequest request) =>
 {
     try
@@ -79,7 +72,7 @@ void Traverse(JsonNode node, string from, string to)
             obj["servlet-name"] = to;
         }
 
-        foreach (var property in obj.ToList()) // ToList to avoid modification during iteration issues if any, though here we modify values not keys
+        foreach (var property in obj.ToList())
         {
             if (property.Value != null)
                 Traverse(property.Value, from, to);
@@ -95,7 +88,6 @@ void Traverse(JsonNode node, string from, string to)
     }
 }
 
-// 5.5. Database: Read One
 app.MapGet("/db/read/one", async (int id, NpgsqlDataSource db) =>
 {
     using var cmd = db.CreateCommand("SELECT id, name, created_at, updated_at FROM hello_world WHERE id = $1");
@@ -116,7 +108,6 @@ app.MapGet("/db/read/one", async (int id, NpgsqlDataSource db) =>
     return Results.NotFound();
 });
 
-// 5.6. Database: Read Many (Paging)
 app.MapGet("/db/read/many", async (int offset, int? limit, NpgsqlDataSource db) =>
 {
     var actualLimit = limit ?? 50;
@@ -139,7 +130,6 @@ app.MapGet("/db/read/many", async (int offset, int? limit, NpgsqlDataSource db) 
     return Results.Json(results);
 });
 
-// 5.7. Database: Write (Insert)
 app.MapPost("/db/write/insert", async (HttpRequest request, NpgsqlDataSource db) =>
 {
     string? name = request.Query["name"];
@@ -179,10 +169,8 @@ app.MapPost("/db/write/insert", async (HttpRequest request, NpgsqlDataSource db)
     return Results.StatusCode(500);
 });
 
-// 5.8. Static Files
 app.MapGet("/files/{filename}", async (string filename, HttpContext context) =>
 {
-    // Security check
     if (filename.Contains("..") || filename.Contains('/') || filename.Contains('\\'))
     {
         return Results.Forbid();

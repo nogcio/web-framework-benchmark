@@ -1,10 +1,10 @@
+use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::select;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use std::future::Future;
 
 #[derive(Debug)]
 pub struct Monitor {
@@ -13,8 +13,11 @@ pub struct Monitor {
 }
 
 impl Monitor {
-    pub fn new<F, Fut>(fetch_stats: F) -> Self 
-    where F: Fn() -> Fut + Send + 'static, Fut: Future<Output = Option<u64>> + Send {
+    pub fn new<F, Fut>(fetch_stats: F) -> Self
+    where
+        F: Fn() -> Fut + Send + 'static,
+        Fut: Future<Output = Option<u64>> + Send,
+    {
         let token = CancellationToken::new();
         let token_child = token.clone();
         let metrics_handler = tokio::spawn(async move {
@@ -59,7 +62,10 @@ pub fn get_db_env_vars() -> Vec<(String, String)> {
 }
 
 pub fn get_app_env_vars(db_host: &str, db_port: u16) -> Vec<(String, String)> {
-    let db_url = format!("postgres://benchmark:benchmark@{}:{}/benchmark", db_host, db_port);
+    let db_url = format!(
+        "postgres://benchmark:benchmark@{}:{}/benchmark",
+        db_host, db_port
+    );
     vec![
         ("DATABASE_URL".to_string(), db_url),
         ("DB_HOST".to_string(), db_host.to_string()),

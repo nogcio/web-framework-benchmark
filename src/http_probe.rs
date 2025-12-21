@@ -6,6 +6,12 @@ pub struct ServerInfo {
     pub supported_tests: Vec<BenchmarkTests>,
 }
 
+impl ServerInfo {
+    pub fn use_db(&self) -> bool {
+        self.supported_tests.contains(&BenchmarkTests::DbReadOne)
+    }
+}
+
 #[allow(clippy::collapsible_if)]
 pub async fn wait_server_ready(host: &str, timeout: Duration) -> Result<()> {
     let client = reqwest::Client::new();

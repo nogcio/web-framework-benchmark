@@ -34,7 +34,10 @@ pub enum BenchmarkTests {
     StaticFiles,
 }
 
-pub async fn run_benchmark(env: &mut dyn BenchmarkEnvironment, path: &Path) -> Result<BenchmarkResults> {
+pub async fn run_benchmark(
+    env: &mut dyn BenchmarkEnvironment,
+    path: &Path,
+) -> Result<BenchmarkResults> {
     info!("Running benchmark for path: {:?}", path);
     env.prepare(path).await?;
 
@@ -46,6 +49,7 @@ pub async fn run_benchmark(env: &mut dyn BenchmarkEnvironment, path: &Path) -> R
         "Version: {}, Tests: {:?}",
         server_info.version, server_info.supported_tests
     );
+
     let version = server_info.version.clone();
     // stop the temporary run
     let _ = env.stop_app().await?;
@@ -62,7 +66,7 @@ pub async fn run_benchmark(env: &mut dyn BenchmarkEnvironment, path: &Path) -> R
         let app_ep = env.start_app(&db_ep).await?;
 
         info!("Warmup run");
-        let _ = env.exec_wrk_warmup(&app_ep).await?;
+        let _ = env.exec_wrk_warmup(&app_ep, server_info.use_db()).await?;
         tokio::time::sleep(Duration::from_secs(BENCHMARK_WARMUP_COOL_DOWN_SECS)).await;
 
         info!("Starting adaptive benchmark run for test: {:?}", test);

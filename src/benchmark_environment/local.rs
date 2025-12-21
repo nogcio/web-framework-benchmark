@@ -2,9 +2,9 @@ use std::net::TcpListener;
 use std::path::Path;
 use std::time::Duration;
 
-use super::{BenchmarkEnvironment, Endpoint, ServerUsage, WrkConfig, WrkResult};
+use super::common::{Monitor, get_app_env_vars, get_db_env_vars};
 use super::config::LocalConfig;
-use super::common::{Monitor, get_db_env_vars, get_app_env_vars};
+use super::{BenchmarkEnvironment, Endpoint, ServerUsage, WrkResult};
 
 use crate::docker::{self, ContainerOptions};
 use crate::prelude::*;
@@ -48,13 +48,11 @@ impl LocalBenchmarkEnvironment {
 #[async_trait::async_trait]
 impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
     async fn prepare(&mut self, framework_path: &Path) -> Result<()> {
-        // generate unique image tags and container names
         let app_image = format!("benchmark_app:{}", uuid::Uuid::new_v4());
         let db_image = format!("benchmark_db:{}", uuid::Uuid::new_v4());
         let app_container = format!("app-{}", uuid::Uuid::new_v4());
         let db_container = format!("db-{}", uuid::Uuid::new_v4());
 
-        // build images (best-effort)
         let _ = crate::docker::exec_build(framework_path, &app_image).await;
         let _ = crate::docker::exec_build(Path::new("benchmarks_db"), &db_image).await;
 
@@ -124,7 +122,10 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                 memory: self.config.limits.app.as_ref().and_then(|l| l.memory_mb),
                 link: Some(format!("{}:{}", state.db_container, DB_LINK_NAME)),
                 mount: Some("./benchmarks_data:/app/benchmarks_data".to_string()),
-                envs: Some(get_app_env_vars(db_endpoint.address.as_str(), db_endpoint.port)),
+                envs: Some(get_app_env_vars(
+                    db_endpoint.address.as_str(),
+                    db_endpoint.port,
+                )),
             },
         )
         .await?;
@@ -133,7 +134,10 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         state.monitor = Some(Monitor::new(move || {
             let container_id = container_id.clone();
             async move {
-                crate::docker::exec_stats(&container_id).await.ok().map(|s| s.memory_usage)
+                crate::docker::exec_stats(&container_id)
+                    .await
+                    .ok()
+                    .map(|s| s.memory_usage)
             }
         }));
 
@@ -184,6 +188,7 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         _app_endpoint: &Endpoint,
         script: String,
         connections: u32,
+        duration: u64,
     ) -> Result<WrkResult> {
         let guard = self.inner.lock().await;
         let state = guard
@@ -192,7 +197,7 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         let url = format!("http://localhost:{}", state.app_host_port);
         let res = wrk::start_wrk(
             &url,
-            self.config.wrk.duration_secs,
+            duration,
             self.config.wrk.threads,
             connections,
             Some(&script),
@@ -201,20 +206,21 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         Ok(res)
     }
 
-    async fn exec_wrk_warmup(&self, app_endpoint: &Endpoint) -> Result<WrkResult> {
+    async fn exec_wrk_warmup(&self, _app_endpoint: &Endpoint, use_db: bool) -> Result<WrkResult> {
         let guard = self.inner.lock().await;
         let state = guard
             .as_ref()
             .ok_or_else(|| Error::EnvironmentNotPrepared)?;
-        let url = format!("http://localhost:{}", state.app_host_port);
-        let res = wrk::start_wrk(
-            &url,
-            5,
-            4,
-            32,
-            None,
-        )
-        .await?;
+        let url = if use_db {
+            format!("http://localhost:{}/db/read/one?id=1", state.app_host_port)
+        } else {
+            format!("http://localhost:{}/", state.app_host_port)
+        };
+        let res = wrk::start_wrk(&url, 5, 2, 8, None).await?;
         Ok(res)
+    }
+
+    fn wrk_duration(&self) -> u64 {
+        self.config.wrk.duration_secs
     }
 }

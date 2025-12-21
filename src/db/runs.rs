@@ -4,14 +4,20 @@ use crate::benchmark::BenchmarkTests;
 
 use super::languages;
 
-fn serialize_duration_as_nanos<S>(duration: &std::time::Duration, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_duration_as_nanos<S>(
+    duration: &std::time::Duration,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
     serializer.serialize_u128(duration.as_nanos())
 }
 
-fn serialize_latency_distribution<S>(dist: &Vec<(u8, std::time::Duration)>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_latency_distribution<S>(
+    dist: &Vec<(u8, std::time::Duration)>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {

@@ -1,17 +1,17 @@
 use axum::{
+    Router,
     extract::{Path, State},
     http::StatusCode,
     response::Json,
     routing::get,
-    Router,
 };
 use serde::Serialize;
 use std::collections::HashMap;
 
 use crate::{
-    db::{self, runs::RunResult},
     benchmark::BenchmarkTests,
     benchmark_environment::get_environment_config,
+    db::{self, runs::RunResult},
 };
 
 #[derive(Serialize)]
@@ -67,11 +67,15 @@ pub fn create_router(db: db::Db) -> Router {
 }
 
 async fn get_tags(State(db): State<db::Db>) -> Result<Json<Vec<String>>, StatusCode> {
-    let tags = db.get_tag_keys().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let tags = db
+        .get_tag_keys()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(tags))
 }
 
-async fn get_environments(State(db): State<db::Db>) -> Result<Json<Vec<EnvironmentInfo>>, StatusCode> {
+async fn get_environments(
+    State(db): State<db::Db>,
+) -> Result<Json<Vec<EnvironmentInfo>>, StatusCode> {
     let env_names = db
         .get_environments()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -80,7 +84,7 @@ async fn get_environments(State(db): State<db::Db>) -> Result<Json<Vec<Environme
     for name in env_names {
         if let Ok(config) = get_environment_config(&name) {
             environments.push(EnvironmentInfo {
-                name: name,
+                name,
                 display_name: config.name,
                 icon: config.icon.unwrap_or_else(|| "server".to_string()),
             });

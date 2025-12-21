@@ -23,7 +23,7 @@ use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use dotenvy::dotenv;
 use prelude::*;
 
@@ -54,6 +54,13 @@ async fn main() -> Result<()> {
             let languages = db.get_languages()?;
             for lang in languages {
                 for framework in &lang.frameworks {
+                    if db.has_framework_results(id, &environment, &lang.name, &framework.name)? {
+                        info!(
+                            "Skipping existing results for run {}, env {}, {} / {}",
+                            id, environment, lang.name, framework.name
+                        );
+                        continue;
+                    }
                     let benchmark_path = PathBuf::from(&framework.path);
                     let benchmark_results =
                         run_benchmark_for_path(&benchmark_path, &environment).await?;
@@ -67,17 +74,16 @@ async fn main() -> Result<()> {
             let addr: std::net::SocketAddr = format!("{}:{}", host, port).parse().unwrap();
             info!("Starting server on {}", addr);
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-            axum::serve(listener, app.into_make_service()).await.unwrap();
+            axum::serve(listener, app.into_make_service())
+                .await
+                .unwrap();
         }
     }
 
     Ok(())
 }
 
-async fn run_benchmark_for_path(
-    path: &Path,
-    environment: &str,
-) -> Result<BenchmarkResults> {
+async fn run_benchmark_for_path(path: &Path, environment: &str) -> Result<BenchmarkResults> {
     let mut env = crate::benchmark_environment::load_environment(environment)?;
     let result = benchmark::run_benchmark(&mut *env, path).await?;
     Ok(result)

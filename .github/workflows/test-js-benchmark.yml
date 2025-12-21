@@ -1,18 +1,18 @@
-name: Test Go Benchmark
+name: Test JS Benchmark
 
 on:
   push:
     branches: [ "main" ]
     paths:
-      - 'benchmarks/go/std/**'
+      - 'benchmarks/js/std/**'
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'benchmarks/go/std/**'
+      - 'benchmarks/js/std/**'
 
 jobs:
   test:
     uses: ./.github/workflows/reusable-benchmark-test.yml
     with:
-      framework_path: benchmarks/go/std
-      image_tag: wfb-go-std
+      framework_path: benchmarks/js/std
+      image_tag: wfb-js-std

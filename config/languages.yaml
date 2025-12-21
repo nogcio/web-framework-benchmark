@@ -7,3 +7,13 @@
       tags:
         go: "1.21"
         platform: go
+
+- name: JS
+  url: https://nodejs.org
+  frameworks:
+    - name: std
+      path: benchmarks/js/std
+      url: https://nodejs.org/api/http.html
+      tags:
+        node: "25.2.1"
+        platform: node

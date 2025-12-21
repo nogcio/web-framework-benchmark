@@ -1,0 +1,123 @@
+name: Reusable Benchmark Test
+
+on:
+  workflow_call:
+    inputs:
+      framework_path:
+        required: true
+        type: string
+        description: "Path to the framework directory (e.g., benchmarks/go/std)"
+      image_tag:
+        required: true
+        type: string
+        description: "Tag for the docker image (e.g., wfb-go-std)"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: benchmark
+          POSTGRES_PASSWORD: benchmark
+          POSTGRES_DB: benchmark
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Initialize Database
+      run: |
+        docker run --rm --network host \
+          -v ${{ github.workspace }}/benchmarks_db:/benchmarks_db \
+          -e PGPASSWORD=benchmark \
+          postgres:18 \
+          psql -h localhost -U benchmark -d benchmark -f /benchmarks_db/init.sql
+
+    - name: Create Test Data
+      run: |
+        mkdir -p benchmarks_data
+        dd if=/dev/zero of=benchmarks_data/15kb.bin bs=1024 count=15
+        dd if=/dev/zero of=benchmarks_data/1mb.bin bs=1024 count=1024
+        dd if=/dev/zero of=benchmarks_data/10mb.bin bs=1024 count=10240
+
+    - name: Build Docker Image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./${{ inputs.framework_path }}
+        tags: ${{ inputs.image_tag }}
+        load: true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run Docker Container
+      run: |
+        docker run -d \
+          --network host \
+          --name ${{ inputs.image_tag }} \
+          -e DB_HOST=localhost \
+          -e DB_PORT=5432 \
+          -e DB_USER=benchmark \
+          -e DB_PASSWORD=benchmark \
+          -e DB_NAME=benchmark \
+          -e PORT=8000 \
+          -e DATA_DIR=/benchmarks_data \
+          -v $(pwd)/benchmarks_data:/benchmarks_data \
+          ${{ inputs.image_tag }}
+
+    - name: Test Endpoints
+      run: |
+        # Wait for server to start (retry for 30s)
+        echo "Waiting for server to start..."
+        for i in {1..30}; do
+          if curl -s http://localhost:8000/health > /dev/null; then
+            echo "Server is up!"
+            break
+          fi
+          sleep 1
+        done
+        
+        # Test Health Endpoint
+        echo "Testing /health..."
+        curl -v -f http://localhost:8000/health
+
+        # Test Root Endpoint
+        echo "Testing /..."
+        curl -v -f http://localhost:8000/
+
+        # Test Info Endpoint
+        echo "Testing /info..."
+        curl -v -f http://localhost:8000/info
+        
+        # Test JSON Endpoint
+        echo "Testing /json/..."
+        curl -v -f -X POST -d '{"servlet-name": "old", "other": "val"}' http://localhost:8000/json/old/new
+        
+        # Test DB Read One
+        echo "Testing /db/read/one..."
+        curl -v -f "http://localhost:8000/db/read/one?id=1"
+
+        # Test DB Read Many
+        echo "Testing /db/read/many..."
+        curl -v -f "http://localhost:8000/db/read/many?offset=0&limit=10"
+
+        # Test DB Write Insert
+        echo "Testing /db/write/insert..."
+        curl -v -f -X POST "http://localhost:8000/db/write/insert?name=test_insert"
+
+        # Test Static Files
+        echo "Testing /files/15kb.bin..."
+        curl -v -f http://localhost:8000/files/15kb.bin > /dev/null
+        
+        # Stop container
+        docker stop ${{ inputs.image_tag }}

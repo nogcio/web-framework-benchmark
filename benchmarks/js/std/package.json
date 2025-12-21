@@ -1,0 +1,12 @@
+{
+  "name": "node-std",
+  "version": "25.2.1",
+  "description": "Node.js Standard Library Benchmark",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.3"
+  }
+}

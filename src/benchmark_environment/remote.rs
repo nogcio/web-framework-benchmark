@@ -55,6 +55,19 @@ impl RemoteBenchmarkEnvironment {
         Ok(())
     }
 
+    async fn ssh_check(host: &RemoteHostConfig, command: &str) -> Result<bool> {
+        let mut cmd = Command::new("ssh");
+        cmd.arg("-i")
+            .arg(&host.ssh_key_path)
+            .arg("-o")
+            .arg("StrictHostKeyChecking=no")
+            .arg(format!("{}@{}", host.user, host.ip))
+            .arg(command);
+
+        let output = cmd.output().await.map_err(|e| Error::System(format!("Failed to execute ssh: {}", e)))?;
+        Ok(output.status.success())
+    }
+
     async fn rsync(host: &RemoteHostConfig, src: &Path, dest: &str) -> Result<()> {
         debug!("Rsync {:?} to {}:{}", src, host.ip, dest);
         let mut cmd = Command::new("rsync");
@@ -89,10 +102,10 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
 
         // Cleanup existing containers
         debug!("Cleaning up containers on app host...");
-        Self::ssh(app_host, "docker rm -f $(docker ps -aq) || true").await?;
+        Self::ssh(app_host, "sudo docker rm -f $(sudo docker ps -aq) || true").await?;
         
         debug!("Cleaning up containers on db host...");
-        Self::ssh(db_host, "docker rm -f $(docker ps -aq) || true").await?;
+        Self::ssh(db_host, "sudo docker rm -f $(sudo docker ps -aq) || true").await?;
 
         // Prepare App
         // Copy framework code
@@ -117,9 +130,14 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
         Self::ssh(app_host, "mkdir -p ~/benchmarks_data").await?;
         Self::rsync(app_host, Path::new("benchmarks_data/"), "~/benchmarks_data").await?;
 
+        // Sync scripts to wrk host
+        let wrk_host = self.config.hosts.get("wrk").ok_or_else(|| Error::System("Missing wrk host config".to_string()))?;
+        debug!("Syncing scripts to wrk host...");
+        Self::rsync(wrk_host, Path::new("scripts/"), "~/scripts").await?;
+
         // Build App Image
         debug!("Building app image on remote host: {}", app_image);
-        Self::ssh(app_host, &format!("cd {} && docker build -t {} .", remote_app_path, app_image)).await?;
+        Self::ssh(app_host, &format!("cd {} && sudo docker build -t {} .", remote_app_path, app_image)).await?;
 
 
         // Prepare DB
@@ -132,7 +150,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
 
         // Build DB Image
         debug!("Building db image on remote host: {}", db_image);
-        Self::ssh(db_host, &format!("cd {} && docker build -t {} .", remote_db_path, db_image)).await?;
+        Self::ssh(db_host, &format!("cd {} && sudo docker build -t {} .", remote_db_path, db_image)).await?;
 
         let mut guard = self.inner.lock().await;
         *guard = Some(RemoteState {
@@ -157,7 +175,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
         // We assume standard postgres port 5432 for now, or we should make it configurable/discoverable
         // The benchmarks_db/Dockerfile usually exposes 5432
         let mut cmd_str = format!(
-            "docker run --name {} -d -p 5432:5432",
+            "sudo docker run --name {} -d -p 5432:5432",
             state.db_container
         );
         for (k, v) in get_db_env_vars() {
@@ -166,6 +184,21 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
         cmd_str.push_str(&format!(" {}", state.db_image));
         
         Self::ssh(db_host, &cmd_str).await?;
+
+        debug!("Waiting for database to be ready...");
+        let start = std::time::Instant::now();
+        loop {
+            if start.elapsed().as_secs() > 60 {
+                return Err(Error::System("Database startup timed out".to_string()));
+            }
+            
+            let check_cmd = format!("sudo docker exec {} pg_isready -h 127.0.0.1 -U benchmark", state.db_container);
+            if Self::ssh_check(db_host, &check_cmd).await? {
+                break;
+            }
+            
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
 
         debug!("Database started at {}:5432", db_host.internal_ip);
         Ok(Endpoint {
@@ -179,8 +212,8 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
         let guard = self.inner.lock().await;
         if let Some(state) = guard.as_ref() {
             let db_host = self.config.hosts.get("db").ok_or_else(|| Error::System("Missing db host config".to_string()))?;
-            let _ = Self::ssh(db_host, &format!("docker stop {}", state.db_container)).await;
-            let _ = Self::ssh(db_host, &format!("docker rm {}", state.db_container)).await;
+            let _ = Self::ssh(db_host, &format!("sudo docker stop {}", state.db_container)).await;
+            let _ = Self::ssh(db_host, &format!("sudo docker rm {}", state.db_container)).await;
         }
         Ok(())
     }
@@ -211,7 +244,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
         // The format depends on the database. Assuming Postgres.
         
         let mut cmd_str = format!(
-            "docker run --name {} -d -p 8000:8000 -v ~/benchmarks_data:/app/benchmarks_data",
+            "sudo docker run --name {} -d -p 8000:8000 -v ~/benchmarks_data:/app/benchmarks_data",
             state.app_container
         );
         for (k, v) in get_app_env_vars(&db_endpoint.address, db_endpoint.port) {
@@ -228,7 +261,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
             let container_id = container_id.clone();
             async move {
                 let stats_cmd = format!(
-                    "docker stats --no-stream --format \"{{{{.MemUsage}}}}\" {}",
+                    "sudo docker stats --no-stream --format \"{{{{.MemUsage}}}}\" {}",
                     container_id
                 );
                 let mut cmd = Command::new("ssh");
@@ -272,9 +305,9 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
             } else {
                 0
             };
-            
-            let _ = Self::ssh(app_host, &format!("docker stop {}", state.app_container)).await;
-            let _ = Self::ssh(app_host, &format!("docker rm {}", state.app_container)).await;
+
+            let _ = Self::ssh(app_host, &format!("sudo docker stop {}", state.app_container)).await;
+            let _ = Self::ssh(app_host, &format!("sudo docker rm {}", state.app_container)).await;
 
             debug!("Application stopped. Max memory usage: {} bytes", mem_usage);
             return Ok(ServerUsage {
@@ -299,10 +332,6 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
     ) -> Result<WrkResult> {
         debug!("Executing wrk benchmark with {} connections...", connections);
         let wrk_host = self.config.hosts.get("wrk").ok_or_else(|| Error::System("Missing wrk host config".to_string()))?;
-
-        // Sync scripts
-        debug!("Syncing scripts to wrk host...");
-        Self::rsync(wrk_host, Path::new("scripts/"), "~/scripts").await?;
 
         let duration = self.config.wrk.duration_secs;
         let threads = self.config.wrk.threads;

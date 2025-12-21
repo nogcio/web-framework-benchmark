@@ -71,11 +71,15 @@ func (app *App) initDB() error {
 func (app *App) waitForDB(retries int) error {
 	for i := 0; i < retries; i++ {
 		if err := app.initDB(); err == nil {
-			return nil
+			// Check if table exists and has data
+			var count int
+			if err := app.db.QueryRow("SELECT count(*) FROM hello_world").Scan(&count); err == nil && count > 0 {
+				return nil
+			}
 		}
 		time.Sleep(1 * time.Second)
 	}
-	return fmt.Errorf("database unavailable after %d retries", retries)
+	return fmt.Errorf("database or table unavailable after %d retries", retries)
 }
 
 func requestIDMiddleware(next http.Handler) http.Handler {
@@ -229,6 +233,7 @@ func (app *App) handleDBReadOne(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
+		fmt.Fprintf(os.Stderr, "DB error: %v\n", err)
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}

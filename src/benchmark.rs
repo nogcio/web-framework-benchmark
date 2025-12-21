@@ -24,7 +24,7 @@ pub struct BenchmarkResult {
     pub memory_usage: u64,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BenchmarkTests {
     HelloWorld,
     Json,
@@ -51,8 +51,12 @@ pub async fn run_benchmark(env: &mut dyn BenchmarkEnvironment, path: &Path) -> R
     let _ = env.stop_app().await?;
     env.stop_db().await?;
 
+    let mut tests = server_info.supported_tests.clone();
+    tests.sort();
+    tests.dedup();
+
     let mut results = HashMap::new();
-    for test in server_info.supported_tests {
+    for test in tests {
         info!("Running benchmark test: {:?}", test);
         let db_ep = env.start_db().await?;
         let app_ep = env.start_app(&db_ep).await?;
@@ -77,10 +81,11 @@ pub async fn run_benchmark(env: &mut dyn BenchmarkEnvironment, path: &Path) -> R
         env.stop_db().await?;
 
         info!(
-            "Benchmark completed for test: {:?}, req/sec: {}, mem: {}",
+            "Benchmark completed for test: {:?}, req/sec: {}, mem: {}, errors: {}",
             test,
             wrk_result.requests_per_sec,
-            humanize_bytes_binary!(usage.memory_usage_bytes)
+            humanize_bytes_binary!(usage.memory_usage_bytes),
+            wrk_result.errors
         );
         results.insert(
             test,

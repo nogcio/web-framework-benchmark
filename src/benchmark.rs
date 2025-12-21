@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use humanize_bytes::humanize_bytes_binary;
 
-use crate::benchmark_environment::BenchmarkEnvironment;
+use crate::benchmark_environment::{BenchmarkEnvironment, run_adaptive_connections};
 use crate::prelude::*;
 use crate::wrk::WrkResult;
 
@@ -34,10 +34,7 @@ pub enum BenchmarkTests {
     StaticFiles,
 }
 
-pub async fn run_benchmark<E>(env: &mut E, path: &Path) -> Result<BenchmarkResults>
-where
-    E: BenchmarkEnvironment + Send,
-{
+pub async fn run_benchmark(env: &mut dyn BenchmarkEnvironment, path: &Path) -> Result<BenchmarkResults> {
     info!("Running benchmark for path: {:?}", path);
     env.prepare(path).await?;
 
@@ -61,19 +58,19 @@ where
         let app_ep = env.start_app(&db_ep).await?;
 
         info!("Warmup run");
-        let _ = env.exec_wrk(&app_ep, None).await?;
+        let _ = env.exec_wrk_warmup(&app_ep).await?;
         tokio::time::sleep(Duration::from_secs(BENCHMARK_WARMUP_COOL_DOWN_SECS)).await;
 
-        info!("Starting benchmark run for test: {:?}", test);
+        info!("Starting adaptive benchmark run for test: {:?}", test);
         let script = match test {
-            BenchmarkTests::HelloWorld => Some("scripts/wrk_hello.lua"),
-            BenchmarkTests::Json => Some("scripts/wrk_json.lua"),
-            BenchmarkTests::DbReadOne => Some("scripts/wrk_db_read_one.lua"),
-            BenchmarkTests::DbReadPaging => Some("scripts/wrk_db_read_paging.lua"),
-            BenchmarkTests::DbWrite => Some("scripts/wrk_db_write.lua"),
-            BenchmarkTests::StaticFiles => Some("scripts/wrk_static_files.lua"),
+            BenchmarkTests::HelloWorld => "scripts/wrk_hello.lua",
+            BenchmarkTests::Json => "scripts/wrk_json.lua",
+            BenchmarkTests::DbReadOne => "scripts/wrk_db_read_one.lua",
+            BenchmarkTests::DbReadPaging => "scripts/wrk_db_read_paging.lua",
+            BenchmarkTests::DbWrite => "scripts/wrk_db_write.lua",
+            BenchmarkTests::StaticFiles => "scripts/wrk_static_files.lua",
         };
-        let wrk_result = env.exec_wrk(&app_ep, script.map(|s| s.to_string())).await?;
+        let wrk_result = run_adaptive_connections(env, &app_ep, script.to_string()).await?;
 
         // stop app and db, get memory usage from env
         let usage = env.stop_app().await?;

@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::BenchmarkEnvironmentType;
-
 #[derive(Debug, Parser)]
 #[command(name = "wfb")]
 #[command(about = "Web framework benchmark tool", long_about = None)]
@@ -18,13 +16,13 @@ pub enum Commands {
     Benchmark {
         path: PathBuf,
         #[arg(short, long, default_value = "local")]
-        environment: BenchmarkEnvironmentType,
+        environment: String,
     },
 
     Run {
         id: u32,
         #[arg(short, long, default_value = "local")]
-        environment: BenchmarkEnvironmentType,
+        environment: String,
     },
 
     Serve {

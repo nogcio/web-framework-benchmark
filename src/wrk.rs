@@ -58,7 +58,7 @@ pub async fn start_wrk(
     Ok(wrk_result)
 }
 
-fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
+pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
     let mut requests_per_sec = None;
     let mut transfer_per_sec = None;
     let mut latency_avg = None;

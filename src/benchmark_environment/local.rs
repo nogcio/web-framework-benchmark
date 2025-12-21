@@ -1,44 +1,16 @@
 use std::net::TcpListener;
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-use tokio::select;
-use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 
 use super::{BenchmarkEnvironment, Endpoint, ServerUsage, WrkConfig, WrkResult};
-use serde::Deserialize;
+use super::config::LocalConfig;
+use super::common::{Monitor, get_db_env_vars, get_app_env_vars};
 
 use crate::docker::{self, ContainerOptions};
 use crate::prelude::*;
 use crate::wrk;
 
-#[derive(Debug, Deserialize)]
-pub struct LocalConfig {
-    pub wrk: WrkConfig,
-    pub limits: LimitsConfig,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct LimitsConfig {
-    pub db: Option<ResourceLimitSpec>,
-    pub app: Option<ResourceLimitSpec>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ResourceLimitSpec {
-    pub cpus: Option<u32>,
-    pub memory_mb: Option<u32>,
-}
-
 const DB_LINK_NAME: &str = "db";
-
-#[derive(Debug)]
-pub(crate) struct Monitor {
-    token: CancellationToken,
-    handler: JoinHandle<u64>,
-}
 
 #[derive(Debug)]
 pub struct LocalBenchmarkEnvironment {
@@ -117,11 +89,7 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                 memory: self.config.limits.db.as_ref().and_then(|l| l.memory_mb),
                 link: None::<String>,
                 mount: None::<String>,
-                envs: Some(vec![
-                    ("POSTGRES_DB".to_string(), "benchmark".to_string()),
-                    ("POSTGRES_USER".to_string(), "benchmark".to_string()),
-                    ("POSTGRES_PASSWORD".to_string(), "benchmark".to_string()),
-                ]),
+                envs: Some(get_db_env_vars()),
             },
         )
         .await?;
@@ -156,18 +124,18 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                 memory: self.config.limits.app.as_ref().and_then(|l| l.memory_mb),
                 link: Some(format!("{}:{}", state.db_container, DB_LINK_NAME)),
                 mount: Some("./benchmarks_data:/app/benchmarks_data".to_string()),
-                envs: Some(vec![
-                    ("DB_HOST".to_string(), db_endpoint.address.clone()),
-                    ("DB_PORT".to_string(), db_endpoint.port.to_string()),
-                    ("DB_USER".to_string(), "benchmark".to_string()),
-                    ("DB_PASSWORD".to_string(), "benchmark".to_string()),
-                    ("DB_NAME".to_string(), "benchmark".to_string()),
-                ]),
+                envs: Some(get_app_env_vars(db_endpoint.address.as_str(), db_endpoint.port)),
             },
         )
         .await?;
 
-        state.monitor = Some(Monitor::new(state.app_container.clone()));
+        let container_id = state.app_container.clone();
+        state.monitor = Some(Monitor::new(move || {
+            let container_id = container_id.clone();
+            async move {
+                crate::docker::exec_stats(&container_id).await.ok().map(|s| s.memory_usage)
+            }
+        }));
 
         crate::http_probe::wait_server_ready(
             &format!("{}:{}", "localhost", state.app_host_port),
@@ -211,10 +179,11 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         crate::http_probe::get_server_version(&target).await
     }
 
-    async fn exec_wrk(
+    async fn exec_wrk_with_connections(
         &self,
         _app_endpoint: &Endpoint,
-        script: Option<String>,
+        script: String,
+        connections: u32,
     ) -> Result<WrkResult> {
         let guard = self.inner.lock().await;
         let state = guard
@@ -225,56 +194,27 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
             &url,
             self.config.wrk.duration_secs,
             self.config.wrk.threads,
-            self.config.wrk.connections,
-            script.as_deref(),
+            connections,
+            Some(&script),
         )
         .await?;
         Ok(res)
     }
-}
 
-impl LocalConfig {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let content = std::fs::read_to_string(path)?;
-        let config: LocalConfig = serde_yaml::from_str(&content)?;
-        Ok(config)
-    }
-}
-
-impl Monitor {
-    fn new(app_container: String) -> Self {
-        let token = CancellationToken::new();
-        let token_child = token.clone();
-        let metrics_handler = tokio::spawn(async move {
-            let peak = Arc::new(AtomicU64::new(0));
-            let peak_child = peak.clone();
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
-            loop {
-                select! {
-                    _ = token_child.cancelled() => {
-                        break;
-                    }
-                    _ = interval.tick() => {
-                        if let Ok(info) = crate::docker::exec_stats(&app_container).await {
-                            let mem = info.memory_usage;
-                            let prev = peak_child.load(Ordering::Relaxed);
-                            if mem > prev {
-                                peak_child.store(mem, Ordering::Relaxed);
-                            }
-                        }
-                    }
-                }
-            }
-            peak.load(Ordering::Relaxed)
-        });
-        Monitor {
-            token,
-            handler: metrics_handler,
-        }
-    }
-
-    async fn stop(self) -> u64 {
-        self.token.cancel();
-        self.handler.await.unwrap_or(0)
+    async fn exec_wrk_warmup(&self, app_endpoint: &Endpoint) -> Result<WrkResult> {
+        let guard = self.inner.lock().await;
+        let state = guard
+            .as_ref()
+            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
+        let url = format!("http://localhost:{}", state.app_host_port);
+        let res = wrk::start_wrk(
+            &url,
+            5,
+            4,
+            32,
+            None,
+        )
+        .await?;
+        Ok(res)
     }
 }

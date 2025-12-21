@@ -7,11 +7,11 @@ use axum::{
 };
 use serde::Serialize;
 use std::collections::HashMap;
-use clap::ValueEnum;
 
 use crate::{
     db::{self, runs::RunResult},
-    BenchmarkEnvironmentType, benchmark::BenchmarkTests,
+    benchmark::BenchmarkTests,
+    benchmark_environment::get_environment_config,
 };
 
 #[derive(Serialize)]
@@ -72,23 +72,20 @@ async fn get_tags(State(db): State<db::Db>) -> Result<Json<Vec<String>>, StatusC
 }
 
 async fn get_environments(State(db): State<db::Db>) -> Result<Json<Vec<EnvironmentInfo>>, StatusCode> {
-    let environments = db
+    let env_names = db
         .get_environments()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_iter()
-        .map(|e| match e {
-            BenchmarkEnvironmentType::Local => EnvironmentInfo {
-                name: e.to_string(),
-                display_name: "Local".to_string(),
-                icon: "home".to_string(),
-            },
-            BenchmarkEnvironmentType::Remote => EnvironmentInfo {
-                name: e.to_string(),
-                display_name: "XG6254 32CPU".to_string(),
-                icon: "server".to_string(),
-            },
-        })
-        .collect();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut environments = Vec::new();
+    for name in env_names {
+        if let Ok(config) = get_environment_config(&name) {
+            environments.push(EnvironmentInfo {
+                name: name,
+                display_name: config.name,
+                icon: config.icon.unwrap_or_else(|| "server".to_string()),
+            });
+        }
+    }
     Ok(Json(environments))
 }
 
@@ -166,8 +163,7 @@ async fn get_run_results(
     State(db): State<db::Db>,
     Path((run_id, env_str, test_str)): Path<(u32, String, String)>,
 ) -> Result<Json<Vec<RunResult>>, StatusCode> {
-    let environment = BenchmarkEnvironmentType::from_str(&env_str, true)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let environment = env_str;
     let test = test_str
         .as_str()
         .try_into()

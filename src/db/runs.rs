@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{BenchmarkEnvironmentType, benchmark::BenchmarkTests};
+use crate::benchmark::BenchmarkTests;
 
 use super::languages;
 
@@ -62,7 +62,7 @@ pub struct Run {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct FrameworkRun {
-    pub environment: BenchmarkEnvironmentType,
+    pub environment: String,
     pub language: String,
     pub framework: String,
     pub manifest: FrameworkManifest,

@@ -9,11 +9,9 @@ use std::{
 };
 
 use crate::{
-    BenchmarkEnvironmentType,
     benchmark::{BenchmarkResults, BenchmarkTests},
     prelude::*,
 };
-use clap::ValueEnum;
 
 fn load_runs() -> Result<Vec<runs::Run>> {
     let mut runs = Vec::new();
@@ -34,10 +32,7 @@ fn load_runs() -> Result<Vec<runs::Run>> {
                 let env_entry = env_entry?;
                 let env_path = env_entry.path();
                 if env_path.is_dir() {
-                    let environment_str = env_path.file_name().unwrap().to_str().unwrap();
-                    let environment: BenchmarkEnvironmentType =
-                        BenchmarkEnvironmentType::from_str(environment_str, true)
-                            .map_err(|_| Error::InvalidEnvironment(environment_str.to_string()))?;
+                    let environment = env_path.file_name().unwrap().to_str().unwrap().to_string();
                     for lang_entry in fs::read_dir(&env_path)? {
                         let lang_entry = lang_entry?;
                         let lang_path = lang_entry.path();
@@ -162,18 +157,15 @@ impl Db {
     }
 
     #[allow(dead_code)]
-    pub fn get_environments(&self) -> Result<Vec<BenchmarkEnvironmentType>> {
-        Ok(vec![
-            BenchmarkEnvironmentType::Local,
-            BenchmarkEnvironmentType::Remote,
-        ])
+    pub fn get_environments(&self) -> Result<Vec<String>> {
+        crate::benchmark_environment::list_environments()
     }
 
     #[allow(dead_code)]
     pub fn get_run_results(
         &self,
         run_id: u32,
-        environment: BenchmarkEnvironmentType,
+        environment: String,
         test: BenchmarkTests,
     ) -> Result<Vec<runs::RunResult>> {
         let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
@@ -215,7 +207,7 @@ impl Db {
     pub fn save_run(
         &self,
         run_id: u32,
-        environment: &crate::BenchmarkEnvironmentType,
+        environment: &str,
         lang: &languages::Language,
         framework: &languages::Framework,
         benchmark_results: &BenchmarkResults,

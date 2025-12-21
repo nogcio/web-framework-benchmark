@@ -37,4 +37,6 @@ pub enum Error {
     InvalidEnvironment(String),
     #[error("Invalid test type: {0}")]
     InvalidTest(String),
+    #[error("System error: {0}")]
+    System(String),
 }

@@ -27,12 +27,6 @@ use clap::{Parser, ValueEnum};
 use dotenvy::dotenv;
 use prelude::*;
 
-#[derive(Debug, Clone, ValueEnum, serde::Deserialize, PartialEq)]
-pub enum BenchmarkEnvironmentType {
-    Local,
-    Remote,
-}
-
 use crate::benchmark::BenchmarkResults;
 
 #[tokio::main]
@@ -82,22 +76,11 @@ async fn main() -> Result<()> {
 
 async fn run_benchmark_for_path(
     path: &Path,
-    environment: &BenchmarkEnvironmentType,
+    environment: &str,
 ) -> Result<BenchmarkResults> {
-    match environment {
-        BenchmarkEnvironmentType::Local => {
-            let settings = crate::benchmark_environment::local::LocalConfig::from_file(
-                "config/environment.local.yaml",
-            )?;
-            let mut env =
-                crate::benchmark_environment::local::LocalBenchmarkEnvironment::new(settings);
-            let result = benchmark::run_benchmark(&mut env, path).await?;
-            Ok(result)
-        }
-        BenchmarkEnvironmentType::Remote => {
-            unimplemented!()
-        }
-    }
+    let mut env = crate::benchmark_environment::load_environment(environment)?;
+    let result = benchmark::run_benchmark(&mut *env, path).await?;
+    Ok(result)
 }
 
 async fn ensure_benchmark_files() -> std::result::Result<(), io::Error> {
@@ -137,13 +120,4 @@ async fn ensure_benchmark_files() -> std::result::Result<(), io::Error> {
     create_if_missing_random(f10m, 10 * 1024 * 1024)?;
 
     Ok(())
-}
-
-impl std::fmt::Display for BenchmarkEnvironmentType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BenchmarkEnvironmentType::Local => write!(f, "local"),
-            BenchmarkEnvironmentType::Remote => write!(f, "remote"),
-        }
-    }
 }

@@ -1,8 +1,9 @@
-# Local environment config
+type: local
+name: Local
+icon: laptop
 wrk:
   duration_secs: 15
   threads: 2
-  connections: 32
 
 limits:
   db:

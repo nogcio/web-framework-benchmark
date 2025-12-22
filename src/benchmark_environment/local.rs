@@ -6,6 +6,7 @@ use super::common::{Monitor, get_app_env_vars, get_db_env_vars};
 use super::config::LocalConfig;
 use super::{BenchmarkEnvironment, Endpoint, ServerUsage, WrkResult};
 
+use crate::database::DatabaseKind;
 use crate::docker::{self, ContainerOptions};
 use crate::prelude::*;
 use crate::wrk;
@@ -21,10 +22,13 @@ pub struct LocalBenchmarkEnvironment {
 #[derive(Debug)]
 pub struct LocalState {
     pub app_image: String,
-    pub db_image: String,
+    pub db_image: Option<String>,
     pub app_container: String,
-    pub db_container: String,
+    pub db_container: Option<String>,
     pub app_host_port: u16,
+    pub db_kind: Option<DatabaseKind>,
+    pub app_env: Vec<(String, String)>,
+    pub app_args: Vec<String>,
     pub monitor: Option<Monitor>,
 }
 
@@ -47,14 +51,23 @@ impl LocalBenchmarkEnvironment {
 
 #[async_trait::async_trait]
 impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
-    async fn prepare(&mut self, framework_path: &Path) -> Result<()> {
+    async fn prepare(
+        &mut self,
+        framework_path: &Path,
+        database: Option<DatabaseKind>,
+        app_env: &[(String, String)],
+        app_args: &[String],
+    ) -> Result<()> {
         let app_image = format!("benchmark_app:{}", uuid::Uuid::new_v4());
-        let db_image = format!("benchmark_db:{}", uuid::Uuid::new_v4());
         let app_container = format!("app-{}", uuid::Uuid::new_v4());
-        let db_container = format!("db-{}", uuid::Uuid::new_v4());
+        let db_image = database.map(|_| format!("benchmark_db:{}", uuid::Uuid::new_v4()));
+        let db_container = database.map(|_| format!("db-{}", uuid::Uuid::new_v4()));
 
         let _ = crate::docker::exec_build(framework_path, &app_image).await;
-        let _ = crate::docker::exec_build(Path::new("benchmarks_db"), &db_image).await;
+        if let Some(db_kind) = database {
+            let _ = crate::docker::exec_build(Path::new(db_kind.dir()), db_image.as_ref().unwrap())
+                .await;
+        }
 
         let port = Self::find_free_port();
 
@@ -64,6 +77,9 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
             app_container,
             db_container,
             app_host_port: port,
+            db_kind: database,
+            app_env: app_env.to_vec(),
+            app_args: app_args.to_vec(),
             monitor: None,
         };
 
@@ -72,30 +88,37 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         Ok(())
     }
 
-    async fn start_db(&mut self) -> Result<Endpoint> {
+    async fn start_db(&mut self) -> Result<Option<Endpoint>> {
         let guard = self.inner.lock().await;
         let state = guard
             .as_ref()
             .ok_or_else(|| Error::EnvironmentNotPrepared)?;
 
+        let (db_container, db_image, db_kind) =
+            match (&state.db_container, &state.db_image, state.db_kind) {
+                (Some(container), Some(image), Some(kind)) => (container, image, kind),
+                _ => return Ok(None),
+            };
+
         docker::exec_run_container(
-            &state.db_container,
-            &state.db_image,
+            db_container,
+            db_image,
             ContainerOptions {
                 ports: None::<String>,
                 cpus: self.config.limits.db.as_ref().and_then(|l| l.cpus),
                 memory: self.config.limits.db.as_ref().and_then(|l| l.memory_mb),
                 link: None::<String>,
                 mount: None::<String>,
-                envs: Some(get_db_env_vars()),
+                envs: Some(get_db_env_vars(db_kind)),
+                args: None,
             },
         )
         .await?;
 
-        Ok(Endpoint {
+        Ok(Some(Endpoint {
             address: DB_LINK_NAME.to_string(),
-            port: 5432,
-        })
+            port: db_kind.port(),
+        }))
     }
 
     async fn stop_db(&mut self) -> Result<()> {
@@ -103,11 +126,13 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         let state = guard
             .as_ref()
             .ok_or_else(|| Error::EnvironmentNotPrepared)?;
-        let _ = docker::exec_stop_container(&state.db_container).await?;
+        if let Some(db_container) = &state.db_container {
+            let _ = docker::exec_stop_container(db_container).await?;
+        }
         Ok(())
     }
 
-    async fn start_app(&mut self, db_endpoint: &Endpoint) -> Result<Endpoint> {
+    async fn start_app(&mut self, db_endpoint: Option<&Endpoint>) -> Result<Endpoint> {
         let mut guard = self.inner.lock().await;
         let state = guard
             .as_mut()
@@ -120,12 +145,20 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                 ports: Some(format!("{}:8000", state.app_host_port)),
                 cpus: self.config.limits.app.as_ref().and_then(|l| l.cpus),
                 memory: self.config.limits.app.as_ref().and_then(|l| l.memory_mb),
-                link: Some(format!("{}:{}", state.db_container, DB_LINK_NAME)),
+                link: state
+                    .db_container
+                    .as_ref()
+                    .map(|c| format!("{}:{}", c, DB_LINK_NAME)),
                 mount: Some("./benchmarks_data:/app/benchmarks_data".to_string()),
-                envs: Some(get_app_env_vars(
-                    db_endpoint.address.as_str(),
-                    db_endpoint.port,
-                )),
+                envs: Some({
+                    let mut envs = Vec::new();
+                    if let (Some(kind), Some(db_ep)) = (state.db_kind, db_endpoint) {
+                        envs.extend(get_app_env_vars(kind, db_ep.address.as_str(), db_ep.port));
+                    }
+                    envs.extend(state.app_env.clone());
+                    envs
+                }),
+                args: Some(state.app_args.clone()),
             },
         )
         .await?;
@@ -171,18 +204,6 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         })
     }
 
-    async fn get_app_info(
-        &self,
-        _app_endpoint: &Endpoint,
-    ) -> Result<crate::http_probe::ServerInfo> {
-        let guard = self.inner.lock().await;
-        let state = guard
-            .as_ref()
-            .ok_or_else(|| Error::EnvironmentNotPrepared)?;
-        let target = format!("{}:{}", "localhost", state.app_host_port);
-        crate::http_probe::get_server_version(&target).await
-    }
-
     async fn exec_wrk_with_connections(
         &self,
         _app_endpoint: &Endpoint,
@@ -206,17 +227,18 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         Ok(res)
     }
 
-    async fn exec_wrk_warmup(&self, _app_endpoint: &Endpoint, use_db: bool) -> Result<WrkResult> {
+    async fn exec_wrk_warmup(
+        &self,
+        _app_endpoint: &Endpoint,
+        script: &str,
+        duration_secs: u64,
+    ) -> Result<WrkResult> {
         let guard = self.inner.lock().await;
         let state = guard
             .as_ref()
             .ok_or_else(|| Error::EnvironmentNotPrepared)?;
-        let url = if use_db {
-            format!("http://localhost:{}/db/read/one?id=1", state.app_host_port)
-        } else {
-            format!("http://localhost:{}/", state.app_host_port)
-        };
-        let res = wrk::start_wrk(&url, 5, 2, 8, None).await?;
+        let url = format!("http://localhost:{}", state.app_host_port);
+        let res = wrk::start_wrk(&url, duration_secs, 2, 8, Some(script)).await?;
         Ok(res)
     }
 

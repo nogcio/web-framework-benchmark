@@ -17,25 +17,72 @@ benchmarks/python/fastapi/
 
 ## 2. Configuration
 
-Register your new framework in `config/languages.yaml`.
+You need to register your benchmark in the configuration files located in the `config/` directory.
+
+### 2.1. Language (`config/languages.yaml`)
+
+If the language is not already present, add it to `config/languages.yaml`:
 
 ```yaml
 - name: Python
   url: https://www.python.org
-  frameworks:
-    - name: fastapi
-      path: benchmarks/python/fastapi
-      url: https://fastapi.tiangolo.com/
-      tags:
-        python: "3.11"
-        platform: python
+```
+
+### 2.2. Framework (`config/frameworks.yaml`)
+
+Register the framework in `config/frameworks.yaml`:
+
+```yaml
+- name: fastapi
+  language: Python
+  url: https://fastapi.tiangolo.com/
+```
+
+### 2.3. Benchmark (`config/benchmarks.yaml`)
+
+Define the benchmark configuration in `config/benchmarks.yaml`. This links the code, tests, and metadata.
+
+```yaml
+- name: fastapi
+  language: Python
+  language_version: "3.11"
+  framework: fastapi
+  framework_version: "0.100.0"
+  tests:
+    - hello_world
+    - json
+  tags:
+    platform: python
+    python: "3.11"
+  path: benchmarks/python/fastapi
+```
+
+If your benchmark uses a database, specify the `database` field (e.g., `postgres`, `mysql`, `mssql`) and include the relevant database tests:
+
+```yaml
+- name: fastapi-pg
+  language: Python
+  language_version: "3.11"
+  framework: fastapi
+  framework_version: "0.100.0"
+  tests:
+    - db_read_one
+    - db_read_paging
+    - db_write
+  tags:
+    platform: python
+    python: "3.11"
+    orm: sqlalchemy
+  path: benchmarks/python/fastapi-pg
+  database: postgres
 ```
 
 ## 3. Dockerfile
 
 You must provide a `Dockerfile` that builds and runs your application.
+
 *   **Base Image**: Use an official and appropriate base image (e.g., `python:3.11-slim`, `golang:1.21-alpine`).
-*   **Port**: The application must listen on port **8000** (or use the `PORT` env var).
+*   **Port**: The application must listen on port **8000** (or use the `PORT` env var if passed, but 8000 is the standard expectation).
 *   **Command**: The container must start the web server automatically.
 
 Example (Python):
@@ -48,94 +95,78 @@ COPY src/ .
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-## 4. Environment Variables
+## 4. Implementation Requirements
 
-Your application must respect the following environment variables:
+Your application must implement the endpoints required for the tests you enabled in `config/benchmarks.yaml`.
 
-| Variable | Default | Description |
-| :--- | :--- | :--- |
-| `PORT` | `8000` | The port to listen on. |
-| `DB_HOST` | `db` | PostgreSQL database host. |
-| `DB_PORT` | `5432` | PostgreSQL database port. |
-| `DB_USER` | `benchmark` | Database user. |
-| `DB_PASSWORD` | `benchmark` | Database password. |
-| `DB_NAME` | `benchmark` | Database name. |
-| `DATA_DIR` | `benchmarks_data` | Directory containing static files to serve. |
+### General Requirements
 
-## 5. Required Endpoints
+*   **Port**: Listen on port **8000** (or the `PORT` environment variable).
+*   **Headers**:
+    *   **X-Request-ID**: If the request contains an `X-Request-ID` header, the response **MUST** include the same header with the same value. This is used to verify that responses match requests.
 
-Your application must implement the following endpoints. All JSON responses should have `Content-Type: application/json`.
+### Test Scenarios
 
-**Important**: All endpoints must echo the `x-request-id` request header in the response if it is present. This is used by the verification scripts to match requests and responses.
+#### 1. Hello World (`hello_world`)
+*   **Endpoint**: `GET /`
+*   **Response Body**: `Hello, World!` (exact string match)
+*   **Content-Type**: `text/plain` (optional but recommended)
+*   **Status Code**: 200 OK
 
-### 5.1. Root / Hello World
-*   **Path**: `GET /`
-*   **Response**: Plain text "Hello, World!"
-*   **Status**: 200 OK
-
-### 5.2. Health Check
-*   **Path**: `GET /health`
-*   **Logic**: Check if the database connection is active.
-*   **Response**: "OK" (or similar) if healthy.
-*   **Status**: 200 OK if healthy, 503 Service Unavailable if DB is down.
-
-### 5.3. Info
-*   **Path**: `GET /info`
-*   **Response**: A comma-separated string of capabilities/versions.
-*   **Example**: `1.21,hello_world,json,db_read_one,db_read_paging,db_write,static_files`
-*   **Status**: 200 OK
-
-### 5.4. JSON Processing
-*   **Path**: `POST /json/{from}/{to}`
+#### 2. JSON Serialization (`json`)
+*   **Endpoint**: `POST /json/{from}/{to}`
+*   **Request Body**: A large JSON object (see `scripts/wrk_json.lua` for structure).
 *   **Logic**:
-    1.  Parse the request body as JSON.
-    2.  Traverse the JSON structure.
-    3.  Find all objects where the key is `servlet-name` and the value equals `{from}`.
-    4.  Replace the value with `{to}`.
-    5.  Return the modified JSON.
-*   **Status**: 200 OK
+    1.  Deserialize the request body.
+    2.  Find all occurrences of `servlet-name` equal to the `{from}` path parameter.
+    3.  Replace them with the `{to}` path parameter.
+    4.  Serialize the modified object back to JSON.
+*   **Response Body**: The modified JSON object.
+*   **Status Code**: 200 OK
 
-### 5.5. Database: Read One
-*   **Path**: `GET /db/read/one`
-*   **Query Param**: `id` (integer)
-*   **Logic**: Fetch a single row from the `hello_world` table by `id`.
-*   **Response JSON**:
+#### 3. Database Read One (`db_read_one`)
+*   **Endpoint**: `GET /db/read/one?id={id}`
+*   **Query Parameter**: `id` (integer, 1-1000)
+*   **Logic**: Fetch a single row from the `hello_world` table where `id` matches the parameter.
+*   **Response Body**: JSON representation of the row.
     ```json
     {
-      "id": 1,
+      "id": 123,
       "name": "...",
       "created_at": "...",
       "updated_at": "..."
     }
     ```
-*   **Status**: 200 OK, or 404 if not found.
+*   **Status Code**: 200 OK
 
-### 5.6. Database: Read Many (Paging)
-*   **Path**: `GET /db/read/many`
-*   **Query Params**:
-    *   `offset` (integer, required)
-    *   `limit` (integer, optional, default 50)
-*   **Logic**: Fetch rows from `hello_world` ordered by `id` with limit and offset.
-*   **Response JSON**: Array of objects (same format as Read One).
-*   **Status**: 200 OK
+#### 4. Database Read Paging (`db_read_paging`)
+*   **Endpoint**: `GET /db/read/many?offset={offset}&limit={limit}`
+*   **Query Parameters**:
+    *   `offset` (integer)
+    *   `limit` (integer, default 50)
+*   **Logic**: Fetch rows from the `hello_world` table ordered by `id`, using the specified limit and offset.
+*   **Response Body**: JSON array of rows.
+*   **Status Code**: 200 OK
 
-### 5.7. Database: Write (Insert)
-*   **Path**: `POST /db/write/insert`
-*   **Input**: JSON `{"name": "..."}` OR Query Param `name`.
-*   **Logic**: Insert a new row into `hello_world` with the provided name and current timestamp for `created_at` and `updated_at`.
-*   **Response JSON**: The created object (including the generated ID).
-*   **Status**: 200 OK
+#### 5. Database Write (`db_write`)
+*   **Endpoint**: `POST /db/write/insert`
+*   **Request Body**: JSON `{"name": "..."}`
+*   **Logic**:
+    1.  Insert a new row into the `hello_world` table with the provided `name`.
+    2.  Set `created_at` and `updated_at` to the current timestamp.
+    3.  Return the inserted row.
+*   **Response Body**: JSON representation of the inserted row (including the generated `id`).
+*   **Status Code**: 200 OK
 
-### 5.8. Static Files
-*   **Path**: `GET /files/{filename}`
-*   **Logic**: Serve the file named `{filename}` from the `DATA_DIR`.
-*   **Security**: Prevent directory traversal (e.g., `..`).
-*   **Files to support**: `15kb.bin`, `1mb.bin`, `10mb.bin`.
-*   **Status**: 200 OK
+#### 6. Static Files (`static_files_*`)
+*   **Endpoint**: `GET /files/{filename}`
+*   **Logic**: Serve the requested file from the `benchmarks_data` directory (mounted at runtime).
+*   **Security**: Ensure no directory traversal attacks (e.g., `../`).
+*   **Status Code**: 200 OK
 
-## 6. Database Schema and Data
+## 5. Database Schema
 
-The PostgreSQL database has the following schema:
+The database (PostgreSQL, MySQL, MSSQL) is initialized with a `hello_world` table:
 
 ```sql
 CREATE TABLE hello_world (
@@ -146,17 +177,4 @@ CREATE TABLE hello_world (
 );
 ```
 
-The table is pre-populated with 1000 rows where `id` ranges from 1 to 1000, and `name` is `name_<id>` (e.g., `name_1`, `name_2`, ..., `name_1000`).
-The verification scripts rely on this data pattern.
-
-
-## 7. Verification
-
-The project uses `wrk` with Lua scripts (located in `scripts/`) to verify and benchmark your implementation.
-Ensure your implementation passes the logic checks in these scripts:
-*   `wrk_hello.lua`
-*   `wrk_json.lua`
-*   `wrk_db_read_one.lua`
-*   `wrk_db_read_paging.lua`
-*   `wrk_db_write.lua`
-*   `wrk_static_files.lua`
+(Syntax varies slightly by database dialect).

@@ -1,0 +1,15 @@
+- name: stdlib
+  language: Go
+  url: https://golang.org/pkg/net/http/
+
+- name: std
+  language: JS
+  url: https://nodejs.org/api/http.html
+
+- name: axum
+  language: Rust
+  url: https://github.com/tokio-rs/axum
+
+- name: aspnetcore
+  language: C#
+  url: https://dotnet.microsoft.com/apps/aspnet

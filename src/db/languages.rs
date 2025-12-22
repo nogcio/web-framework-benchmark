@@ -1,28 +1,33 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
 use crate::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanguageRecord {
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Language {
     pub name: String,
     pub url: String,
-    pub frameworks: Vec<Framework>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Framework {
-    pub name: String,
-    pub path: String,
-    pub url: String,
-    pub tags: HashMap<String, String>,
+impl From<&LanguageRecord> for Language {
+    fn from(record: &LanguageRecord) -> Self {
+        Self {
+            name: record.name.clone(),
+            url: record.url.clone(),
+        }
+    }
 }
 
-pub fn parse_languages<P: AsRef<Path>>(path: P) -> Result<Vec<Language>> {
+pub fn parse_languages<P: AsRef<Path>>(path: P) -> Result<Vec<LanguageRecord>> {
     let content = fs::read_to_string(path)?;
-    let languages: Vec<Language> = serde_yaml::from_str(&content)?;
+    let languages: Vec<LanguageRecord> = serde_yaml::from_str(&content)?;
     Ok(languages)
 }
 
@@ -37,13 +42,6 @@ mod tests {
         let yaml_content = r#"
 - name: Go
   url: https://golang.org
-  frameworks:
-    - name: stdlib
-      path: benchmarks/go/std
-      url: https://golang.org/pkg/net/http/
-      tags:
-        go: "1.21"
-        platform: go
 "#;
 
         let mut temp_file = NamedTempFile::new().unwrap();
@@ -52,17 +50,8 @@ mod tests {
 
         let languages = parse_languages(path).unwrap();
         assert_eq!(languages.len(), 1);
-        let lang = &languages[0];
+        let lang: Language = (&languages[0]).into();
         assert_eq!(lang.name, "Go");
         assert_eq!(lang.url, "https://golang.org");
-        assert_eq!(lang.frameworks.len(), 1);
-        let fw = &lang.frameworks[0];
-        assert_eq!(fw.name, "stdlib");
-        assert_eq!(fw.path, "benchmarks/go/std");
-        assert_eq!(fw.url, "https://golang.org/pkg/net/http/");
-        let mut expected_tags = HashMap::new();
-        expected_tags.insert("go".to_string(), "1.21".to_string());
-        expected_tags.insert("platform".to_string(), "go".to_string());
-        assert_eq!(fw.tags, expected_tags);
     }
 }

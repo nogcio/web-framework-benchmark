@@ -6,6 +6,19 @@ use crate::{
     prelude::*,
 };
 
+fn parse_percentage(value: &str) -> Option<f64> {
+    let lower = value.to_ascii_lowercase();
+    if lower == "nan" || lower == "+nan" || lower == "-nan" {
+        Some(f64::NAN)
+    } else if lower == "inf" || lower == "+inf" {
+        Some(f64::INFINITY)
+    } else if lower == "-inf" {
+        Some(f64::NEG_INFINITY)
+    } else {
+        value.parse::<f64>().ok()
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct WrkResult {
@@ -70,7 +83,7 @@ pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
     let mut req_per_sec_stdev = None;
     let mut req_per_sec_max = None;
     let mut req_per_sec_stdev_pct = None;
-    let mut errors = None;
+    let mut errors_total: i64 = 0;
 
     let re_rps = Regex::new(r"Requests/sec:\s+([\d.]+)").unwrap();
     let re_tps = Regex::new(r"Transfer/sec:\s+([\w./]+)").unwrap();
@@ -80,25 +93,29 @@ pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
             .unwrap();
     let re_latency_dist = Regex::new(r"\s*(\d+)%\s+([\d.]+[a-zA-Zμ]+)").unwrap();
     let re_thread_stats_latency = Regex::new(
-        r"^\s*Latency\s+([\d.]+[a-zA-Zμ]+)\s+([\d.]+[a-zA-Zμ]+)\s+([\d.]+[a-zA-Zμ]+)\s+([\d.]+)%$",
+        r"(?i)^\s*Latency\s+([\d.]+[a-zA-Zμ]+)\s+([\d.]+[a-zA-Zμ]+)\s+([\d.]+[a-zA-Zμ]+)\s+([+\-]?(?:[\d.]+|nan|inf))%$",
     )
     .unwrap();
     let re_thread_stats_req =
-        Regex::new(r"^\s*Req/Sec\s+([\d.]+[kM]?)\s+([\d.]+[kM]?)\s+([\d.]+[kM]?)\s+([\d.]+)%$")
+        Regex::new(r"(?i)^\s*Req/Sec\s+([\d.]+[kM]?)\s+([\d.]+[kM]?)\s+([\d.]+[kM]?)\s+([+\-]?(?:[\d.]+|nan|inf))%$")
             .unwrap();
-    let re_errors = Regex::new(r"^(Errors):\s+(\d+)$").unwrap();
+    let re_errors = Regex::new(r"^\s*(Errors):\s+(\d+)$").unwrap();
+    let re_socket_errors = Regex::new(
+        r"^\s*Socket errors:\s+connect\s+(\d+),\s+read\s+(\d+),\s+write\s+(\d+),\s+timeout\s+(\d+)",
+    )
+    .unwrap();
 
     for line in lines {
         if let Some(cap) = re_thread_stats_latency.captures(line) {
             latency_avg = cap.get(1).and_then(|m| parse_latency(m.as_str()));
             latency_stdev = cap.get(2).and_then(|m| parse_latency(m.as_str()));
             latency_max = cap.get(3).and_then(|m| parse_latency(m.as_str()));
-            latency_stdev_pct = cap.get(4).and_then(|m| m.as_str().parse::<f64>().ok());
+            latency_stdev_pct = cap.get(4).and_then(|m| parse_percentage(m.as_str()));
         } else if let Some(cap) = re_thread_stats_req.captures(line) {
             req_per_sec_avg = cap.get(1).and_then(|m| parse_metric(m.as_str()));
             req_per_sec_stdev = cap.get(2).and_then(|m| parse_metric(m.as_str()));
             req_per_sec_max = cap.get(3).and_then(|m| parse_metric(m.as_str()));
-            req_per_sec_stdev_pct = cap.get(4).and_then(|m| m.as_str().parse::<f64>().ok());
+            req_per_sec_stdev_pct = cap.get(4).and_then(|m| parse_percentage(m.as_str()));
         } else if let Some(cap) = re_rps.captures(line) {
             requests_per_sec = cap.get(1).and_then(|m| m.as_str().parse::<f64>().ok());
         } else if let Some(cap) = re_tps.captures(line) {
@@ -114,7 +131,14 @@ pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
             latency_max = cap.get(3).and_then(|m| parse_latency(m.as_str()));
             latency_stdev_pct = Some(0.0);
         } else if let Some(cap) = re_errors.captures(line) {
-            errors = cap.get(2).and_then(|m| m.as_str().parse::<i64>().ok());
+            if let Some(value) = cap.get(2).and_then(|m| m.as_str().parse::<i64>().ok()) {
+                errors_total += value;
+            }
+        } else if let Some(cap) = re_socket_errors.captures(line) {
+            let socket_errors: i64 = (1..=4)
+                .filter_map(|i| cap.get(i).and_then(|m| m.as_str().parse::<i64>().ok()))
+                .sum();
+            errors_total += socket_errors;
         } else if let Some(cap) = re_latency_dist.captures(line) {
             let pct = cap.get(1).and_then(|m| m.as_str().parse::<u8>().ok());
             let dur = cap.get(2).and_then(|m| parse_latency(m.as_str()));
@@ -151,7 +175,7 @@ pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
                 "wrk output: missing latency_distribution".to_string(),
             ));
         }
-        let errors = errors.unwrap_or(0);
+        let errors = errors_total;
         Ok(WrkResult {
             requests_per_sec,
             transfer_per_sec,
@@ -170,5 +194,33 @@ pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
         Err(Error::WrkParseError(
             "wrk output: missing required field".to_string(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_socket_errors_and_errors_sum() {
+        let lines = vec![
+            "Running 10s test @ http://127.0.0.1:8080".to_string(),
+            "  2 threads and 10 connections".to_string(),
+            "  Thread Stats   Avg      Stdev     Max   +/- Stdev".to_string(),
+            "    Latency     1.00ms    0.50ms   2.00ms   10%".to_string(),
+            "    Req/Sec     1000.00   50.00    1100.00   5%".to_string(),
+            "  Latency Distribution".to_string(),
+            "     50%   1.00ms".to_string(),
+            "     75%   1.50ms".to_string(),
+            "     99%   3.00ms".to_string(),
+            "Requests/sec: 1000.00".to_string(),
+            "Transfer/sec: 1.00MB".to_string(),
+            "  Errors: 3".to_string(),
+            "Socket errors: connect 0, read 1171, write 0, timeout 2".to_string(),
+        ];
+
+        let result = parse_wrk_output(&lines).expect("failed to parse wrk output");
+
+        assert_eq!(result.errors, 1176);
     }
 }

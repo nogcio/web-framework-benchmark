@@ -4,15 +4,64 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'benchmarks/csharp/aspnetcore/**'
+      - 'benchmarks/csharp/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'benchmarks/csharp/aspnetcore/**'
+      - 'benchmarks/csharp/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
 
 jobs:
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: aspnetcore
+            framework_path: benchmarks/csharp/aspnetcore
+            image_tag: wfb-aspnetcore
+            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
+            database: ""
+          - name: aspnetcore-npgsql
+            framework_path: benchmarks/csharp/aspnetcore-npgsql
+            image_tag: wfb-aspnetcore-npgsql
+            tests: db_read_one,db_read_paging,db_write
+            database: postgres
+          - name: aspnetcore-mysql
+            framework_path: benchmarks/csharp/aspnetcore-mysql
+            image_tag: wfb-aspnetcore-mysql
+            tests: db_read_one,db_read_paging,db_write
+            database: mysql
+          - name: aspnetcore-mssql
+            framework_path: benchmarks/csharp/aspnetcore-mssql
+            image_tag: wfb-aspnetcore-mssql
+            tests: db_read_one,db_read_paging,db_write
+            database: mssql
+          - name: aspnetcore-efcore-postgres
+            framework_path: benchmarks/csharp/aspnetcore-efcore
+            image_tag: wfb-aspnetcore-efcore-postgres
+            tests: db_read_one,db_read_paging,db_write
+            database: postgres
+          - name: aspnetcore-efcore-mysql
+            framework_path: benchmarks/csharp/aspnetcore-efcore
+            image_tag: wfb-aspnetcore-efcore-mysql
+            tests: db_read_one,db_read_paging,db_write
+            database: mysql
+          - name: aspnetcore-efcore-mssql
+            framework_path: benchmarks/csharp/aspnetcore-efcore
+            image_tag: wfb-aspnetcore-efcore-mssql
+            tests: db_read_one,db_read_paging,db_write
+            database: mssql
+
+    name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml
     with:
-      framework_path: benchmarks/csharp/aspnetcore
-      image_tag: wfb-aspnetcore
+      framework_path: ${{ matrix.framework_path }}
+      image_tag: ${{ matrix.image_tag }}
+      tests: ${{ matrix.tests }}
+      database: ${{ matrix.database }}

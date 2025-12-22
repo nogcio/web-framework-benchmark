@@ -4,7 +4,7 @@ A comprehensive benchmarking tool for comparing the performance of web framework
 
 ## Features
 
-- **Multi-language Support**: Benchmark frameworks written in different languages (currently Go, extensible to others)
+- **Multi-language Support**: Benchmark frameworks written in different languages (currently C#, extensible to others)
 - **Comprehensive Test Suite**: Includes tests for:
   - Hello World responses
   - JSON serialization/deserialization
@@ -12,23 +12,26 @@ A comprehensive benchmarking tool for comparing the performance of web framework
   - Database write operations
   - Static file serving
 - **Automated Benchmarking**: Uses `wrk` for high-performance HTTP load testing
-- **Result Visualization**: Web dashboard built with React/TypeScript for viewing and comparing results
+- **Result Visualization**: Modern web dashboard built with React, TypeScript, and Tailwind CSS
+- **API-Driven Architecture**: Rust-based backend serves benchmark results via a REST API
 - **Result Storage**: Local filesystem storage of benchmark results in YAML format
-- **Database Integration**: PostgreSQL test database for benchmark workloads
+- **Database Integration**: Support for PostgreSQL, MySQL, and MSSQL test databases
 - **Docker Support**: Containerized environments for consistent benchmarking
 - **Local and Remote Environments**: Support for both local development and remote deployment
 
 ## Architecture
 
-The project consists of several components:
+The project consists of several key components:
 
-- **Rust CLI (`src/`)**: Core benchmarking engine and command-line interface
-- **Web Dashboard (`web-app/`)**: React application for result visualization
-- **Framework Implementations (`benchmarks/`)**: Example web services in different languages/frameworks
-- **Database (`benchmarks_db/`)**: PostgreSQL setup with initialization scripts for test data
-- **Configuration (`config/`)**: Language and environment configurations
-- **Scripts (`scripts/`)**: Lua scripts for `wrk` load testing
-- **Test Data (`benchmarks_data/`)**: Static files for benchmarking
+- **Core Engine (`src/`)**: A Rust application that serves two purposes:
+  - **Runner**: Executes benchmarks using `wrk`, manages Docker containers, and collects metrics.
+  - **API Server**: Provides a REST API to serve benchmark configurations and results to the frontend.
+- **Web Dashboard (`web-app/`)**: A React application (Vite + Tailwind + TanStack Query) that consumes the Core API to visualize benchmark results.
+- **Framework Implementations (`benchmarks/`)**: Benchmark implementations for various frameworks (currently focused on C#/.NET).
+- **Databases (`benchmarks_db/`)**: Docker configurations and initialization scripts for benchmark databases (PostgreSQL, MySQL, MSSQL).
+- **Configuration (`config/`)**: YAML-based configuration for languages, frameworks, benchmarks, and environments.
+- **Data Storage (`data/`)**: Benchmark run results are stored as YAML files in the filesystem.
+- **Scripts (`scripts/`)**: Lua scripts used by `wrk` to generate load for different test scenarios.
 
 ## Quick Start
 
@@ -49,23 +52,27 @@ cd web-framework-benchmark
 cargo build --release
 ```
 
-### 2. View CLI Help
+### 2. Run Benchmarks
+
+To run benchmarks, you use the `run` command. This will execute the configured benchmarks and save the results to the `data/` directory.
 
 ```bash
-cargo run --release -- --help
-```
-
-### 3. Run a Benchmark
-
-```bash
-# Benchmark a specific framework
-cargo run --release -- benchmark benchmarks/go/std --environment local
-
-# Run all benchmarks and save to database
+# Run all benchmarks with run ID "1" in the local environment
 cargo run --release -- run 1 --environment local
 ```
 
+### 3. Start the API Server
+
+The API server provides access to the benchmark results.
+
+```bash
+# Start the server on localhost:8080
+cargo run --release -- serve
+```
+
 ### 4. Start the Web Dashboard
+
+In a new terminal, start the frontend development server. It is configured to proxy API requests to the Rust server running on port 8080.
 
 ```bash
 cd web-app
@@ -79,138 +86,37 @@ Open http://localhost:5173 to view the dashboard.
 
 ### CLI Commands
 
-#### Benchmark Command
-Run benchmarks for a specific framework implementation:
-
-```bash
-cargo run --release -- benchmark <path> [--environment <type>]
-```
-
-- `path`: Path to the framework implementation directory
-- `environment`: `local` (default) or `remote`
+The `wfb` tool has two main commands: `run` and `serve`.
 
 #### Run Command
-Execute all configured benchmarks and store results:
+Execute configured benchmarks and store results.
 
 ```bash
 cargo run --release -- run <id> [--environment <type>]
 ```
 
-- `id`: Unique run identifier
-- `environment`: `local` (default) or `remote`
+- `id`: Unique identifier for this benchmark run (e.g., `1`, `2023-10-27`).
+- `environment`: The environment configuration to use (default: `local`). Defined in `config/environments/`.
 
-### Adding New Frameworks
-
-1. Create a new directory under `benchmarks/<language>/<framework>/`
-2. Implement the required endpoints (see existing implementations for reference)
-3. Add configuration to `config/languages.yaml`
-4. Ensure Docker support if needed
-
-### Required Endpoints
-
-Framework implementations must provide these endpoints:
-
-- `GET /` - Hello World response
-- `GET /info` - Server version and supported tests information (returns plain text: `version,test1,test2,...` where version is a string and tests are from: hello_world, json, db_read_one, db_read_paging, db_write, static_files)
-- `GET /json` - JSON serialization
-- `GET /db` - Single database read
-- `GET /db/paging?page=1&limit=10` - Paginated database read
-- `POST /db` - Database write
-- `GET /static/*` - Static file serving
-
-## Configuration
-
-### Languages Configuration (`config/languages.yaml`)
-
-Define supported languages and frameworks:
-
-```yaml
-- name: Go
-  url: https://golang.org
-  frameworks:
-    - name: stdlib
-      path: benchmarks/go/std
-      url: https://golang.org/pkg/net/http/
-      tags:
-        go: "1.21"
-        platform: go
-```
-
-### Environment Configuration (`config/environment.local.yaml`)
-
-Configure local benchmarking parameters:
-
-```yaml
-# Local environment config
-wrk:
-  duration_secs: 15
-  threads: 2
-  connections: 32
-
-limits:
-  db:
-    cpus: 2
-    memory_mb: 1024
-  app:
-    cpus: 4
-    memory_mb: 1024
-```
-
-## Development
-
-### Code Quality
+#### Serve Command
+Start the REST API server to expose benchmark data.
 
 ```bash
-# Rust formatting and linting
-cargo fmt --all
-cargo clippy --all-targets -- -D warnings
-
-# Frontend linting
-cd web-app
-npm run lint
+cargo run --release -- serve [--host <host>] [--port <port>]
 ```
 
-### Testing
+- `host`: Host to bind to (default: `127.0.0.1`).
+- `port`: Port to listen on (default: `8080`).
 
-```bash
-# Run Rust tests
-cargo test
+## Project Structure
 
-# Run frontend tests (if configured)
-cd web-app
-npm test
 ```
-
-### Building for Production
-
-```bash
-# Build Rust CLI
-cargo build --release
-
-# Build web app
-cd web-app
-npm run build
+├── benchmarks/         # Framework implementations (e.g., csharp/aspnetcore)
+├── benchmarks_data/    # Static files used during benchmarking
+├── benchmarks_db/      # Database configurations (PostgreSQL, MySQL, MSSQL)
+├── config/             # Configuration files (benchmarks.yaml, frameworks.yaml, etc.)
+├── data/               # Stored benchmark results
+├── scripts/            # Lua scripts for wrk
+├── src/                # Rust source code for the CLI and API server
+└── web-app/            # React frontend application
 ```
-
-## Contributing
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
-
-### Adding Support for New Languages/Frameworks
-
-See [ADDING_FRAMEWORK.md](ADDING_FRAMEWORK.md) for detailed instructions on how to add a new framework benchmark.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Authors
-
-- **Andrew Sumskoy** - *Initial work* - [getansum@nogc.io](mailto:getansum@nogc.io)
-
-## Acknowledgments
-
-- Built with [Rust](https://www.rust-lang.org/), [React](https://reactjs.org/), and [Vite](https://vitejs.dev/)
-- Load testing powered by [wrk](https://github.com/wg/wrk)
-- UI components from [shadcn/ui](https://ui.shadcn.com/) (built on Radix UI and Tailwind CSS)
-- State management with [Zustand](https://zustand-demo.pmnd.rs/)

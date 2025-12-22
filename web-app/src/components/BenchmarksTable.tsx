@@ -2,12 +2,14 @@ import { useMemo, useState, useEffect } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from './ui/table'
 import { Skeleton } from './ui/skeleton'
 import { Empty, EmptyTitle, EmptyDescription, EmptyMedia } from './ui/empty'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from './ui/hover-card'
-import { Button } from './ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuCheckboxItem } from './ui/dropdown-menu'
-import { BarChart3, Settings } from 'lucide-react'
-import type { Benchmark } from '../types'
+import { HoverCard, HoverCardTrigger } from './ui/hover-card'
+import { BarChart3 } from 'lucide-react'
+import type { Benchmark, VisibleColumns } from '../types'
 import { useAppStore, type AppState } from '../store/useAppStore'
+import { TagsInline } from './TagsInline'
+import { getColorForLanguage, formatNumber, cn, getDatabaseColor } from '../lib/utils'
+import { TableSettings } from './TableSettings'
+import { BenchmarkHoverDetails } from './BenchmarkHoverDetails'
 
 interface Props {
   benchmarks: Benchmark[]
@@ -17,19 +19,9 @@ export default function BenchmarksTable({ benchmarks }: Props) {
   const languages = useAppStore((s: AppState) => s.languages)
   const frameworks = useAppStore((s: AppState) => s.frameworks)
   const benchmarksLoading = useAppStore((s: AppState) => s.benchmarksLoading)
+  const visibleColumns = useAppStore((s: AppState) => s.visibleColumns)
+  const toggleColumn = useAppStore((s: AppState) => s.toggleColumn)
   const [localLoading, setLocalLoading] = useState(false)
-  const [visibleColumns, setVisibleColumns] = useState({
-    framework: true,
-    rps: true,
-    memory: true,
-    tps: true,
-    errors: true,
-    tags: true,
-  })
-
-  const toggleColumn = (column: keyof typeof visibleColumns) => {
-    setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }))
-  }
 
   useEffect(() => {
     if (benchmarksLoading) {
@@ -48,101 +40,56 @@ export default function BenchmarksTable({ benchmarks }: Props) {
     return Math.max(...benchmarks.map((b) => b.rps))
   }, [benchmarks])
 
-  function getColorForLanguage(lang: string) {
-    let hash = 0
-    for (let i = 0; i < lang.length; i++) {
-      hash = (hash << 5) - hash + lang.charCodeAt(i)
-      hash |= 0
-    }
-    const hue = Math.abs(hash) % 360
-    return `hsl(${hue}, 65%, 50%)`
-  }
+  const columnOrder: (keyof VisibleColumns)[] = ['rank', 'framework', 'rps', 'memory', 'memoryBar', 'tps', 'tpsBar', 'errors', 'tags']
+  const lastVisibleColumn = columnOrder.filter(c => visibleColumns[c]).pop()
 
-  function TagsInline({ tags }: { tags: Record<string, string> | undefined }) {
-    const entries = Object.entries(tags || {})
-    const limit = 3
-    const [open, setOpen] = useState(false)
-
-    if (entries.length === 0) {
-      return <span className="text-sm text-muted-foreground">—</span>
-    }
-
-    const visible = open ? entries : entries.slice(0, limit)
-    const hiddenCount = Math.max(0, entries.length - limit)
-
-    return (
-      <div className="flex items-center gap-2">
-        {visible.map(([k, v]) => (
-          <span
-            key={`${k}-${v}`}
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-muted/30 text-sm text-muted-foreground border border-muted/30"
-          >
-            <span className="font-medium text-xs">{k}</span>
-            {v ? <span className="text-xs">{v}</span> : null}
-          </span>
-        ))}
-
-        {hiddenCount > 0 && (
-          <button
-            type="button"
-            className="text-sm text-primary ml-1 px-2 py-0.5 rounded hover:bg-muted/20"
-            onClick={() => setOpen(!open)}
-          >
-            {open ? 'show less' : `+${hiddenCount}`}
-          </button>
-        )}
-      </div>
-    )
-  }
+  const settingsMenu = (
+    <TableSettings visibleColumns={visibleColumns} onToggleColumn={toggleColumn} />
+  )
 
   if (localLoading) {
     return (
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-1/6 pl-4">Framework</TableHead>
-            <TableHead className="w-1/6">Requests/sec</TableHead>
-            <TableHead className="w-1/6">Memory</TableHead>
-            <TableHead className="w-1/6">TPS</TableHead>
-            <TableHead className="w-1/6 pr-4">Tags</TableHead>
+            {visibleColumns.rank && <TableHead className="w-8 pl-4">#</TableHead>}
+            {visibleColumns.framework && <TableHead className="w-[20%] pl-4">Framework</TableHead>}
+            {visibleColumns.rps && <TableHead className="w-auto">Requests/sec</TableHead>}
+            {visibleColumns.memory && <TableHead className="w-24">Memory</TableHead>}
+            {visibleColumns.memoryBar && <TableHead className="w-[15%]"></TableHead>}
+            {visibleColumns.tps && <TableHead className="w-24">TPS</TableHead>}
+            {visibleColumns.tpsBar && <TableHead className="w-[15%]"></TableHead>}
+            {visibleColumns.errors && <TableHead className="w-20 text-right">Errors</TableHead>}
+            {visibleColumns.tags && <TableHead className="w-24 pr-4">Tags</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {Array.from({ length: 6 }).map((_, i) => (
             <TableRow key={i}>
-              <TableCell className="w-1/6 pl-4">
+              {visibleColumns.rank && <TableCell className="w-8 pl-4"><Skeleton className="h-4 w-4" /></TableCell>}
+              {visibleColumns.framework && <TableCell className="w-[20%] pl-4">
                 <div className="flex items-center">
                   <Skeleton className="w-3 h-3 rounded-sm mr-2" />
                   <Skeleton className="h-4 w-20" />
                 </div>
-              </TableCell>
-              <TableCell className="w-1/6 text-right">
-                <Skeleton className="h-4 w-16 ml-auto" />
-              </TableCell>
-              <TableCell className="w-1/2">
+              </TableCell>}
+              {visibleColumns.rps && <TableCell className="w-auto">
                 <div className="flex items-center gap-3">
                   <Skeleton className="flex-1 h-2 rounded" />
                   <Skeleton className="w-12 h-3" />
                 </div>
-              </TableCell>
-              <TableCell className="w-1/4">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="flex-1 h-2 rounded" />
-                  <Skeleton className="w-12 h-3" />
-                </div>
-              </TableCell>
-              <TableCell className="w-1/6">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="flex-1 h-2 rounded" />
-                  <Skeleton className="w-12 h-3" />
-                </div>
-              </TableCell>
-              <TableCell className="w-1/6 pr-4">
+              </TableCell>}
+              {visibleColumns.memory && <TableCell className="w-24"><Skeleton className="h-4 w-16" /></TableCell>}
+              {visibleColumns.memoryBar && <TableCell className="w-[15%]"><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.tps && <TableCell className="w-24"><Skeleton className="h-4 w-16" /></TableCell>}
+              {visibleColumns.tpsBar && <TableCell className="w-[15%]"><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.errors && <TableCell className="w-20"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>}
+              {visibleColumns.tags && <TableCell className="w-24 pr-4">
                 <div className="flex gap-2">
                   <Skeleton className="h-5 w-12 rounded-full" />
                   <Skeleton className="h-5 w-10 rounded-full" />
                 </div>
-              </TableCell>
+              </TableCell>}
             </TableRow>
           ))}
         </TableBody>
@@ -167,61 +114,68 @@ export default function BenchmarksTable({ benchmarks }: Props) {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuCheckboxItem
-              checked={visibleColumns.rps}
-              onCheckedChange={() => toggleColumn('rps')}
-            >
-              Rps
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={visibleColumns.memory}
-              onCheckedChange={() => toggleColumn('memory')}
-            >
-              Memory
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={visibleColumns.tps}
-              onCheckedChange={() => toggleColumn('tps')}
-            >
-              TPS
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={visibleColumns.errors}
-              onCheckedChange={() => toggleColumn('errors')}
-            >
-              Errors
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={visibleColumns.tags}
-              onCheckedChange={() => toggleColumn('tags')}
-            >
-              Tags
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
       <Table className="w-full text-xs">
         <TableHeader>
-          <TableRow>
-            {visibleColumns.framework && <TableHead className="w-1/6 pl-4">Framework</TableHead>}
-            {visibleColumns.rps && <TableHead className="w-1/6">Requests/sec</TableHead>}
-            {visibleColumns.memory && <TableHead className="w-1/6">Memory</TableHead>}
-            {visibleColumns.tps && <TableHead className="w-1/6">TPS</TableHead>}
-            {visibleColumns.errors && <TableHead className="w-1/12 text-right">Errors</TableHead>}
-            {visibleColumns.tags && <TableHead className="w-1/12 pr-4">Tags</TableHead>}
+          <TableRow className="border-b-primary border-b-2 hover:bg-transparent">
+            {visibleColumns.rank && <TableHead className="w-8 pl-4">
+              <div className="flex items-center justify-between">
+                <span>#</span>
+                {lastVisibleColumn === 'rank' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.framework && <TableHead className="w-[20%] pl-4">
+              <div className="flex items-center justify-between">
+                <span>Framework</span>
+                {lastVisibleColumn === 'framework' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.rps && <TableHead className="w-auto">
+              <div className="flex items-center justify-between">
+                <span>Requests/sec</span>
+                {lastVisibleColumn === 'rps' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.memory && <TableHead className="w-24">
+              <div className="flex items-center justify-between">
+                <span>Memory</span>
+                {lastVisibleColumn === 'memory' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.memoryBar && <TableHead className="w-[15%]">
+              <div className="flex items-center justify-between">
+                <span></span>
+                {lastVisibleColumn === 'memoryBar' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.tps && <TableHead className="w-24">
+              <div className="flex items-center justify-between">
+                <span>TPS</span>
+                {lastVisibleColumn === 'tps' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.tpsBar && <TableHead className="w-[15%]">
+              <div className="flex items-center justify-between">
+                <span></span>
+                {lastVisibleColumn === 'tpsBar' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.errors && <TableHead className="w-20 text-right">
+              <div className="flex items-center justify-end">
+                <span>Errors</span>
+                {lastVisibleColumn === 'errors' && settingsMenu}
+              </div>
+            </TableHead>}
+            {visibleColumns.tags && <TableHead className="w-24 pr-4">
+              <div className="flex items-center justify-between">
+                <span>Tags</span>
+                {lastVisibleColumn === 'tags' && settingsMenu}
+              </div>
+            </TableHead>}
           </TableRow>
         </TableHeader>
 
         <TableBody>
-          {sorted.map((benchmark) => {
+          {sorted.map((benchmark, index) => {
             const langColor = getColorForLanguage(benchmark.language || 'unknown')
             // Resolve language/framework URLs from the global store lists
             const language = languages.find((l) => l.name === benchmark.language)
@@ -233,34 +187,49 @@ export default function BenchmarksTable({ benchmarks }: Props) {
               <HoverCard>
                 <HoverCardTrigger asChild>
                   <TableRow key={benchmark.language + '-' + benchmark.framework} className="hover:cursor-pointer">
-                    {visibleColumns.framework && <TableCell className="w-1/6 pl-4">
-                      <div className="flex items-center">
-                        <span
-                          className="inline-block w-3 h-3 rounded-sm mr-2"
-                          style={{ backgroundColor: langColor }}
-                        />
-                        <div className="font-medium">
-                          {languageHref ? (
-                            <a href={languageHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                              {benchmark.language}
-                            </a>
-                          ) : (
-                            <span>{benchmark.language}</span>
-                          )}
-                          <span className="mx-1 text-muted-foreground">/</span>
-                          {frameworkHref ? (
-                            <a href={frameworkHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                              {benchmark.framework}
-                            </a>
-                          ) : (
-                            <span>{benchmark.framework}</span>
-                          )}
-                          <span className="text-[10px] text-muted-foreground lowercase ml-2 leading-none">v{benchmark.version}</span>
+                    {visibleColumns.rank && <TableCell className="w-8 pl-4 font-mono text-muted-foreground">
+                      {index + 1}
+                    </TableCell>}
+                    {visibleColumns.framework && <TableCell className="w-[20%] pl-4">
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center min-w-0">
+                          <span
+                            className="inline-block w-3 h-3 rounded-sm mr-2 shrink-0"
+                            style={{ backgroundColor: langColor }}
+                          />
+                          <div className="font-medium flex items-center flex-wrap gap-x-2 gap-y-1">
+                            <div className="flex items-center">
+                              {languageHref ? (
+                                <a href={languageHref} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline hover:text-primary">
+                                  {benchmark.language}
+                                </a>
+                              ) : (
+                                <span>{benchmark.language}</span>
+                              )}
+                              <span className="mx-0.5 text-muted-foreground">/</span>
+                              {frameworkHref ? (
+                                <a href={frameworkHref} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline hover:text-primary">
+                                  {benchmark.framework}
+                                </a>
+                              ) : (
+                                <span>{benchmark.framework}</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground lowercase leading-none">v{benchmark.frameworkVersion}</span>
+                            {benchmark.database && (
+                              <span className={cn("inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent h-5", getDatabaseColor(benchmark.database))}>
+                                {benchmark.database}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <span className="text-[10px] text-muted-foreground ml-2 shrink-0">
+                          {benchmark.name}
+                        </span>
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.rps && <TableCell className="w-1/4">
+                    {visibleColumns.rps && <TableCell className="w-auto">
                       <div className="flex items-center gap-3">
                         <div className="text-xs ml-auto font-mono">{(benchmark.rps || 0).toLocaleString()}</div>
                         <div className="flex-1">
@@ -286,11 +255,14 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.memory && <TableCell className="w-1/4">
+                    {visibleColumns.memory && <TableCell className="w-24">
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {(benchmark.memoryUsage / (1024 * 1024)).toFixed(1)}MB
+                      </span>
+                    </TableCell>}
+
+                    {visibleColumns.memoryBar && <TableCell className="w-[15%]">
                       <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono text-muted-foreground mr-2">
-                          {(benchmark.memoryUsage / (1024 * 1024)).toFixed(1)}MB
-                        </span>
                         <div className="flex-1">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                             <div
@@ -319,11 +291,14 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.tps && <TableCell className="w-1/6">
+                    {visibleColumns.tps && <TableCell className="w-24">
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {formatNumber(benchmark.tps)}/s
+                      </span>
+                    </TableCell>}
+
+                    {visibleColumns.tpsBar && <TableCell className="w-[15%]">
                       <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono text-muted-foreground mr-2">
-                          {(benchmark.tps / 1000).toFixed(1)}K/s
-                        </span>
                         <div className="flex-1">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                             <div
@@ -350,51 +325,18 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.errors && <TableCell className="w-1/12 text-right">
+                    {visibleColumns.errors && <TableCell className="w-20 text-right">
                       <span className={benchmark.errors === 0 ? 'text-muted-foreground' : 'text-red-500'}>
                         {benchmark.errors}
                       </span>
                     </TableCell>}
 
-                    {visibleColumns.tags && <TableCell className="w-1/6 pr-4">
+                    {visibleColumns.tags && <TableCell className="w-24 pr-4">
                       <TagsInline tags={benchmark.tags} />
                     </TableCell>}
                   </TableRow>
                 </HoverCardTrigger>
-                <HoverCardContent className="w-80">
-                  <div className="space-y-2">
-                    <div className="font-semibold flex items-center justify-between">
-                      <div className="flex items-center">
-                        <span
-                          className="inline-block w-3 h-3 rounded-sm mr-2"
-                          style={{ backgroundColor: langColor }}
-                        />
-                        {benchmark.language} / {benchmark.framework}
-                      </div>
-                      <div className="text-sm">v{benchmark.version}</div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><strong>RPS:</strong> {benchmark.rps?.toLocaleString()}</div>
-                      <div><strong>Memory:</strong> {(benchmark.memoryUsage / (1024 * 1024)).toFixed(2)} MB</div>
-                      <div><strong>TPS:</strong> {(benchmark.tps / (1024 * 1024)).toFixed(2)} MB/s</div>
-                      <div><strong>Latency Avg:</strong> {(benchmark.latencyAvg / 1e6).toFixed(2)} ms</div>
-                      <div><strong>Errors:</strong> {benchmark.errors}</div>
-                    </div>
-                    {benchmark.tags && Object.keys(benchmark.tags).length > 0 && (
-                      <div className="text-sm">
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {Object.entries(benchmark.tags).map(([k, v]) => (
-                            <span key={`${k}-${v}`} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-muted/30 text-xs text-muted-foreground border border-muted/30">
-                              <span className="font-medium">{k}</span>
-                              {v ? <span>{v}</span> : null}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </HoverCardContent>
+                <BenchmarkHoverDetails benchmark={benchmark} langColor={langColor} />
               </HoverCard>
             )
           })}

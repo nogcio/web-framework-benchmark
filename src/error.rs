@@ -15,8 +15,6 @@ pub enum Error {
     DockerStatsParseError(String),
     #[error("Server start timeout error")]
     ServerStartTimeoutError,
-    #[error("Server info parse error: {0}")]
-    ServerInfoParseError(String),
     #[error("HTTP request error: {0}")]
     HttpError(#[from] reqwest::Error),
     #[error("Parse error: {0}")]

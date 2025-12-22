@@ -11,48 +11,149 @@ on:
         required: true
         type: string
         description: "Tag for the docker image (e.g., wfb-go-std)"
+      tests:
+        required: true
+        type: string
+        description: "Comma-separated or JSON array with tests to run (hello_world, json, db_read_one, db_read_paging, db_write, static_files_small, static_files_medium, static_files_large)"
+      database:
+        required: false
+        type: string
+        default: ""
+        description: "Database kind to start for DB-related tests (postgres, mysql, mssql). Leave empty when no DB is needed."
+      port:
+        required: false
+        type: string
+        default: "8000"
+        description: "Port the app listens on inside the container"
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: benchmark
-          POSTGRES_PASSWORD: benchmark
-          POSTGRES_DB: benchmark
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    env:
+      APP_PORT: ${{ inputs.port }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
-    - name: Initialize Database
+    - name: Build database image (if required)
+      if: inputs.database != ''
       run: |
-        docker run --rm --network host \
-          -v ${{ github.workspace }}/benchmarks_db:/benchmarks_db \
-          -e PGPASSWORD=benchmark \
-          postgres:18 \
-          psql -h localhost -U benchmark -d benchmark -f /benchmarks_db/init.sql
+        set -euo pipefail
+        db_input="${{ inputs.database }}"
+        db_kind=$(echo "$db_input" | tr '[:upper:]' '[:lower:]')
+        case "$db_kind" in
+          postgres|pg|postgresql)
+            db_dir="pg"
+            db_kind="postgres"
+            db_port=5432
+            ;;
+          mysql)
+            db_dir="mysql"
+            db_kind="mysql"
+            db_port=3306
+            ;;
+          mssql|sqlserver)
+            db_dir="mssql"
+            db_kind="mssql"
+            db_port=1433
+            ;;
+          *)
+            echo "Unsupported database: $db_input"
+            exit 1
+            ;;
+        esac
 
-    - name: Create Test Data
+        {
+          echo "DB_DIR=$db_dir"
+          echo "DB_PORT=$db_port"
+          echo "DB_KIND=$db_kind"
+        } >> "$GITHUB_ENV"
+
+        docker build -t "wfb-db:${db_kind}" "benchmarks_db/${db_dir}"
+
+    - name: Start database container (if required)
+      if: inputs.database != ''
       run: |
+        set -euo pipefail
+        db_envs=()
+        case "$DB_KIND" in
+          postgres)
+            db_envs+=(
+              -e POSTGRES_DB=benchmark
+              -e POSTGRES_USER=benchmark
+              -e POSTGRES_PASSWORD=benchmark
+            )
+            ;;
+          mysql)
+            db_envs+=(
+              -e MYSQL_DATABASE=benchmark
+              -e MYSQL_USER=benchmark
+              -e MYSQL_PASSWORD=benchmark
+              -e MYSQL_ROOT_PASSWORD=benchmark
+            )
+            ;;
+          mssql)
+            db_envs+=(
+              -e ACCEPT_EULA=Y
+              -e MSSQL_SA_PASSWORD=Benchmark!12345
+              -e MSSQL_PID=Developer
+            )
+            ;;
+        esac
+
+        docker run -d \
+          --name wfb-db \
+          --network host \
+          "${db_envs[@]}" \
+          "wfb-db:${DB_KIND}"
+
+    - name: Wait for database to be ready
+      if: inputs.database != ''
+      run: |
+        set -euo pipefail
+        case "$DB_KIND" in
+          postgres)
+            for _ in $(seq 1 60); do
+              if docker run --rm --network host postgres:18 pg_isready -h 127.0.0.1 -p "${DB_PORT}" -U benchmark >/dev/null 2>&1; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "Postgres did not become ready" && exit 1
+            ;;
+          mysql)
+            for _ in $(seq 1 60); do
+              if docker exec wfb-db mysqladmin ping -h127.0.0.1 -P"${DB_PORT}" -ubenchmark -pbenchmark --silent; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "MySQL did not become ready" && exit 1
+            ;;
+          mssql)
+            for _ in $(seq 1 90); do
+              if docker exec -e MSSQL_SA_PASSWORD=Benchmark!12345 wfb-db /usr/config/check_ready.sh >/dev/null 2>&1; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "MSSQL did not become ready" && exit 1
+            ;;
+        esac
+
+    - name: Create test data fixtures
+      run: |
+        set -euo pipefail
         mkdir -p benchmarks_data
         dd if=/dev/zero of=benchmarks_data/15kb.bin bs=1024 count=15
         dd if=/dev/zero of=benchmarks_data/1mb.bin bs=1024 count=1024
         dd if=/dev/zero of=benchmarks_data/10mb.bin bs=1024 count=10240
 
-    - name: Build Docker Image
-      uses: docker/build-push-action@v4
+    - name: Build Docker image for benchmark
+      uses: docker/build-push-action@v5
       with:
         context: ./${{ inputs.framework_path }}
         tags: ${{ inputs.image_tag }}
@@ -60,64 +161,116 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Run Docker Container
+    - name: Run benchmark container
       run: |
+        set -euo pipefail
+        extra_env=()
+        if [ -n "${{ inputs.database }}" ]; then
+          extra_env+=(
+            -e DB_HOST=127.0.0.1
+            -e DB_PORT="${DB_PORT}"
+            -e DB_USER=benchmark
+            -e DB_NAME=benchmark
+            -e DB_KIND="${DB_KIND}"
+          )
+          case "$DB_KIND" in
+            postgres|mysql)
+              extra_env+=( -e DB_PASSWORD=benchmark )
+              ;;
+            mssql)
+              extra_env+=( -e DB_PASSWORD=Benchmark!12345 )
+              ;;
+          esac
+        fi
+
         docker run -d \
           --network host \
           --name ${{ inputs.image_tag }} \
-          -e DB_HOST=127.0.0.1 \
-          -e DB_PORT=5432 \
-          -e DB_USER=benchmark \
-          -e DB_PASSWORD=benchmark \
-          -e DB_NAME=benchmark \
-          -e PORT=8000 \
-          -e DATA_DIR=/benchmarks_data \
-          -v $(pwd)/benchmarks_data:/benchmarks_data \
+          -e PORT="${APP_PORT}" \
+          -e DATA_DIR=/app/benchmarks_data \
+          "${extra_env[@]}" \
+          -v "$PWD/benchmarks_data:/app/benchmarks_data" \
           ${{ inputs.image_tag }}
 
-    - name: Test Endpoints
+    - name: Wait for app to become ready
       run: |
-        # Wait for server to start (retry for 30s)
-        echo "Waiting for server to start..."
-        for i in {1..30}; do
-          if curl -s http://localhost:8000/health > /dev/null; then
-            echo "Server is up!"
-            break
+        set -euo pipefail
+        for _ in $(seq 1 60); do
+          if curl -fsS "http://localhost:${APP_PORT}/health" >/dev/null 2>&1; then
+            exit 0
           fi
-          sleep 1
+          sleep 2
         done
-        
-        # Test Health Endpoint
-        echo "Testing /health..."
-        curl -v -f http://localhost:8000/health
+        echo "App did not become ready" && exit 1
 
-        # Test Root Endpoint
-        echo "Testing /..."
-        curl -v -f http://localhost:8000/
+    - name: Run smoke tests for selected benchmarks
+      env:
+        TESTS_INPUT: ${{ inputs.tests }}
+      run: |
+        set -euo pipefail
 
-        # Test Info Endpoint
-        echo "Testing /info..."
-        curl -v -f http://localhost:8000/info
-        
-        # Test JSON Endpoint
-        echo "Testing /json/..."
-        curl -v -f -X POST -H "Content-Type: application/json" -d '{"servlet-name": "old", "other": "val"}' http://localhost:8000/json/old/new
-        
-        # Test DB Read One
-        echo "Testing /db/read/one..."
-        curl -v -f "http://localhost:8000/db/read/one?id=1"
+        tests=$(python3 scripts/ci_parse_tests.py "$TESTS_INPUT")
+        if [ -z "$tests" ]; then
+          echo "No tests provided" >&2
+          exit 1
+        fi
 
-        # Test DB Read Many
-        echo "Testing /db/read/many..."
-        curl -v -f "http://localhost:8000/db/read/many?offset=0&limit=10"
+        mapfile -t tests_array <<<"$tests"
+        base_url="http://localhost:${APP_PORT}"
 
-        # Test DB Write Insert
-        echo "Testing /db/write/insert..."
-        curl -v -f -X POST "http://localhost:8000/db/write/insert?name=test_insert"
+        # Always verify health first
+        curl -v -f "${base_url}/health"
 
-        # Test Static Files
-        echo "Testing /files/15kb.bin..."
-        curl -v -f http://localhost:8000/files/15kb.bin > /dev/null
-        
-        # Stop container
-        docker stop ${{ inputs.image_tag }}
+        for test in "${tests_array[@]}"; do
+          echo "Running test: $test"
+          case "$test" in
+            hello_world)
+              curl -v -f "${base_url}/"
+              ;;
+            json)
+              curl -v -f -X POST -H "Content-Type: application/json" \
+                -d '{"web-app":{"servlet":[{"servlet-name":"old"}]}}' \
+                "${base_url}/json/old/new"
+              ;;
+            db_read_one)
+              curl -v -f "${base_url}/db/read/one?id=1"
+              ;;
+            db_read_paging)
+              curl -v -f "${base_url}/db/read/many?offset=0&limit=10"
+              ;;
+            db_write)
+              curl -v -f -X POST "${base_url}/db/write/insert?name=ci_insert"
+              ;;
+            static_files_small)
+              curl -v -f "${base_url}/files/15kb.bin" > /dev/null
+              ;;
+            static_files_medium)
+              curl -v -f "${base_url}/files/1mb.bin" > /dev/null
+              ;;
+            static_files_large)
+              curl -v -f "${base_url}/files/10mb.bin" > /dev/null
+              ;;
+            *)
+              echo "Unknown test name: $test" >&2
+              exit 1
+              ;;
+          esac
+        done
+
+    - name: Show container logs on failure
+      if: failure()
+      run: |
+        docker logs ${{ inputs.image_tag }} || true
+        if [ -n "${{ inputs.database }}" ]; then
+          docker logs wfb-db || true
+        fi
+
+    - name: Stop containers
+      if: always()
+      run: |
+        docker stop ${{ inputs.image_tag }} >/dev/null 2>&1 || true
+        docker rm ${{ inputs.image_tag }} >/dev/null 2>&1 || true
+        if [ -n "${{ inputs.database }}" ]; then
+          docker stop wfb-db >/dev/null 2>&1 || true
+          docker rm wfb-db >/dev/null 2>&1 || true
+        fi

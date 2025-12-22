@@ -10,10 +10,14 @@ export default function TestSelector() {
   const [localLoading, setLocalLoading] = useState(false)
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
     if (loadingTests) {
-      const timer = setTimeout(() => setLocalLoading(true), 200)
-      return () => clearTimeout(timer)
-    } else {
+      timer = setTimeout(() => setLocalLoading(true), 200)
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer)
       setLocalLoading(false)
     }
   }, [loadingTests])

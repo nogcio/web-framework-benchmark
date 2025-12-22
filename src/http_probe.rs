@@ -1,16 +1,5 @@
-use crate::{benchmark::BenchmarkTests, prelude::*};
-use std::{collections::VecDeque, time::Duration};
-
-pub struct ServerInfo {
-    pub version: String,
-    pub supported_tests: Vec<BenchmarkTests>,
-}
-
-impl ServerInfo {
-    pub fn use_db(&self) -> bool {
-        self.supported_tests.contains(&BenchmarkTests::DbReadOne)
-    }
-}
+use crate::prelude::*;
+use std::time::Duration;
 
 #[allow(clippy::collapsible_if)]
 pub async fn wait_server_ready(host: &str, timeout: Duration) -> Result<()> {
@@ -28,23 +17,4 @@ pub async fn wait_server_ready(host: &str, timeout: Duration) -> Result<()> {
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-}
-
-pub async fn get_server_version(host: &str) -> Result<ServerInfo> {
-    let client = reqwest::Client::new();
-    let resp = client.get(format!("http://{}/info", host)).send().await?;
-    let result = resp.text().await?;
-    let mut parts = result.split(',').collect::<VecDeque<&str>>();
-    let mut version = "unknown".to_string();
-    let mut supported_tests = Vec::new();
-    if let Some(v) = parts.pop_front() {
-        version = v.to_string();
-    }
-    for test in parts {
-        supported_tests.push(test.try_into().map_err(Error::ServerInfoParseError)?);
-    }
-    Ok(ServerInfo {
-        version,
-        supported_tests,
-    })
 }

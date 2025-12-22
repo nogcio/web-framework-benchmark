@@ -7,12 +7,16 @@ export interface Environment {
   name: string
   displayName: string
   icon: string
+  spec?: string
 }
 
 export interface Benchmark {
+  name: string
   language: string
+  languageVersion: string
   framework: string
-  version: string
+  frameworkVersion: string
+  database: string | null
   rps: number
   tps: number
   latencyAvg: number
@@ -35,15 +39,35 @@ export interface Framework {
   language: string
   name: string
   url: string
-  tags: Record<string, string>
 }
 
-export interface Environment {
-  id: string
+export interface BenchmarkDefinition {
   name: string
+  language: string
+  languageVersion: string
+  framework: string
+  frameworkVersion: string
+  tests: string[]
+  tags: Record<string, string>
+  path: string
+  database: string
+  arguments?: string[]
+  env?: Record<string, string>
 }
 
 export interface Test {
   id: string
   name: string
+}
+
+export interface VisibleColumns {
+  rank: boolean
+  framework: boolean
+  rps: boolean
+  memory: boolean
+  memoryBar: boolean
+  tps: boolean
+  tpsBar: boolean
+  errors: boolean
+  tags: boolean
 }

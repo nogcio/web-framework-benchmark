@@ -42,6 +42,7 @@ pub struct ContainerOptions {
     pub link: Option<String>,
     pub mount: Option<String>,
     pub envs: Option<Vec<(String, String)>>,
+    pub args: Option<Vec<String>>,
 }
 
 pub async fn exec_run_container(
@@ -76,6 +77,11 @@ pub async fn exec_run_container(
         }
     }
     cmd.arg(tag);
+    if let Some(args) = options.args {
+        for arg in args {
+            cmd.arg(arg);
+        }
+    }
     exec(&mut cmd).await?;
     Ok(())
 }

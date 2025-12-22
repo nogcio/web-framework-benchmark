@@ -10,6 +10,7 @@ pub struct WrkConfig {
 #[derive(Debug, Deserialize)]
 pub struct EnvironmentFile {
     pub name: String,
+    pub spec: Option<String>,
     pub icon: Option<String>,
     #[serde(flatten)]
     pub kind: EnvironmentKind,

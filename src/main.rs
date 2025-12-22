@@ -1,6 +1,7 @@
 mod benchmark;
 mod benchmark_environment;
 mod cli;
+mod database;
 mod db;
 mod docker;
 mod error;
@@ -21,13 +22,11 @@ use rand::rngs::OsRng;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use dotenvy::dotenv;
 use prelude::*;
-
-use crate::benchmark::BenchmarkResults;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -45,27 +44,29 @@ async fn main() -> Result<()> {
 
     let cli = cli::Cli::parse();
     match cli.command {
-        cli::Commands::Benchmark { path, environment } => {
-            let result = run_benchmark_for_path(&path, &environment).await?;
-            info!("Benchmark completed for {:?}: {:?}", path, result);
-        }
         cli::Commands::Run { id, environment } => {
             let db = db::Db::open()?;
-            let languages = db.get_languages()?;
-            for lang in languages {
-                for framework in &lang.frameworks {
-                    if db.has_framework_results(id, &environment, &lang.name, &framework.name)? {
-                        info!(
-                            "Skipping existing results for run {}, env {}, {} / {}",
-                            id, environment, lang.name, framework.name
-                        );
-                        continue;
-                    }
-                    let benchmark_path = PathBuf::from(&framework.path);
-                    let benchmark_results =
-                        run_benchmark_for_path(&benchmark_path, &environment).await?;
-                    db.save_run(id, &environment, &lang, framework, &benchmark_results)?;
+            let benchmarks = db.get_benchmarks()?;
+            let has_only = benchmarks.iter().any(|b| b.only);
+            for benchmark in benchmarks {
+                if has_only && !benchmark.only {
+                    debug!(
+                        "Skipping benchmark {} because other benchmarks are marked as only",
+                        benchmark.name
+                    );
+                    continue;
                 }
+                if benchmark.disabled {
+                    info!("Skipping disabled benchmark {}", benchmark.name);
+                    continue;
+                }
+                if db.has_framework_results(id, &environment, &benchmark.language, &benchmark.name)? {
+                    info!("Skipping benchmark {} because it already has data", benchmark.name);
+                    continue;
+                }
+                let mut env = crate::benchmark_environment::load_environment(&environment)?;
+                let benchmark_results = benchmark::run_benchmark(&mut *env, &benchmark).await?;
+                db.save_run(id, &environment, &benchmark, &benchmark_results)?;
             }
         }
         cli::Commands::Serve { host, port } => {
@@ -81,12 +82,6 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-async fn run_benchmark_for_path(path: &Path, environment: &str) -> Result<BenchmarkResults> {
-    let mut env = crate::benchmark_environment::load_environment(environment)?;
-    let result = benchmark::run_benchmark(&mut *env, path).await?;
-    Ok(result)
 }
 
 async fn ensure_benchmark_files() -> std::result::Result<(), io::Error> {

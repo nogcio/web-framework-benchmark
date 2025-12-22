@@ -11,7 +11,10 @@ use std::collections::HashMap;
 use crate::{
     benchmark::BenchmarkTests,
     benchmark_environment::get_environment_config,
-    db::{self, runs::RunResult},
+    db::{
+        self,
+        runs::{RunResult, RunSummary},
+    },
 };
 
 #[derive(Serialize)]
@@ -33,14 +36,24 @@ struct FrameworkInfo {
     language: String,
     name: String,
     url: String,
-    tags: HashMap<String, String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct RunInfo {
-    id: u32,
-    created_at: chrono::DateTime<chrono::Utc>,
+struct BenchmarkInfo {
+    name: String,
+    language: String,
+    language_version: String,
+    framework: String,
+    framework_version: String,
+    tests: Vec<String>,
+    tags: HashMap<String, String>,
+    path: String,
+    database: String,
+    disabled: bool,
+    only: bool,
+    arguments: Vec<String>,
+    env: HashMap<String, String>,
 }
 
 #[derive(Serialize)]
@@ -48,6 +61,7 @@ struct RunInfo {
 struct EnvironmentInfo {
     name: String,
     display_name: String,
+    spec: Option<String>,
     icon: String,
 }
 
@@ -58,6 +72,7 @@ pub fn create_router(db: db::Db) -> Router {
         .route("/api/tests", get(get_tests))
         .route("/api/languages", get(get_languages))
         .route("/api/frameworks", get(get_frameworks))
+        .route("/api/benchmarks", get(get_benchmarks))
         .route("/api/runs", get(get_runs))
         .route(
             "/api/runs/{run_id}/environments/{env}/tests/{test}",
@@ -85,6 +100,7 @@ async fn get_environments(
         if let Ok(config) = get_environment_config(&name) {
             environments.push(EnvironmentInfo {
                 name,
+                spec: config.spec,
                 display_name: config.name,
                 icon: config.icon.unwrap_or_else(|| "server".to_string()),
             });
@@ -100,7 +116,9 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, Sta
         BenchmarkTests::DbReadOne,
         BenchmarkTests::DbReadPaging,
         BenchmarkTests::DbWrite,
-        BenchmarkTests::StaticFiles,
+        BenchmarkTests::StaticFilesSmall,
+        BenchmarkTests::StaticFilesMedium,
+        BenchmarkTests::StaticFilesLarge,
     ]
     .into_iter()
     .map(|t| TestInfo {
@@ -113,12 +131,14 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, Sta
 
 fn readable_test_name(test: &BenchmarkTests) -> String {
     match test {
-        BenchmarkTests::HelloWorld => "Hello World".to_string(),
+        BenchmarkTests::HelloWorld => "Plain Text".to_string(),
         BenchmarkTests::Json => "JSON".to_string(),
-        BenchmarkTests::DbReadOne => "Database Read One".to_string(),
-        BenchmarkTests::DbReadPaging => "Database Read Paging".to_string(),
-        BenchmarkTests::DbWrite => "Database Write".to_string(),
-        BenchmarkTests::StaticFiles => "Static Files".to_string(),
+        BenchmarkTests::DbReadOne => "DB Read One".to_string(),
+        BenchmarkTests::DbReadPaging => "DB Read Paging".to_string(),
+        BenchmarkTests::DbWrite => "DB Write".to_string(),
+        BenchmarkTests::StaticFilesSmall => "Files Small".to_string(),
+        BenchmarkTests::StaticFilesMedium => "Files Medium".to_string(),
+        BenchmarkTests::StaticFilesLarge => "Files Large".to_string(),
     }
 }
 
@@ -142,24 +162,44 @@ async fn get_frameworks(State(db): State<db::Db>) -> Result<Json<Vec<FrameworkIn
         .into_iter()
         .map(|f| FrameworkInfo {
             language: f.language,
-            name: f.framework.name,
-            url: f.framework.url,
-            tags: f.framework.tags,
+            name: f.name,
+            url: f.url,
         })
         .collect();
     Ok(Json(frameworks))
 }
 
-async fn get_runs(State(db): State<db::Db>) -> Result<Json<Vec<RunInfo>>, StatusCode> {
-    let runs = db
-        .get_runs()
+async fn get_benchmarks(State(db): State<db::Db>) -> Result<Json<Vec<BenchmarkInfo>>, StatusCode> {
+    let benchmarks = db
+        .get_benchmarks()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .into_iter()
-        .map(|r| RunInfo {
-            id: r.id,
-            created_at: r.manifest.created_at,
+        .map(|b| BenchmarkInfo {
+            name: b.name,
+            language: b.language,
+            language_version: b.language_version,
+            framework: b.framework,
+            framework_version: b.framework_version,
+            tests: b.tests.iter().map(|t| t.to_string()).collect(),
+            tags: b.tags,
+            path: b.path,
+            database: b
+                .database
+                .map(|d| d.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+            disabled: b.disabled,
+            only: b.only,
+            arguments: b.arguments,
+            env: b.env,
         })
         .collect();
+    Ok(Json(benchmarks))
+}
+
+async fn get_runs(State(db): State<db::Db>) -> Result<Json<Vec<RunSummary>>, StatusCode> {
+    let runs = db
+        .get_runs()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(runs))
 }
 

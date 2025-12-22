@@ -1,8 +1,12 @@
 import { create } from 'zustand'
 import axios from 'axios'
-import type { Run, Benchmark, Language, Framework, Environment, Test } from '../types'
+import type { Run, Benchmark, Language, Framework, Environment, Test, VisibleColumns } from '../types'
 
 const API_BASE = '/api'
+
+type BenchmarkResponse = Benchmark & {
+  tags?: Record<string, string>
+}
 
 export type AppState = {
   runs: Run[]
@@ -27,8 +31,9 @@ export type AppState = {
   fetchTests: () => Promise<void>
   selectedTest: string | null
   setSelectedTest: (test: string | null) => void
-  theme: 'light' | 'dark'
-  toggleTheme: () => void
+  visibleColumns: VisibleColumns
+  setVisibleColumns: (columns: VisibleColumns) => void
+  toggleColumn: (column: keyof VisibleColumns) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -43,6 +48,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   tests: [],
   testsLoading: false,
   selectedTest: null,
+  visibleColumns: {
+    rank: true,
+    framework: true,
+    rps: true,
+    memory: true,
+    memoryBar: false,
+    tps: true,
+    tpsBar: false,
+    errors: true,
+    tags: true,
+  },
+  setVisibleColumns: (columns) => set({ visibleColumns: columns }),
+  toggleColumn: (column) => set((state) => ({
+    visibleColumns: {
+      ...state.visibleColumns,
+      [column]: !state.visibleColumns[column]
+    }
+  })),
   fetchLanguages: async (): Promise<void> => {
     set({ languagesLoading: true })
     try {
@@ -63,8 +86,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       // auto-select latest if none
       const currentSelected = get().selectedRunId
       if (!currentSelected && runs.length > 0) {
-        const latest = runs.reduce((latest, current) =>
-          new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+        // Select the run with the highest ID (assuming higher ID = newer)
+        const latest = runs.reduce((max, current) => 
+          current.id > max.id ? current : max
         ).id
         get().setSelectedRunId(latest)
       }
@@ -95,22 +119,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ benchmarksLoading: true })
     try {
       const url = `${API_BASE}/runs/${runId}/environments/${selectedEnv}/tests/${selectedTest}`
-      const res = await axios.get(url)
-      const benchmarks = res.data.map((item: any) => ({
-        language: item.language,
-        framework: item.framework,
-        version: item.version,
-        timestamp: item.timestamp,
-        rps: item.rps,
-        tps: item.tps,
-        latencyAvg: item.latencyAvg,
-        latencyMax: item.latencyMax,
-        latency50: item.latency50,
-        latency75: item.latency75,
-        latency90: item.latency90,
-        latency99: item.latency99,
-        errors: item.errors,
-        memoryUsage: item.memoryUsage,
+      const res = await axios.get<BenchmarkResponse[]>(url)
+      const benchmarks = (res.data || []).map((item) => ({
+        ...item,
         tags: item.tags || {},
       }))
       set({ benchmarks, benchmarksLoading: false })
@@ -163,21 +174,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().fetchBenchmarks(runId)
     }
   },
-  theme: (localStorage.getItem('theme') as 'light' | 'dark' | null) || 'dark',
-  toggleTheme: (): void => {
-    const current = get().theme
-    const next = current === 'light' ? 'dark' : 'light'
-    set({ theme: next })
-    localStorage.setItem('theme', next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
-  },
 }))
 
 // initialize theme on load
 try {
-  const initialTheme = (localStorage.getItem('theme') as 'light' | 'dark' | null) || 'dark'
   if (typeof document !== 'undefined') {
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark')
+    document.documentElement.classList.add('dark')
   }
 } catch {
   // ignore

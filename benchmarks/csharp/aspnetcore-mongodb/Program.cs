@@ -12,7 +12,14 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
+ThreadPool.SetMinThreads(Environment.ProcessorCount * 32, Environment.ProcessorCount * 32);
+
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxConcurrentConnections = null;
+    options.Limits.MaxConcurrentUpgradedConnections = null;
+});
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Error);

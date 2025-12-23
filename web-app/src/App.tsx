@@ -3,7 +3,7 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 import RunsTabs from './components/RunsTabs'
 import EnvironmentDetails from './components/EnvironmentDetails'
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useAppStore, type AppState } from './store/useAppStore'
 import { useUrlSync } from './hooks/useUrlSync'
 

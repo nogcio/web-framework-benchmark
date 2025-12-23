@@ -42,8 +42,6 @@ async fn main() -> Result<()> {
         env!("CARGO_PKG_VERSION")
     );
 
-    ensure_benchmark_files().await?;
-
     let cli = cli::Cli::parse();
     match cli.command {
         cli::Commands::Run {
@@ -51,6 +49,7 @@ async fn main() -> Result<()> {
             environment,
             filter,
         } => {
+            ensure_benchmark_files().await?;
             let db = db::Db::open()?;
             let benchmarks = db.get_benchmarks()?;
             let has_only = benchmarks.iter().any(|b| b.only);

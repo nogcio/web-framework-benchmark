@@ -1,0 +1,15 @@
+# Benchmark static files directory (created at runtime)
+benchmarks_data/*.bin
+
+data/**/*.yaml
+data/**/*.md
+
+# Ignore environment files except the local one
+/config/environments/*
+!/config/environments/local.yaml
+
+## Node
+node_modules
+
+## Rust
+target

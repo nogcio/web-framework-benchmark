@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
+use tower_http::services::ServeDir;
 
 use crate::{
     benchmark::BenchmarkTests,
@@ -79,7 +80,7 @@ struct TranscriptParams {
 }
 
 pub fn create_router(db: db::Db) -> Router {
-    Router::new()
+    let mut router = Router::new()
         .route("/api/tags", get(get_tags))
         .route("/api/environments", get(get_environments))
         .route("/api/tests", get(get_tests))
@@ -96,7 +97,13 @@ pub fn create_router(db: db::Db) -> Router {
             "/api/runs/{run_id}/environments/{env}/tests/{test}/frameworks/{framework}/transcript",
             get(get_run_transcript),
         )
-        .with_state(db)
+        .with_state(db);
+
+    if std::path::Path::new("static").exists() {
+        router = router.fallback_service(ServeDir::new("static").append_index_html_on_directories(true));
+    }
+
+    router
 }
 
 async fn get_version() -> Json<VersionInfo> {

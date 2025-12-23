@@ -1,0 +1,11 @@
+services:
+  wfb:
+    build: .
+    image: wfb:latest
+    container_name: wfb
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./config/environments:/app/config/environments      
+    restart: unless-stopped

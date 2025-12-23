@@ -57,7 +57,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     tps: true,
     tpsBar: false,
     errors: true,
-    tags: true,
+    tags: false,
   },
   setVisibleColumns: (columns) => set({ visibleColumns: columns }),
   toggleColumn: (column) => set((state) => ({
@@ -99,8 +99,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedRunId: null,
   setSelectedRunId: (id: number | null) => {
     set({ selectedRunId: id })
-    // fetch benchmarks for this run
-    get().fetchBenchmarks(id)
   },
   benchmarks: [],
   benchmarksLoading: false,
@@ -160,19 +158,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setSelectedEnvironment: (env: string | null) => {
     set({ selectedEnvironment: env })
-    // refetch benchmarks if run selected
-    const runId = get().selectedRunId
-    if (runId) {
-      get().fetchBenchmarks(runId)
-    }
   },
   setSelectedTest: (test: string | null) => {
     set({ selectedTest: test })
-    // refetch benchmarks if run selected
-    const runId = get().selectedRunId
-    if (runId) {
-      get().fetchBenchmarks(runId)
-    }
   },
 }))
 

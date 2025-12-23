@@ -6,13 +6,42 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getColorForLanguage(lang: string) {
+  return getColorForString(lang)
+}
+
+const TAG_COLORS: Record<string, string> = {
+  platform: 'hsl(262, 83%, 58%)', // Purple
+  orm: 'hsl(142, 71%, 45%)',      // Green
+  db_lib: 'hsl(217, 91%, 60%)',   // Blue
+}
+
+const TAG_PRIORITY = ['platform', 'orm', 'db_lib']
+
+export function getColorForString(str: string) {
+  if (TAG_COLORS[str]) {
+    return TAG_COLORS[str]
+  }
   let hash = 0
-  for (let i = 0; i < lang.length; i++) {
-    hash = (hash << 5) - hash + lang.charCodeAt(i)
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
     hash |= 0
   }
   const hue = Math.abs(hash) % 360
   return `hsl(${hue}, 65%, 50%)`
+}
+
+export function getSortedTags(tags: Record<string, string> | undefined) {
+  if (!tags) return []
+  return Object.entries(tags).sort(([keyA], [keyB]) => {
+    const indexA = TAG_PRIORITY.indexOf(keyA)
+    const indexB = TAG_PRIORITY.indexOf(keyB)
+    
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB
+    if (indexA !== -1) return -1
+    if (indexB !== -1) return 1
+    
+    return keyA.localeCompare(keyB)
+  })
 }
 
 export function formatNumber(num: number): string {

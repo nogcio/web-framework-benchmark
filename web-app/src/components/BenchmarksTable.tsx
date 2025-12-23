@@ -49,18 +49,19 @@ export default function BenchmarksTable({ benchmarks }: Props) {
 
   if (localLoading) {
     return (
-      <Table className="w-full text-xs">
-        <TableHeader>
+      <Table containerClassName="h-full overflow-auto bg-[linear-gradient(90deg,var(--primary)_1px,transparent_1px)]" className="w-full text-xs">
+        <TableHeader className="sticky top-0 z-20 bg-background">
           <TableRow>
             {visibleColumns.rank && <TableHead className="w-8 pl-4">#</TableHead>}
             {visibleColumns.framework && <TableHead className="w-[20%] pl-4">Framework</TableHead>}
             {visibleColumns.rps && <TableHead className="w-auto">Requests/sec</TableHead>}
-            {visibleColumns.memory && <TableHead className="w-24">Memory</TableHead>}
+            {visibleColumns.memory && <TableHead className="w-px whitespace-nowrap px-2">Memory</TableHead>}
             {visibleColumns.memoryBar && <TableHead className="w-[15%]"></TableHead>}
-            {visibleColumns.tps && <TableHead className="w-24">TPS</TableHead>}
+            {visibleColumns.tps && <TableHead className="w-px whitespace-nowrap px-2">TPS</TableHead>}
             {visibleColumns.tpsBar && <TableHead className="w-[15%]"></TableHead>}
-            {visibleColumns.errors && <TableHead className="w-20 text-right">Errors</TableHead>}
+            {visibleColumns.errors && <TableHead className="w-px text-right whitespace-nowrap">Errors</TableHead>}
             {visibleColumns.tags && <TableHead className="w-24 pr-4">Tags</TableHead>}
+            <TableHead className="w-[var(--spacing)] p-0"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -79,17 +80,18 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                   <Skeleton className="w-12 h-3" />
                 </div>
               </TableCell>}
-              {visibleColumns.memory && <TableCell className="w-24"><Skeleton className="h-4 w-16" /></TableCell>}
+              {visibleColumns.memory && <TableCell className="w-px whitespace-nowrap px-2"><Skeleton className="h-4 w-16" /></TableCell>}
               {visibleColumns.memoryBar && <TableCell className="w-[15%]"><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.tps && <TableCell className="w-24"><Skeleton className="h-4 w-16" /></TableCell>}
+              {visibleColumns.tps && <TableCell className="w-px whitespace-nowrap px-2"><Skeleton className="h-4 w-16" /></TableCell>}
               {visibleColumns.tpsBar && <TableCell className="w-[15%]"><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.errors && <TableCell className="w-20"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>}
+              {visibleColumns.errors && <TableCell className="w-px whitespace-nowrap"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>}
               {visibleColumns.tags && <TableCell className="w-24 pr-4">
                 <div className="flex gap-2">
                   <Skeleton className="h-5 w-12 rounded-full" />
                   <Skeleton className="h-5 w-10 rounded-full" />
                 </div>
               </TableCell>}
+              <TableCell className="w-[var(--spacing)] p-0"></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -113,9 +115,9 @@ export default function BenchmarksTable({ benchmarks }: Props) {
   }
 
   return (
-    <div>
-      <Table className="w-full text-xs">
-        <TableHeader>
+    <div className="h-full">
+      <Table containerClassName="h-full overflow-auto bg-[linear-gradient(90deg,var(--primary)_1px,transparent_1px)]" className="w-full text-xs">
+        <TableHeader className="sticky top-0 z-20 bg-background">
           <TableRow className="border-b-primary border-b-2 hover:bg-transparent">
             {visibleColumns.rank && <TableHead className="w-8 pl-4">
               <div className="flex items-center justify-between">
@@ -135,7 +137,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                 {lastVisibleColumn === 'rps' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.memory && <TableHead className="w-24">
+            {visibleColumns.memory && <TableHead className="w-px whitespace-nowrap px-2">
               <div className="flex items-center justify-between">
                 <span>Memory</span>
                 {lastVisibleColumn === 'memory' && settingsMenu}
@@ -147,7 +149,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                 {lastVisibleColumn === 'memoryBar' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.tps && <TableHead className="w-24">
+            {visibleColumns.tps && <TableHead className="w-px whitespace-nowrap px-2">
               <div className="flex items-center justify-between">
                 <span>TPS</span>
                 {lastVisibleColumn === 'tps' && settingsMenu}
@@ -159,7 +161,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                 {lastVisibleColumn === 'tpsBar' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.errors && <TableHead className="w-20 text-right">
+            {visibleColumns.errors && <TableHead className="w-px text-right whitespace-nowrap">
               <div className="flex items-center justify-end">
                 <span>Errors</span>
                 {lastVisibleColumn === 'errors' && settingsMenu}
@@ -171,6 +173,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                 {lastVisibleColumn === 'tags' && settingsMenu}
               </div>
             </TableHead>}
+            <TableHead className="w-[var(--spacing)] p-0"></TableHead>
           </TableRow>
         </TableHeader>
 
@@ -197,8 +200,8 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                             className="inline-block w-3 h-3 rounded-sm mr-2 shrink-0"
                             style={{ backgroundColor: langColor }}
                           />
-                          <div className="font-medium flex items-center flex-wrap gap-x-2 gap-y-1">
-                            <div className="flex items-center">
+                          <div className="font-medium flex items-center gap-x-2 gap-y-1 min-w-0">
+                            <div className="flex items-center whitespace-nowrap">
                               {languageHref ? (
                                 <a href={languageHref} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline hover:text-primary">
                                   {benchmark.language}
@@ -223,7 +226,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                             )}
                           </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground ml-2 shrink-0">
+                        <span className="text-[10px] text-muted-foreground ml-2 truncate min-w-0 flex-1 text-right">
                           {benchmark.name}
                         </span>
                       </div>
@@ -255,7 +258,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.memory && <TableCell className="w-24">
+                    {visibleColumns.memory && <TableCell className="w-px whitespace-nowrap px-2">
                       <span className="text-xs font-mono text-muted-foreground">
                         {(benchmark.memoryUsage / (1024 * 1024)).toFixed(1)}MB
                       </span>
@@ -291,7 +294,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.tps && <TableCell className="w-24">
+                    {visibleColumns.tps && <TableCell className="w-px whitespace-nowrap px-2">
                       <span className="text-xs font-mono text-muted-foreground">
                         {formatNumber(benchmark.tps)}/s
                       </span>
@@ -325,7 +328,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.errors && <TableCell className="w-20 text-right">
+                    {visibleColumns.errors && <TableCell className="w-px text-right whitespace-nowrap">
                       <span className={benchmark.errors === 0 ? 'text-muted-foreground' : 'text-red-500'}>
                         {benchmark.errors}
                       </span>
@@ -334,6 +337,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                     {visibleColumns.tags && <TableCell className="w-24 pr-4">
                       <TagsInline tags={benchmark.tags} />
                     </TableCell>}
+                    <TableCell className="w-[var(--spacing)] p-0"></TableCell>
                   </TableRow>
                 </HoverCardTrigger>
                 <BenchmarkHoverDetails benchmark={benchmark} langColor={langColor} />

@@ -1,6 +1,7 @@
 import { HoverCardContent } from './ui/hover-card'
 import type { Benchmark } from '../types'
-import { cn, getDatabaseColor } from '../lib/utils'
+import { cn, getDatabaseColor, getSortedTags } from '../lib/utils'
+import { Tag } from './Tag'
 
 interface BenchmarkHoverDetailsProps {
   benchmark: Benchmark
@@ -48,11 +49,8 @@ export function BenchmarkHoverDetails({ benchmark, langColor }: BenchmarkHoverDe
         {benchmark.tags && Object.keys(benchmark.tags).length > 0 && (
           <div className="text-sm">
             <div className="flex flex-wrap gap-1 mt-1">
-              {Object.entries(benchmark.tags).map(([k, v]) => (
-                <span key={`${k}-${v}`} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-muted/30 text-xs text-muted-foreground border border-muted/30">
-                  <span className="font-medium">{k}</span>
-                  {v ? <span>{v}</span> : null}
-                </span>
+              {getSortedTags(benchmark.tags).map(([k, v]) => (
+                <Tag key={`${k}-${v}`} k={k} v={v} />
               ))}
             </div>
           </div>

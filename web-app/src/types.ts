@@ -17,6 +17,7 @@ export interface Benchmark {
   framework: string
   frameworkVersion: string
   database: string | null
+  path?: string
   rps: number
   tps: number
   latencyAvg: number

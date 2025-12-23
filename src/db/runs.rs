@@ -95,6 +95,7 @@ pub struct RunResult {
     pub framework: String,
     pub framework_version: String,
     pub database: Option<String>,
+    pub path: Option<String>,
     pub rps: f64,
     pub tps: u64,
     #[serde(serialize_with = "serialize_duration_as_nanos")]

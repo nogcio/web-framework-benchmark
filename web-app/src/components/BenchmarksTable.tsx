@@ -10,6 +10,7 @@ import { TagsInline } from './TagsInline'
 import { getColorForLanguage, formatNumber, cn, getDatabaseColor } from '../lib/utils'
 import { TableSettings } from './TableSettings'
 import { BenchmarkHoverDetails } from './BenchmarkHoverDetails'
+import { REPO_URL } from '../lib/constants'
 
 interface Props {
   benchmarks: Benchmark[]
@@ -189,7 +190,15 @@ export default function BenchmarksTable({ benchmarks }: Props) {
             return (
               <HoverCard>
                 <HoverCardTrigger asChild>
-                  <TableRow key={benchmark.language + '-' + benchmark.framework} className="hover:cursor-pointer">
+                  <TableRow
+                    key={benchmark.language + '-' + benchmark.framework}
+                    className="hover:cursor-pointer"
+                    onClick={() => {
+                      if (benchmark.path) {
+                        window.open(`${REPO_URL}/tree/main/${benchmark.path}`, '_blank')
+                      }
+                    }}
+                  >
                     {visibleColumns.rank && <TableCell className="w-8 pl-4 font-mono text-muted-foreground">
                       {index + 1}
                     </TableCell>}

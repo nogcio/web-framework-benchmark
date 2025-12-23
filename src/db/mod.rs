@@ -100,6 +100,12 @@ impl Db {
                     && let Some(result) = fw_run.results.get(&test)
                 {
                     let manifest = &fw_run.manifest;
+                    let path = inner
+                        .benchmarks
+                        .iter()
+                        .find(|b| b.name == fw_run.framework)
+                        .map(|b| b.path.clone());
+
                     results.push(runs::RunResult {
                         name: fw_run.framework.clone(),
                         language: manifest.language.clone(),
@@ -107,6 +113,7 @@ impl Db {
                         framework: manifest.framework.clone(),
                         framework_version: manifest.framework_version.clone(),
                         database: manifest.database.clone(),
+                        path,
                         rps: result.requests_per_sec,
                         tps: result.transfer_per_sec,
                         latency_avg: result.latency_avg,

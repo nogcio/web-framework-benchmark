@@ -1,6 +1,7 @@
 import { Github, Mail } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import pkg from '../../package.json'
+import { REPO_URL } from '../lib/constants'
 
 export default function Footer() {
   const [backendVersion, setBackendVersion] = useState<string | null>(null)
@@ -35,7 +36,7 @@ export default function Footer() {
           </a>
           
           <a 
-            href="https://github.com/nogcio/web-framework-benchmark" 
+            href={REPO_URL}
             target="_blank" 
             rel="noopener noreferrer" 
             className="flex items-center gap-1.5 hover:text-foreground transition-colors"

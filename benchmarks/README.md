@@ -21,6 +21,7 @@ benchmarks/
 - **aspnetcore-efcore**: ASP.NET Core with Entity Framework Core.
 - **aspnetcore-mssql**: ASP.NET Core using MSSQL.
 - **aspnetcore-mysql**: ASP.NET Core using MySQL.
+- **aspnetcore-mariadb**: ASP.NET Core using MariaDB.
 - **aspnetcore-npgsql**: ASP.NET Core using PostgreSQL (Npgsql).
 
 ## Adding a New Benchmark

@@ -55,6 +55,11 @@ jobs:
             db_kind="mysql"
             db_port=3306
             ;;
+          mariadb)
+            db_dir="mariadb"
+            db_kind="mariadb"
+            db_port=3306
+            ;;
           mssql|sqlserver)
             db_dir="mssql"
             db_kind="mssql"
@@ -95,6 +100,14 @@ jobs:
               -e MYSQL_ROOT_PASSWORD=benchmark
             )
             ;;
+          mariadb)
+            db_envs+=(
+              -e MARIADB_DATABASE=benchmark
+              -e MARIADB_USER=benchmark
+              -e MARIADB_PASSWORD=benchmark
+              -e MARIADB_ROOT_PASSWORD=benchmark
+            )
+            ;;
           mssql)
             db_envs+=(
               -e ACCEPT_EULA=Y
@@ -125,7 +138,16 @@ jobs:
             echo "Postgres did not become ready" && exit 1
             ;;
           mysql)
+           ariadb)
             for _ in $(seq 1 60); do
+              if docker exec wfb-db mariadb-admin ping -h127.0.0.1 -P"${DB_PORT}" -ubenchmark -pbenchmark --silent; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "MariaDB did not become ready" && exit 1
+            ;;
+          m for _ in $(seq 1 60); do
               if docker exec wfb-db mysqladmin ping -h127.0.0.1 -P"${DB_PORT}" -ubenchmark -pbenchmark --silent; then
                 exit 0
               fi

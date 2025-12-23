@@ -48,6 +48,23 @@
   path: benchmarks/csharp/aspnetcore-mysql
   database: mysql
 
+- name: aspnetcore-mariadb
+  language: C#
+  language_version: "10.0"
+  framework: aspnetcore
+  framework_version: "10.0"
+  tests:
+    - db_read_one
+    - db_read_paging
+    - db_write
+  tags:
+    platform: dotnet
+    dotnet: "10.0"
+    db_lib: mysqlconnector
+    db_lib_version: "2.5.0"
+  path: benchmarks/csharp/aspnetcore-mysql
+  database: mariadb
+
 - name: aspnetcore-mssql
   language: C#
   language_version: "10.0"
@@ -104,6 +121,26 @@
     db_lib_version: "9.0.0"
   path: benchmarks/csharp/aspnetcore-efcore
   database: mysql
+
+- name: aspnetcore-efcore-mariadb
+  language: C#
+  language_version: "9.0"
+  framework: aspnetcore
+  framework_version: "9.0"
+  tests:
+    - db_read_one
+    - db_read_paging
+    - db_write
+    - tweet_service
+  tags:
+    platform: dotnet
+    dotnet: "9.0"
+    orm: efcore
+    orm_version: "9.0.0"
+    db_lib: pomelo-efcore-mysql
+    db_lib_version: "9.0.0"
+  path: benchmarks/csharp/aspnetcore-efcore
+  database: mariadb
 
 - name: aspnetcore-efcore-mssql
   language: C#

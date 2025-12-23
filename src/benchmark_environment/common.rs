@@ -68,6 +68,12 @@ pub fn get_db_env_vars(db: DatabaseKind) -> Vec<(String, String)> {
             ("MYSQL_PASSWORD".to_string(), "benchmark".to_string()),
             ("MYSQL_ROOT_PASSWORD".to_string(), "benchmark".to_string()),
         ],
+        DatabaseKind::Mariadb => vec![
+            ("MARIADB_DATABASE".to_string(), "benchmark".to_string()),
+            ("MARIADB_USER".to_string(), "benchmark".to_string()),
+            ("MARIADB_PASSWORD".to_string(), "benchmark".to_string()),
+            ("MARIADB_ROOT_PASSWORD".to_string(), "benchmark".to_string()),
+        ],
         DatabaseKind::Mssql => vec![
             ("ACCEPT_EULA".to_string(), "Y".to_string()),
             (
@@ -109,6 +115,21 @@ pub fn get_app_env_vars(db: DatabaseKind, db_host: &str, db_port: u16) -> Vec<(S
                 ("DB_PASSWORD".to_string(), "benchmark".to_string()),
                 ("DB_NAME".to_string(), "benchmark".to_string()),
                 ("DB_KIND".to_string(), "mysql".to_string()),
+            ]
+        }
+        DatabaseKind::Mariadb => {
+            let db_url = format!(
+                "mysql://benchmark:benchmark@{}:{}/benchmark",
+                db_host, db_port
+            );
+            vec![
+                ("DATABASE_URL".to_string(), db_url),
+                ("DB_HOST".to_string(), db_host.to_string()),
+                ("DB_PORT".to_string(), db_port.to_string()),
+                ("DB_USER".to_string(), "benchmark".to_string()),
+                ("DB_PASSWORD".to_string(), "benchmark".to_string()),
+                ("DB_NAME".to_string(), "benchmark".to_string()),
+                ("DB_KIND".to_string(), "mariadb".to_string()),
             ]
         }
         DatabaseKind::Mssql => {

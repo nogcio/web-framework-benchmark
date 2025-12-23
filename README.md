@@ -15,7 +15,7 @@ A comprehensive benchmarking tool for comparing the performance of web framework
 - **Result Visualization**: Modern web dashboard built with React, TypeScript, and Tailwind CSS
 - **API-Driven Architecture**: Rust-based backend serves benchmark results via a REST API
 - **Result Storage**: Local filesystem storage of benchmark results in YAML format
-- **Database Integration**: Support for PostgreSQL, MySQL, and MSSQL test databases
+- **Database Integration**: Support for PostgreSQL, MySQL, MariaDB, and MSSQL test databases
 - **Docker Support**: Containerized environments for consistent benchmarking
 - **Local and Remote Environments**: Support for both local development and remote deployment
 
@@ -28,7 +28,7 @@ The project consists of several key components:
   - **API Server**: Provides a REST API to serve benchmark configurations and results to the frontend.
 - **Web Dashboard (`web-app/`)**: A React application (Vite + Tailwind + TanStack Query) that consumes the Core API to visualize benchmark results.
 - **Framework Implementations (`benchmarks/`)**: Benchmark implementations for various frameworks (currently focused on C#/.NET).
-- **Databases (`benchmarks_db/`)**: Docker configurations and initialization scripts for benchmark databases (PostgreSQL, MySQL, MSSQL).
+- **Databases (`benchmarks_db/`)**: Docker configurations and initialization scripts for benchmark databases (PostgreSQL, MySQL, MariaDB, MSSQL).
 - **Configuration (`config/`)**: YAML-based configuration for languages, frameworks, benchmarks, and environments.
 - **Data Storage (`data/`)**: Benchmark run results are stored as YAML files in the filesystem.
 - **Scripts (`scripts/`)**: Lua scripts used by `wrk` to generate load for different test scenarios.

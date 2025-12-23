@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum DatabaseKind {
     Postgres,
     Mysql,
+    Mariadb,
     Mssql,
 }
 
@@ -13,6 +14,7 @@ impl DatabaseKind {
         match self {
             DatabaseKind::Postgres => 5432,
             DatabaseKind::Mysql => 3306,
+            DatabaseKind::Mariadb => 3306,
             DatabaseKind::Mssql => 1433,
         }
     }
@@ -21,6 +23,7 @@ impl DatabaseKind {
         match self {
             DatabaseKind::Postgres => "benchmarks_db/pg",
             DatabaseKind::Mysql => "benchmarks_db/mysql",
+            DatabaseKind::Mariadb => "benchmarks_db/mariadb",
             DatabaseKind::Mssql => "benchmarks_db/mssql",
         }
     }
@@ -29,6 +32,7 @@ impl DatabaseKind {
         match self {
             DatabaseKind::Postgres => "pg",
             DatabaseKind::Mysql => "mysql",
+            DatabaseKind::Mariadb => "mariadb",
             DatabaseKind::Mssql => "mssql",
         }
     }
@@ -41,6 +45,7 @@ impl TryFrom<&str> for DatabaseKind {
         match value.to_lowercase().as_str() {
             "pg" | "postgres" | "postgresql" => Ok(DatabaseKind::Postgres),
             "mysql" => Ok(DatabaseKind::Mysql),
+            "mariadb" => Ok(DatabaseKind::Mariadb),
             "mssql" | "sqlserver" | "microsoft sql server" => Ok(DatabaseKind::Mssql),
             other => Err(format!("Unsupported database: {}", other)),
         }

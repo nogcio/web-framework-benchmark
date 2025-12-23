@@ -270,6 +270,13 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
                     );
                     Self::ssh_check(db_host, &check_cmd).await?
                 }
+                DatabaseKind::Mariadb => {
+                    let check_cmd = format!(
+                        "sudo docker exec {} mariadb-admin ping -h 127.0.0.1 -u benchmark -pbenchmark --silent",
+                        db_container
+                    );
+                    Self::ssh_check(db_host, &check_cmd).await?
+                }
                 DatabaseKind::Mssql => {
                     let check_cmd = format!(
                         "sudo docker exec {} /usr/config/check_ready.sh",

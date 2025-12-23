@@ -37,6 +37,11 @@ jobs:
             image_tag: wfb-aspnetcore-mysql
             tests: db_read_one,db_read_paging,db_write
             database: mysql
+          - name: aspnetcore-mariadb
+            framework_path: benchmarks/csharp/aspnetcore-mysql
+            image_tag: wfb-aspnetcore-mariadb
+            tests: db_read_one,db_read_paging,db_write
+            database: mariadb
           - name: aspnetcore-mssql
             framework_path: benchmarks/csharp/aspnetcore-mssql
             image_tag: wfb-aspnetcore-mssql
@@ -52,6 +57,11 @@ jobs:
             image_tag: wfb-aspnetcore-efcore-mysql
             tests: db_read_one,db_read_paging,db_write,tweet_service
             database: mysql
+          - name: aspnetcore-efcore-mariadb
+            framework_path: benchmarks/csharp/aspnetcore-efcore
+            image_tag: wfb-aspnetcore-efcore-mariadb
+            tests: db_read_one,db_read_paging,db_write,tweet_service
+            database: mariadb
           - name: aspnetcore-efcore-mssql
             framework_path: benchmarks/csharp/aspnetcore-efcore
             image_tag: wfb-aspnetcore-efcore-mssql

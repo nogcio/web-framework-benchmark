@@ -1,4 +1,4 @@
-import { Home, Server, Laptop, Cloud, Activity } from 'lucide-react'
+import { Home, Server, Laptop, Cloud } from 'lucide-react'
 import { useAppStore, type AppState } from '../store/useAppStore'
 import TestSelector from './TestSelector'
 
@@ -19,9 +19,11 @@ export default function Header() {
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
-              <Activity className="h-6 w-6" />
-            </div>
+            <img 
+              src="/logo.svg" 
+              alt="WFB Logo" 
+              className="h-10 w-10 rounded-xl shadow-sm"
+            />
             <div className="flex flex-col gap-0.5">
               <h1 className="text-xl font-bold tracking-tight">
                 Web Framework <span className="text-primary">Benchmarks</span>

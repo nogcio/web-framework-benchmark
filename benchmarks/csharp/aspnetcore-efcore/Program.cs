@@ -29,7 +29,7 @@ var dbPass = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "benchmark";
 var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "benchmark";
 var dbKindEnv = Environment.GetEnvironmentVariable("DB_KIND") ?? "postgres";
 var dbKind = dbKindEnv.ToLowerInvariant();
-var isMysql = dbKind == "mysql";
+var isMysql = dbKind == "mysql" || dbKind == "mariadb";
 var isMssql = dbKind == "mssql" || dbKind == "sqlserver";
 
 var dbPort = ushort.TryParse(dbPortEnv, out var parsedPort)

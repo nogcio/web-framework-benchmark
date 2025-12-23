@@ -92,6 +92,7 @@ pub async fn run_adaptive_connections(
     const MAX_CONNECTIONS: u32 = 16_384;
     const PROBE_DURATION: u64 = 10;
     const LATENCY_LIMIT_MS: u64 = 100;
+    const BYTES_PER_MS_LIMIT_SCALE: u64 = 10 * 1024 * 1024; // 10 MB/ms
     const RPS_DROP_RATIO: f64 = 0.8; // Fail if RPS < 80% of peak
     const PRECISION_CONNECTIONS: u32 = 10;
 
@@ -132,14 +133,19 @@ pub async fn run_adaptive_connections(
             Error::System("Missing 99th percentile latency from wrk output".to_string())
         })?;
 
+        let latency_limit_ms = std::cmp::max(
+            LATENCY_LIMIT_MS,
+            result.transfer_per_sec / BYTES_PER_MS_LIMIT_SCALE,
+        );
+
         let mut fail_reason = None;
         if result.errors > 0 {
             fail_reason = Some(format!("errors detected ({})", result.errors));
-        } else if p99_latency.as_millis() as u64 > LATENCY_LIMIT_MS {
+        } else if p99_latency.as_millis() as u64 > latency_limit_ms {
             fail_reason = Some(format!(
                 "p99 latency {}ms > {}ms limit",
                 p99_latency.as_millis(),
-                LATENCY_LIMIT_MS
+                latency_limit_ms
             ));
         } else if peak_rps > 0.0 && result.requests_per_sec < peak_rps * RPS_DROP_RATIO {
             fail_reason = Some(format!(
@@ -221,14 +227,19 @@ pub async fn run_adaptive_connections(
                 Error::System("Missing 99th percentile latency from wrk output".to_string())
             })?;
 
+            let latency_limit_ms = std::cmp::max(
+                LATENCY_LIMIT_MS,
+                result.transfer_per_sec / BYTES_PER_MS_LIMIT_SCALE,
+            );
+
             let mut fail_reason = None;
             if result.errors > 0 {
                 fail_reason = Some(format!("errors detected ({})", result.errors));
-            } else if p99_latency.as_millis() as u64 > LATENCY_LIMIT_MS {
+            } else if p99_latency.as_millis() as u64 > latency_limit_ms {
                 fail_reason = Some(format!(
                     "p99 latency {}ms > {}ms limit",
                     p99_latency.as_millis(),
-                    LATENCY_LIMIT_MS
+                    latency_limit_ms
                 ));
             } else if peak_rps > 0.0 && result.requests_per_sec < peak_rps * RPS_DROP_RATIO {
                 fail_reason = Some(format!(

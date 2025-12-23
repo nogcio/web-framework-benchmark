@@ -249,6 +249,7 @@ jobs:
     - name: Run smoke tests for selected benchmarks
       env:
         TESTS_INPUT: ${{ inputs.tests }}
+        DATABASE_KIND: ${{ inputs.database }}
       run: |
         set -euo pipefail
 
@@ -276,13 +277,17 @@ jobs:
                 "${base_url}/json/old/new"
               ;;
             db_read_one)
-              curl -v -f "${base_url}/db/read/one?id=1"
+              if [[ "$DATABASE_KIND" == "mongodb" ]]; then
+                curl -v -f "${base_url}/db/read/one?id=000000000000000000000001"
+              else
+                curl -v -f "${base_url}/db/read/one?id=1"
+              fi
               ;;
             db_read_paging)
               curl -v -f "${base_url}/db/read/many?offset=0&limit=10"
               ;;
             db_write)
-              curl -v -f -X POST "${base_url}/db/write/insert?name=ci_insert"
+              curl -v -f -X POST -H "Content-Type: application/json" -d '{"name":"ci_insert"}' "${base_url}/db/write/insert"
               ;;
             static_files_small)
               curl -v -f "${base_url}/files/15kb.bin" > /dev/null

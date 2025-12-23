@@ -26,6 +26,15 @@ pub struct BenchmarkResults {
 pub struct BenchmarkResult {
     pub wrk_result: WrkResult,
     pub memory_usage: u64,
+    pub samples: Vec<BenchmarkSample>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BenchmarkSample {
+    pub connections: u32,
+    pub result: WrkResult,
+    pub p99_latency: Duration,
+    pub fail_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -90,7 +99,10 @@ pub async fn run_benchmark(
     let mut results = HashMap::new();
     for test in tests {
         if !allowed_tests.contains(&test) {
-            info!("Skipping test {:?} because it is not in the allowed list", test);
+            info!(
+                "Skipping test {:?} because it is not in the allowed list",
+                test
+            );
             continue;
         }
         info!("Running benchmark test: {:?}", test);
@@ -139,7 +151,8 @@ pub async fn run_benchmark(
         tokio::time::sleep(Duration::from_secs(BENCHMARK_WARMUP_COOL_DOWN_SECS)).await;
 
         info!("Starting adaptive benchmark run for test: {:?}", test);
-        let wrk_result = run_adaptive_connections(env, &app_ep, script.to_string()).await?;
+        let (wrk_result, samples) =
+            run_adaptive_connections(env, &app_ep, script.to_string()).await?;
 
         let usage = env.stop_app().await?;
         if db_configured {
@@ -158,6 +171,7 @@ pub async fn run_benchmark(
             BenchmarkResult {
                 wrk_result,
                 memory_usage: usage.memory_usage_bytes,
+                samples,
             },
         );
     }
@@ -168,7 +182,10 @@ pub async fn run_benchmark(
 fn test_requires_db(test: &BenchmarkTests) -> bool {
     matches!(
         test,
-        BenchmarkTests::DbReadOne | BenchmarkTests::DbReadPaging | BenchmarkTests::DbWrite | BenchmarkTests::TweetService   
+        BenchmarkTests::DbReadOne
+            | BenchmarkTests::DbReadPaging
+            | BenchmarkTests::DbWrite
+            | BenchmarkTests::TweetService
     )
 }
 

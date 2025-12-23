@@ -84,8 +84,14 @@ pub fn get_db_env_vars(db: DatabaseKind) -> Vec<(String, String)> {
         ],
         DatabaseKind::Mongodb => vec![
             ("MONGO_INITDB_DATABASE".to_string(), "benchmark".to_string()),
-            ("MONGO_INITDB_ROOT_USERNAME".to_string(), "benchmark".to_string()),
-            ("MONGO_INITDB_ROOT_PASSWORD".to_string(), "benchmark".to_string()),
+            (
+                "MONGO_INITDB_ROOT_USERNAME".to_string(),
+                "benchmark".to_string(),
+            ),
+            (
+                "MONGO_INITDB_ROOT_PASSWORD".to_string(),
+                "benchmark".to_string(),
+            ),
         ],
     }
 }

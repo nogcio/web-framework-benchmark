@@ -3,6 +3,7 @@ pub mod config;
 pub mod local;
 pub mod remote;
 
+use crate::benchmark::BenchmarkSample;
 use crate::database::DatabaseKind;
 use crate::{prelude::*, wrk::WrkResult};
 use config::{EnvironmentFile, EnvironmentKind};
@@ -87,7 +88,7 @@ pub async fn run_adaptive_connections(
     env: &dyn BenchmarkEnvironment,
     app_endpoint: &Endpoint,
     script: String,
-) -> Result<WrkResult> {
+) -> Result<(WrkResult, Vec<BenchmarkSample>)> {
     const START_CONNECTIONS: u32 = 16;
     const MAX_CONNECTIONS: u32 = 16_384;
     const PROBE_DURATION: u64 = 10;
@@ -96,18 +97,10 @@ pub async fn run_adaptive_connections(
     const RPS_DROP_RATIO: f64 = 0.8; // Fail if RPS < 80% of peak
     const PRECISION_CONNECTIONS: u32 = 10;
 
-    #[derive(Clone)]
-    struct Sample {
-        connections: u32,
-        result: WrkResult,
-        p99_latency: Duration,
-        fail_reason: Option<String>,
-    }
-
     let full_duration = env.wrk_duration();
-    let mut samples: Vec<Sample> = Vec::new();
+    let mut samples: Vec<BenchmarkSample> = Vec::new();
     let mut peak_rps = 0.0;
-    let mut best_sample: Option<Sample> = None;
+    let mut best_sample: Option<BenchmarkSample> = None;
 
     let mut next_connections = START_CONNECTIONS;
     let mut lower_bound: Option<u32> = None;
@@ -154,7 +147,7 @@ pub async fn run_adaptive_connections(
             ));
         }
 
-        let sample = Sample {
+        let sample = BenchmarkSample {
             connections: next_connections,
             result: result.clone(),
             p99_latency,
@@ -177,7 +170,7 @@ pub async fn run_adaptive_connections(
             }
             if best_sample
                 .as_ref()
-                .map_or(true, |b| result.requests_per_sec > b.result.requests_per_sec)
+                .is_none_or(|b| result.requests_per_sec > b.result.requests_per_sec)
             {
                 best_sample = Some(sample.clone());
             }
@@ -215,12 +208,7 @@ pub async fn run_adaptive_connections(
 
             info!("Refining probe: {} connections", mid);
             let result = env
-                .exec_wrk_with_connections(
-                    app_endpoint,
-                    script.clone(),
-                    mid,
-                    PROBE_DURATION,
-                )
+                .exec_wrk_with_connections(app_endpoint, script.clone(), mid, PROBE_DURATION)
                 .await?;
 
             let p99_latency = percentile_latency(&result, 99).ok_or_else(|| {
@@ -248,7 +236,7 @@ pub async fn run_adaptive_connections(
                 ));
             }
 
-            let sample = Sample {
+            let sample = BenchmarkSample {
                 connections: mid,
                 p99_latency,
                 result: result.clone(),
@@ -270,7 +258,7 @@ pub async fn run_adaptive_connections(
                 }
                 if best_sample
                     .as_ref()
-                    .map_or(true, |b| result.requests_per_sec > b.result.requests_per_sec)
+                    .is_none_or(|b| result.requests_per_sec > b.result.requests_per_sec)
                 {
                     best_sample = Some(sample.clone());
                 }
@@ -301,8 +289,7 @@ pub async fn run_adaptive_connections(
     if let Some(reason) = &final_sample.fail_reason {
         warn!(
             "No successful benchmark run found. Using fallback run with {} connections (Reason: {}).",
-            final_sample.connections,
-            reason
+            final_sample.connections, reason
         );
     } else {
         info!(
@@ -333,5 +320,5 @@ pub async fn run_adaptive_connections(
         final_result.errors
     );
 
-    Ok(final_result)
+    Ok((final_result, samples))
 }

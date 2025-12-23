@@ -51,6 +51,25 @@ pub struct FrameworkManifest {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct RunDataSample {
+    pub connections: u32,
+    pub requests_per_sec: f64,
+    pub transfer_per_sec: u64,
+    pub latency_avg: std::time::Duration,
+    pub latency_stdev: std::time::Duration,
+    pub latency_max: std::time::Duration,
+    pub latency_stdev_pct: f64,
+    pub latency_distribution: Vec<(u8, std::time::Duration)>,
+    pub req_per_sec_avg: f64,
+    pub req_per_sec_stdev: f64,
+    pub req_per_sec_max: f64,
+    pub req_per_sec_stdev_pct: f64,
+    pub errors: i64,
+    pub p99_latency: std::time::Duration,
+    pub fail_reason: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct RunDataRecord {
     pub requests_per_sec: f64,
     pub transfer_per_sec: u64,
@@ -65,6 +84,8 @@ pub struct RunDataRecord {
     pub req_per_sec_stdev_pct: f64,
     pub errors: i64,
     pub memory_usage: u64,
+    #[serde(default)]
+    pub samples: Vec<RunDataSample>,
 }
 
 #[derive(Debug, Clone)]
@@ -281,6 +302,28 @@ pub fn save_run(
 
     for (test, result) in &benchmark_results.results {
         let test_path = path.join(format!("{}.yaml", test));
+        let samples = result
+            .samples
+            .iter()
+            .map(|s| RunDataSample {
+                connections: s.connections,
+                requests_per_sec: s.result.requests_per_sec,
+                transfer_per_sec: s.result.transfer_per_sec,
+                latency_avg: s.result.latency_avg,
+                latency_stdev: s.result.latency_stdev,
+                latency_max: s.result.latency_max,
+                latency_stdev_pct: s.result.latency_stdev_pct,
+                latency_distribution: s.result.latency_distribution.clone(),
+                req_per_sec_avg: s.result.req_per_sec_avg,
+                req_per_sec_stdev: s.result.req_per_sec_stdev,
+                req_per_sec_max: s.result.req_per_sec_max,
+                req_per_sec_stdev_pct: s.result.req_per_sec_stdev_pct,
+                errors: s.result.errors,
+                p99_latency: s.p99_latency,
+                fail_reason: s.fail_reason.clone(),
+            })
+            .collect();
+
         let run_result = RunDataRecord {
             requests_per_sec: result.wrk_result.requests_per_sec,
             transfer_per_sec: result.wrk_result.transfer_per_sec,
@@ -295,6 +338,7 @@ pub fn save_run(
             req_per_sec_stdev_pct: result.wrk_result.req_per_sec_stdev_pct,
             memory_usage: result.memory_usage,
             errors: result.wrk_result.errors,
+            samples,
         };
         let result_content = serde_yaml::to_string(&run_result)?;
         fs::write(test_path, result_content)?;

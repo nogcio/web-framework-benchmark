@@ -131,7 +131,7 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, Sta
         BenchmarkTests::TweetService,
         BenchmarkTests::StaticFilesSmall,
         BenchmarkTests::StaticFilesMedium,
-        BenchmarkTests::StaticFilesLarge,        
+        BenchmarkTests::StaticFilesLarge,
     ]
     .into_iter()
     .map(|t| TestInfo {

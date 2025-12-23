@@ -159,26 +159,6 @@ impl Db {
         Ok(results)
     }
 
-    pub fn has_framework_results(
-        &self,
-        run_id: u32,
-        environment: &str,
-        language: &str,
-        benchmark_name: &str,
-    ) -> Result<bool> {
-        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
-        if let Some(run) = inner.runs.iter().find(|r| r.id == run_id)
-            && let Some(fw_run) = run.frameworks.iter().find(|fw| {
-                fw.environment == environment
-                    && fw.language == language
-                    && fw.framework == benchmark_name
-            })
-        {
-            return Ok(!fw_run.results.is_empty());
-        }
-        Ok(false)
-    }
-
     pub fn get_completed_tests(
         &self,
         run_id: u32,

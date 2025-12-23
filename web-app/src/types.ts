@@ -29,6 +29,7 @@ export interface Benchmark {
   errors: number
   memoryUsage: number
   tags: Record<string, string>
+  hasTranscript?: boolean
 }
 
 export interface Language {

@@ -1,13 +1,13 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WrkConfig {
     pub duration_secs: u64,
     pub threads: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EnvironmentFile {
     pub name: String,
     pub spec: Option<String>,
@@ -16,38 +16,38 @@ pub struct EnvironmentFile {
     pub kind: EnvironmentKind,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum EnvironmentKind {
     Local(LocalConfig),
     Remote(RemoteConfig),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LocalConfig {
     pub wrk: WrkConfig,
     pub limits: LimitsConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LimitsConfig {
     pub db: Option<ResourceLimitSpec>,
     pub app: Option<ResourceLimitSpec>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResourceLimitSpec {
     pub cpus: Option<u32>,
     pub memory_mb: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RemoteConfig {
     pub wrk: WrkConfig,
     pub hosts: HashMap<String, RemoteHostConfig>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct RemoteHostConfig {
     pub ip: String,
     pub internal_ip: String,

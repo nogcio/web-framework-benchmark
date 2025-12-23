@@ -10,6 +10,8 @@ mod http;
 mod http_probe;
 mod parsers;
 mod wrk;
+mod analysis;
+mod analysis_context;
 
 pub mod prelude {
     pub use crate::error::*;
@@ -102,6 +104,16 @@ async fn main() -> Result<()> {
             axum::serve(listener, app.into_make_service())
                 .await
                 .unwrap();
+        }
+        cli::Commands::Analyze {
+            run_id,
+            api_key,
+            model,
+            api_url,
+            languages,
+        } => {
+            let db = db::Db::open()?;
+            analysis::run_analysis(db, run_id, api_key, model, api_url, languages).await?;
         }
     }
 

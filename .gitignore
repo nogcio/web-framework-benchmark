@@ -64,6 +64,7 @@ secrets.yml
 benchmarks_data/*.bin
 
 data/**/*.yaml
+data/**/*.md
 
 # Ignore environment files except the local one
 /config/environments/*

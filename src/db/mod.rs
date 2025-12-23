@@ -2,6 +2,7 @@ pub mod benchmarks;
 pub mod frameworks;
 pub mod languages;
 pub mod runs;
+pub mod environments;
 
 use std::{
     sync::{Arc, RwLock},
@@ -10,6 +11,7 @@ use std::{
 
 use crate::{
     benchmark::{BenchmarkResults, BenchmarkTests},
+    benchmark_environment::config::EnvironmentFile,
     prelude::*,
 };
 
@@ -23,6 +25,7 @@ struct DbInner {
     frameworks: Vec<frameworks::FrameworkRecord>,
     benchmarks: Vec<benchmarks::BenchmarkRecord>,
     runs: Vec<runs::RunRecord>,
+    environments: Vec<environments::EnvironmentRecord>,
 }
 
 impl Db {
@@ -31,15 +34,22 @@ impl Db {
         let frameworks = frameworks::parse_frameworks("config/frameworks.yaml")?;
         let benchmarks = benchmarks::parse_benchmarks("config/benchmarks.yaml")?;
         let runs = runs::load_runs("data")?;
+        let environments = environments::load_environments("config/environments")?;
         let inner = DbInner {
             languages,
             frameworks,
             benchmarks,
             runs,
+            environments,
         };
         Ok(Db {
             inner: Arc::new(RwLock::new(inner)),
         })
+    }
+
+    pub fn get_environment(&self, id: &str) -> Result<Option<EnvironmentFile>> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        Ok(inner.environments.iter().find(|e| e.id == id).map(|e| e.config.clone()))
     }
 
     pub fn get_languages(&self) -> Result<Vec<languages::Language>> {
@@ -50,6 +60,26 @@ impl Db {
     pub fn get_runs(&self) -> Result<Vec<runs::RunSummary>> {
         let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
         Ok(inner.runs.iter().map(runs::RunSummary::from).collect())
+    }
+
+    pub fn get_full_runs(&self) -> Result<Vec<runs::RunRecord>> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        Ok(inner.runs.clone())
+    }
+
+    pub fn get_framework_records(&self) -> Result<Vec<frameworks::FrameworkRecord>> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        Ok(inner.frameworks.clone())
+    }
+
+    pub fn get_language_records(&self) -> Result<Vec<languages::LanguageRecord>> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        Ok(inner.languages.clone())
+    }
+
+    pub fn get_benchmark_records(&self) -> Result<Vec<benchmarks::BenchmarkRecord>> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        Ok(inner.benchmarks.clone())
     }
 
     pub fn get_frameworks(&self) -> Result<Vec<frameworks::Framework>> {
@@ -106,6 +136,27 @@ impl Db {
                         .find(|b| b.name == fw_run.framework)
                         .map(|b| b.path.clone());
 
+                    let transcript_path = std::path::Path::new("data")
+                        .join(run_id.to_string())
+                        .join(&fw_run.environment)
+                        .join(&manifest.language)
+                        .join(&fw_run.framework);
+                    
+                    let test_str = test.to_string();
+                    let has_transcript = transcript_path.join(format!("{}.md", test_str)).exists() || {
+                        if let Ok(entries) = std::fs::read_dir(&transcript_path) {
+                            entries.flatten().any(|entry| {
+                                if let Some(name) = entry.file_name().to_str() {
+                                    name.starts_with(&test_str) && name.ends_with(".md") && name[test_str.len()..].starts_with('.')
+                                } else {
+                                    false
+                                }
+                            })
+                        } else {
+                            false
+                        }
+                    };
+
                     results.push(runs::RunResult {
                         name: fw_run.framework.clone(),
                         language: manifest.language.clone(),
@@ -152,6 +203,7 @@ impl Db {
                         errors: result.errors,
                         memory_usage: result.memory_usage,
                         tags: manifest.tags.clone(),
+                        has_transcript,
                     });
                 }
             }
@@ -187,5 +239,52 @@ impl Db {
         benchmark_results: &BenchmarkResults,
     ) -> Result<()> {
         runs::save_run("data", run_id, environment, benchmark, benchmark_results)
+    }
+
+    pub fn get_transcript(
+        &self,
+        run_id: u32,
+        environment: &str,
+        test: &str,
+        framework: &str,
+        lang: Option<&str>,
+    ) -> Result<Option<std::path::PathBuf>> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        if let Some(run) = inner.runs.iter().find(|r| r.id == run_id) {
+            for fw_run in &run.frameworks {
+                if fw_run.environment == environment && fw_run.framework == framework {
+                    let base_path = std::path::Path::new("data")
+                        .join(run_id.to_string())
+                        .join(environment)
+                        .join(&fw_run.language)
+                        .join(framework);
+
+                    let requested_lang = lang.unwrap_or("en");
+
+                    // Try specific language
+                    let lang_path = base_path.join(format!("{}.{}.md", test, requested_lang));
+                    if lang_path.exists() {
+                        return Ok(Some(lang_path));
+                    }
+
+                    // Try English fallback if requested lang wasn't en
+                    if requested_lang != "en" {
+                        let en_path = base_path.join(format!("{}.en.md", test));
+                        if en_path.exists() {
+                            return Ok(Some(en_path));
+                        }
+                    }
+
+                    // Try default file
+                    let default_path = base_path.join(format!("{}.md", test));
+                    if default_path.exists() {
+                        return Ok(Some(default_path));
+                    }
+
+                    return Ok(None);
+                }
+            }
+        }
+        Ok(None)
     }
 }

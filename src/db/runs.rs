@@ -143,6 +143,7 @@ pub struct RunResult {
     pub errors: i64,
     pub memory_usage: u64,
     pub tags: HashMap<String, String>,
+    pub has_transcript: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

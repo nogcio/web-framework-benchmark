@@ -1,12 +1,15 @@
 use axum::{
     Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
-    response::Json,
+    response::{Json, Response},
+    body::Body,
     routing::get,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tokio::fs::File;
+use tokio_util::io::ReaderStream;
 
 use crate::{
     benchmark::BenchmarkTests,
@@ -70,6 +73,11 @@ struct VersionInfo {
     version: String,
 }
 
+#[derive(Deserialize)]
+struct TranscriptParams {
+    lang: Option<String>,
+}
+
 pub fn create_router(db: db::Db) -> Router {
     Router::new()
         .route("/api/tags", get(get_tags))
@@ -83,6 +91,10 @@ pub fn create_router(db: db::Db) -> Router {
         .route(
             "/api/runs/{run_id}/environments/{env}/tests/{test}",
             get(get_run_results),
+        )
+        .route(
+            "/api/runs/{run_id}/environments/{env}/tests/{test}/frameworks/{framework}/transcript",
+            get(get_run_transcript),
         )
         .with_state(db)
 }
@@ -230,4 +242,28 @@ async fn get_run_results(
         .get_run_results(run_id, environment, test)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(results))
+}
+
+async fn get_run_transcript(
+    State(db): State<db::Db>,
+    Path((run_id, env, test, framework)): Path<(u32, String, String, String)>,
+    Query(params): Query<TranscriptParams>,
+) -> Result<Response, StatusCode> {
+    let transcript_path = db
+        .get_transcript(run_id, &env, &test, &framework, params.lang.as_deref())
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    match transcript_path {
+        Some(path) => {
+            let file = File::open(path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let stream = ReaderStream::new(file);
+            let body = Body::from_stream(stream);
+
+            Ok(Response::builder()
+                .header("Content-Type", "text/markdown; charset=utf-8")
+                .body(body)
+                .unwrap())
+        }
+        None => Err(StatusCode::NOT_FOUND),
+    }
 }

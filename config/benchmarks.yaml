@@ -67,9 +67,9 @@
 
 - name: aspnetcore-efcore-postgres
   language: C#
-  language_version: "10.0"
+  language_version: "9.0"
   framework: aspnetcore
-  framework_version: "10.0"
+  framework_version: "9.0"
   tests:
     - db_read_one
     - db_read_paging
@@ -77,19 +77,19 @@
     - tweet_service
   tags:
     platform: dotnet
-    dotnet: "10.0"
+    dotnet: "9.0"
     orm: efcore
-    orm_version: "10.0.0"
+    orm_version: "9.0.0"
     db_lib: npgsql-efcore
-    db_lib_version: "10.0.0"
+    db_lib_version: "9.0.2"
   path: benchmarks/csharp/aspnetcore-efcore
   database: postgres
 
 - name: aspnetcore-efcore-mysql
   language: C#
-  language_version: "10.0"
+  language_version: "9.0"
   framework: aspnetcore
-  framework_version: "10.0"
+  framework_version: "9.0"
   tests:
     - db_read_one
     - db_read_paging
@@ -97,19 +97,19 @@
     - tweet_service
   tags:
     platform: dotnet
-    dotnet: "10.0"
+    dotnet: "9.0"
     orm: efcore
-    orm_version: "10.0.0"
-    db_lib: mysql-efcore
-    db_lib_version: "10.0.0-rc"
+    orm_version: "9.0.0"
+    db_lib: pomelo-efcore-mysql
+    db_lib_version: "9.0.0"
   path: benchmarks/csharp/aspnetcore-efcore
   database: mysql
 
 - name: aspnetcore-efcore-mssql
   language: C#
-  language_version: "10.0"
+  language_version: "9.0"
   framework: aspnetcore
-  framework_version: "10.0"
+  framework_version: "9.0"
   tests:
     - db_read_one
     - db_read_paging
@@ -117,10 +117,10 @@
     - tweet_service
   tags:
     platform: dotnet
-    dotnet: "10.0"
+    dotnet: "9.0"
     orm: efcore
-    orm_version: "10.0.0"
+    orm_version: "9.0.0"
     db_lib: mssql-efcore
-    db_lib_version: "10.0.0"
+    db_lib_version: "9.0.0"
   path: benchmarks/csharp/aspnetcore-efcore
   database: mssql

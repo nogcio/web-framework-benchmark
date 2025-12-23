@@ -89,48 +89,36 @@ pub async fn run_adaptive_connections(
     script: String,
 ) -> Result<WrkResult> {
     const START_CONNECTIONS: u32 = 16;
-    const LOAD_MULTIPLIER: f64 = 1.7; // exponential growth factor while searching
     const MAX_CONNECTIONS: u32 = 16_384;
-    const MAX_ITERATIONS: usize = 32;
-    const PRECISION_CONNECTIONS: u32 = 10;
     const PROBE_DURATION: u64 = 10;
-    const BASE_P99_LATENCY_LIMIT_MS: u64 = 100;
-    const P99_LATENCY_PER_KB_MS: f64 = 0.20; // allow larger payloads to take proportionally longer
-    const P99_LATENCY_LIMIT_MAX_MS: u64 = 5_000;
-    const RPS_DROP_THRESHOLD: f64 = 0.20;
-    const STDEV_LATENCY_RATIO_LIMIT: f64 = 0.80;
-    const STDEV_ABS_FAIL_MIN: Duration = Duration::from_millis(1); // avoid tripping on sub-ms jitter
-    const LOW_LATENCY_P99_IGNORE: Duration = Duration::from_millis(50); // allow jitter when latency is tiny
+    const LATENCY_LIMIT_MS: u64 = 100;
+    const RPS_DROP_RATIO: f64 = 0.8; // Fail if RPS < 80% of peak
+    const PRECISION_CONNECTIONS: u32 = 10;
 
     #[derive(Clone)]
     struct Sample {
         connections: u32,
         result: WrkResult,
         p99_latency: Duration,
-        stdev_ratio: f64,
         fail_reason: Option<String>,
     }
 
     let full_duration = env.wrk_duration();
-
     let mut samples: Vec<Sample> = Vec::new();
-    let mut lower_pass: Option<Sample> = None; // best known passing point (lower bound)
-    let mut upper_fail: Option<Sample> = None; // first failing point (upper bound)
-    let mut best_by_rps: Option<Sample> = None;
+    let mut peak_rps = 0.0;
+    let mut best_sample: Option<Sample> = None;
 
-    let mut iteration: usize = 0;
     let mut next_connections = START_CONNECTIONS;
-    let mut last_sample: Option<Sample> = None;
+    let mut lower_bound: Option<u32> = None;
+    let mut upper_bound: Option<u32> = None;
 
-    while iteration < MAX_ITERATIONS && next_connections > 0 && next_connections <= MAX_CONNECTIONS
-    {
-        iteration += 1;
+    // Phase 1: Growth
+    loop {
+        if next_connections > MAX_CONNECTIONS {
+            break;
+        }
 
-        info!(
-            "Adaptive iteration {}: {} connections ({}s probe)",
-            iteration, next_connections, PROBE_DURATION
-        );
-
+        info!("Adaptive probe: {} connections", next_connections);
         let result = env
             .exec_wrk_with_connections(
                 app_endpoint,
@@ -144,258 +132,179 @@ pub async fn run_adaptive_connections(
             Error::System("Missing 99th percentile latency from wrk output".to_string())
         })?;
 
-        let stdev_ratio = if result.latency_avg.as_secs_f64() > 0.0 {
-            result.latency_stdev.as_secs_f64() / result.latency_avg.as_secs_f64()
-        } else {
-            0.0
-        };
-
-        let payload_kb = if result.requests_per_sec > 0.0 {
-            (result.transfer_per_sec as f64 / result.requests_per_sec) / 1024.0
-        } else {
-            0.0
-        };
-
-        let p99_limit_ms = (BASE_P99_LATENCY_LIMIT_MS as f64 + payload_kb * P99_LATENCY_PER_KB_MS)
-            .min(P99_LATENCY_LIMIT_MAX_MS as f64)
-            .max(BASE_P99_LATENCY_LIMIT_MS as f64);
-
-        let p99_limit = Duration::from_millis(p99_limit_ms.round() as u64);
-
-        let rps_drop = last_sample.as_ref().and_then(|prev| {
-            if next_connections > prev.connections && prev.result.requests_per_sec > 0.0 {
-                Some(
-                    (prev.result.requests_per_sec - result.requests_per_sec)
-                        / prev.result.requests_per_sec,
-                )
-            } else {
-                None
-            }
-        });
-
         let mut fail_reason = None;
         if result.errors > 0 {
             fail_reason = Some(format!("errors detected ({})", result.errors));
-        } else if p99_latency > p99_limit {
+        } else if p99_latency.as_millis() as u64 > LATENCY_LIMIT_MS {
             fail_reason = Some(format!(
                 "p99 latency {}ms > {}ms limit",
                 p99_latency.as_millis(),
-                p99_limit.as_millis()
+                LATENCY_LIMIT_MS
             ));
-        } else if let Some(drop) = rps_drop
-            && drop >= RPS_DROP_THRESHOLD
-        {
-            fail_reason = Some(format!("RPS dropped by {:.1}%", drop * 100.0));
+        } else if peak_rps > 0.0 && result.requests_per_sec < peak_rps * RPS_DROP_RATIO {
+            fail_reason = Some(format!(
+                "RPS {:.2} < 80% of peak {:.2}",
+                result.requests_per_sec, peak_rps
+            ));
         }
-
-        let unstable = p99_latency >= LOW_LATENCY_P99_IGNORE
-            && stdev_ratio > STDEV_LATENCY_RATIO_LIMIT
-            && result.latency_stdev >= STDEV_ABS_FAIL_MIN;
-
-        if fail_reason.is_none() && unstable {
-            if lower_pass.is_some() {
-                // Only start failing on instability after we observed at least one stable point.
-                fail_reason = Some(format!(
-                    "unstable latency: stdev {:.1}% of avg",
-                    stdev_ratio * 100.0
-                ));
-            } else {
-                // First probe: treat as warning so baseline doesn't immediately fail on jitter.
-                warn!(
-                    "High jitter on baseline: stdev {:.1}% ({}ms) of avg {}ms",
-                    stdev_ratio * 100.0,
-                    result.latency_stdev.as_millis(),
-                    result.latency_avg.as_millis()
-                );
-            }
-        }
-
-        info!(
-            "Result: {} conn -> {:.2} rps, avg {:.2}ms, p99 {}ms, stdev {:.1}%, errors {}{}",
-            next_connections,
-            result.requests_per_sec,
-            result.latency_avg.as_secs_f64() * 1000.0,
-            p99_latency.as_millis(),
-            stdev_ratio * 100.0,
-            result.errors,
-            rps_drop
-                .map(|d| format!("; ΔRPS {:.1}%", -d * 100.0))
-                .unwrap_or_default()
-        );
 
         let sample = Sample {
             connections: next_connections,
             result: result.clone(),
             p99_latency,
-            stdev_ratio,
             fail_reason: fail_reason.clone(),
         };
-
-        last_sample = Some(sample.clone());
         samples.push(sample.clone());
 
-        let passed = fail_reason.is_none();
+        info!(
+            "Result: {} conn -> {:.2} rps, p99 {}ms, {}",
+            next_connections,
+            result.requests_per_sec,
+            p99_latency.as_millis(),
+            fail_reason.as_deref().unwrap_or("pass")
+        );
 
-        if passed {
-            if best_by_rps
+        if fail_reason.is_none() {
+            // Pass
+            if result.requests_per_sec > peak_rps {
+                peak_rps = result.requests_per_sec;
+            }
+            if best_sample
                 .as_ref()
-                .map(|s| s.result.requests_per_sec)
-                .unwrap_or(-1.0)
-                < sample.result.requests_per_sec
+                .map_or(true, |b| result.requests_per_sec > b.result.requests_per_sec)
             {
-                best_by_rps = Some(sample.clone());
+                best_sample = Some(sample.clone());
             }
-
-            if lower_pass
-                .as_ref()
-                .map(|s| s.connections < sample.connections)
-                .unwrap_or(true)
-            {
-                lower_pass = Some(sample.clone());
-            }
-
-            if let Some(high) = upper_fail.as_ref() {
-                let low_conn = sample.connections;
-                let high_conn = high.connections;
-
-                if high_conn <= low_conn + PRECISION_CONNECTIONS {
-                    info!(
-                        "Boundary pinned between {} and {} connections (±{}), stopping",
-                        low_conn, high_conn, PRECISION_CONNECTIONS
-                    );
-                    break;
-                }
-
-                let mut mid = low_conn + (high_conn - low_conn) / 2;
-                if mid <= low_conn {
-                    mid = low_conn + 1;
-                }
-                next_connections = mid;
-            } else {
-                let mut scaled = ((sample.connections as f64) * LOAD_MULTIPLIER).ceil() as u32;
-                if scaled <= sample.connections {
-                    scaled = sample.connections + 1;
-                }
-
-                if scaled > MAX_CONNECTIONS {
-                    info!(
-                        "Reached max_connections {}, stopping growth",
-                        MAX_CONNECTIONS
-                    );
-                    break;
-                }
-
-                next_connections = scaled;
-            }
+            lower_bound = Some(next_connections);
+            next_connections *= 2;
         } else {
-            if upper_fail
-                .as_ref()
-                .map(|s| sample.connections < s.connections)
-                .unwrap_or(true)
-            {
-                upper_fail = Some(sample.clone());
-            }
-
-            match lower_pass.as_ref() {
-                Some(low) => {
-                    let low_conn = low.connections;
-                    let high_conn = upper_fail.as_ref().unwrap().connections;
-
-                    if high_conn <= low_conn + PRECISION_CONNECTIONS {
-                        info!(
-                            "Boundary narrowed to {}..{} connections (±{}), stopping",
-                            low_conn, high_conn, PRECISION_CONNECTIONS
-                        );
-                        break;
-                    }
-
-                    let mut mid = low_conn + (high_conn - low_conn) / 2;
-                    if mid <= low_conn {
-                        mid = low_conn + 1;
-                    }
-
-                    next_connections = mid;
-                }
-                None => {
-                    return Err(Error::System(
-                        "Server fails baseline load (no successful run)".to_string(),
-                    ));
-                }
-            }
+            // Fail
+            upper_bound = Some(next_connections);
+            break; // Stop growth, move to refinement
         }
+    }
 
-        if next_connections > MAX_CONNECTIONS {
+    // Phase 2: Refinement (Binary Search)
+    if let (Some(low), Some(high)) = (lower_bound, upper_bound) {
+        let mut l = low;
+        let mut r = high;
+        let mut iterations = 0;
+
+        while r - l > PRECISION_CONNECTIONS {
+            if iterations >= 20 {
+                info!("Refinement iteration limit reached (20)");
+                break;
+            }
+            // Stop if the range is within 5% of the lower bound
+            if (r - l) as f64 / l as f64 <= 0.05 {
+                info!("Refinement precision reached (5%)");
+                break;
+            }
+            iterations += 1;
+
+            let mid = l + (r - l) / 2;
+            if mid <= l {
+                break;
+            } // Should not happen given condition
+
+            info!("Refining probe: {} connections", mid);
+            let result = env
+                .exec_wrk_with_connections(
+                    app_endpoint,
+                    script.clone(),
+                    mid,
+                    PROBE_DURATION,
+                )
+                .await?;
+
+            let p99_latency = percentile_latency(&result, 99).ok_or_else(|| {
+                Error::System("Missing 99th percentile latency from wrk output".to_string())
+            })?;
+
+            let mut fail_reason = None;
+            if result.errors > 0 {
+                fail_reason = Some(format!("errors detected ({})", result.errors));
+            } else if p99_latency.as_millis() as u64 > LATENCY_LIMIT_MS {
+                fail_reason = Some(format!(
+                    "p99 latency {}ms > {}ms limit",
+                    p99_latency.as_millis(),
+                    LATENCY_LIMIT_MS
+                ));
+            } else if peak_rps > 0.0 && result.requests_per_sec < peak_rps * RPS_DROP_RATIO {
+                fail_reason = Some(format!(
+                    "RPS {:.2} < 80% of peak {:.2}",
+                    result.requests_per_sec, peak_rps
+                ));
+            }
+
+            let sample = Sample {
+                connections: mid,
+                p99_latency,
+                result: result.clone(),
+                fail_reason: fail_reason.clone(),
+            };
+            samples.push(sample.clone());
+
             info!(
-                "Next step {} exceeds max_connections {}, stopping",
-                next_connections, MAX_CONNECTIONS
+                "Result: {} conn -> {:.2} rps, p99 {}ms, {}",
+                mid,
+                result.requests_per_sec,
+                p99_latency.as_millis(),
+                fail_reason.as_deref().unwrap_or("pass")
             );
-            break;
-        }
-    }
 
-    if samples.is_empty() {
-        return Err(Error::System("No benchmark samples collected".to_string()));
-    }
-
-    let stable_sample = match (lower_pass.clone(), best_by_rps.clone()) {
-        (Some(l), Some(b)) => {
-            if b.result.requests_per_sec >= l.result.requests_per_sec {
-                b
+            if fail_reason.is_none() {
+                if result.requests_per_sec > peak_rps {
+                    peak_rps = result.requests_per_sec;
+                }
+                if best_sample
+                    .as_ref()
+                    .map_or(true, |b| result.requests_per_sec > b.result.requests_per_sec)
+                {
+                    best_sample = Some(sample.clone());
+                }
+                l = mid;
             } else {
-                l
+                r = mid;
             }
         }
-        (Some(l), None) => l,
-        (None, Some(b)) => b,
-        (None, None) => {
-            return Err(Error::System("No successful benchmark run".to_string()));
-        }
-    };
-
-    let boundary_reason = upper_fail
-        .as_ref()
-        .and_then(|s| s.fail_reason.clone())
-        .unwrap_or_else(|| "limit not reached (max connections/iterations)".to_string());
+    }
 
     samples.sort_by_key(|s| s.connections);
-    info!("Performance curve (connections -> rps, p99, stdev%, status):");
-    for s in &samples {
+    info!("Benchmark results:");
+    for sample in &samples {
         info!(
-            "  {} -> {:.2} rps, p99 {}ms, stdev {:.1}%, {}, {}",
-            s.connections,
-            s.result.requests_per_sec,
-            s.p99_latency.as_millis(),
-            s.stdev_ratio * 100.0,
-            if s.fail_reason.is_none() {
-                "pass"
-            } else {
-                "fail"
-            },
-            s.fail_reason.as_deref().unwrap_or("stable")
+            "  {} connections -> {:.2} rps, p99 {}ms, {}",
+            sample.connections,
+            sample.result.requests_per_sec,
+            sample.p99_latency.as_millis(),
+            sample.fail_reason.as_deref().unwrap_or("pass")
         );
     }
 
-    info!(
-        "Stable boundary: {} connections (reason: {})",
-        stable_sample.connections, boundary_reason
-    );
-    info!(
-        "Recommendation: keep connections <= {} for p99 {}ms and stdev {:.1}%",
-        stable_sample.connections,
-        stable_sample.p99_latency.as_millis(),
-        stable_sample.stdev_ratio * 100.0
-    );
+    // Final Selection
+    let final_sample = best_sample
+        .or_else(|| samples.iter().min_by_key(|s| s.connections).cloned())
+        .ok_or_else(|| Error::System("No benchmark samples collected".to_string()))?;
 
-    info!(
-        "Running full-duration benchmark at {} connections ({}s)",
-        stable_sample.connections, full_duration
-    );
+    if let Some(reason) = &final_sample.fail_reason {
+        warn!(
+            "No successful benchmark run found. Using fallback run with {} connections (Reason: {}).",
+            final_sample.connections,
+            reason
+        );
+    } else {
+        info!(
+            "Selected best run: {} connections, {:.2} rps. Running full benchmark ({}s)...",
+            final_sample.connections, final_sample.result.requests_per_sec, full_duration
+        );
+    }
 
     let final_result = env
         .exec_wrk_with_connections(
             app_endpoint,
             script.clone(),
-            stable_sample.connections,
+            final_sample.connections,
             full_duration,
         )
         .await?;
@@ -406,7 +315,7 @@ pub async fn run_adaptive_connections(
 
     info!(
         "Final result: {} connections -> {:.2} rps, avg {:.2}ms, p99 {}ms, errors {}",
-        stable_sample.connections,
+        final_sample.connections,
         final_result.requests_per_sec,
         final_result.latency_avg.as_secs_f64() * 1000.0,
         final_p99.as_millis(),

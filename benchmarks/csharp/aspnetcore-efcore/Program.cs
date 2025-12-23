@@ -12,8 +12,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using MySql.Data.MySqlClient;
-using MySql.EntityFrameworkCore.Extensions;
+using MySqlConnector;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,7 +52,7 @@ if (isMysql)
         SslMode = MySqlSslMode.Preferred,
     };
     builder.Services.AddDbContextPool<BenchmarkContext>(options =>
-        options.UseMySQL(csb.ConnectionString, my => my.EnableRetryOnFailure()));
+        options.UseMySql(csb.ConnectionString, ServerVersion.AutoDetect(csb.ConnectionString), my => my.EnableRetryOnFailure()));
 }
 else if (isMssql)
 {

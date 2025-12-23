@@ -1,6 +1,17 @@
 import { Github, Mail } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import pkg from '../../package.json'
 
 export default function Footer() {
+  const [backendVersion, setBackendVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => setBackendVersion(data.version))
+      .catch(() => setBackendVersion('unknown'))
+  }, [])
+
   return (
     <footer className="mt-auto py-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-2 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
@@ -13,6 +24,8 @@ export default function Footer() {
         </div>
         
         <div className="flex items-center gap-4">
+          <span>Client: v{pkg.version}</span>
+          {backendVersion && <span>Backend: v{backendVersion}</span>}
           <a 
             href="mailto:getansum@nogc.io" 
             className="flex items-center gap-1.5 hover:text-foreground transition-colors"

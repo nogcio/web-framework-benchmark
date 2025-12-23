@@ -65,6 +65,11 @@ struct EnvironmentInfo {
     icon: String,
 }
 
+#[derive(Serialize)]
+struct VersionInfo {
+    version: String,
+}
+
 pub fn create_router(db: db::Db) -> Router {
     Router::new()
         .route("/api/tags", get(get_tags))
@@ -74,11 +79,18 @@ pub fn create_router(db: db::Db) -> Router {
         .route("/api/frameworks", get(get_frameworks))
         .route("/api/benchmarks", get(get_benchmarks))
         .route("/api/runs", get(get_runs))
+        .route("/api/version", get(get_version))
         .route(
             "/api/runs/{run_id}/environments/{env}/tests/{test}",
             get(get_run_results),
         )
         .with_state(db)
+}
+
+async fn get_version() -> Json<VersionInfo> {
+    Json(VersionInfo {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })
 }
 
 async fn get_tags(State(db): State<db::Db>) -> Result<Json<Vec<String>>, StatusCode> {
@@ -116,10 +128,10 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, Sta
         BenchmarkTests::DbReadOne,
         BenchmarkTests::DbReadPaging,
         BenchmarkTests::DbWrite,
+        BenchmarkTests::TweetService,
         BenchmarkTests::StaticFilesSmall,
         BenchmarkTests::StaticFilesMedium,
-        BenchmarkTests::StaticFilesLarge,
-        BenchmarkTests::TweetService,
+        BenchmarkTests::StaticFilesLarge,        
     ]
     .into_iter()
     .map(|t| TestInfo {

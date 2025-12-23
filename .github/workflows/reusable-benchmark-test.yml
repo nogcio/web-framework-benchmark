@@ -65,6 +65,11 @@ jobs:
             db_kind="mssql"
             db_port=1433
             ;;
+          mongodb)
+            db_dir="mongodb"
+            db_kind="mongodb"
+            db_port=27017
+            ;;
           *)
             echo "Unsupported database: $db_input"
             exit 1
@@ -113,6 +118,13 @@ jobs:
               -e ACCEPT_EULA=Y
               -e MSSQL_SA_PASSWORD=Benchmark!12345
               -e MSSQL_PID=Developer
+            )
+            ;;
+          mongodb)
+            db_envs+=(
+              -e MONGO_INITDB_ROOT_USERNAME=benchmark
+              -e MONGO_INITDB_ROOT_PASSWORD=benchmark
+              -e MONGO_INITDB_DATABASE=benchmark
             )
             ;;
         esac
@@ -164,6 +176,15 @@ jobs:
             done
             echo "MSSQL did not become ready" && exit 1
             ;;
+          mongodb)
+            for _ in $(seq 1 60); do
+              if docker exec wfb-db mongosh --eval "quit(db.runCommand('ping').ok ? 0 : 1)" --host 127.0.0.1 --port "${DB_PORT}" -u benchmark -p benchmark --authenticationDatabase admin --quiet; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "MongoDB did not become ready" && exit 1
+            ;;
         esac
 
     - name: Create test data fixtures
@@ -196,7 +217,7 @@ jobs:
             -e DB_KIND="${DB_KIND}"
           )
           case "$DB_KIND" in
-            postgres|mysql)
+            postgres|mysql|mariadb|mongodb)
               extra_env+=( -e DB_PASSWORD=benchmark )
               ;;
             mssql)

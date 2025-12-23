@@ -284,6 +284,13 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
                     );
                     Self::ssh_check(db_host, &check_cmd).await?
                 }
+                DatabaseKind::Mongodb => {
+                    let check_cmd = format!(
+                        "sudo docker exec {} mongosh --eval \"db.adminCommand('ping')\"",
+                        db_container
+                    );
+                    Self::ssh_check(db_host, &check_cmd).await?
+                }
             };
 
             if ready {

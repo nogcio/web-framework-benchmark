@@ -7,6 +7,7 @@ pub enum DatabaseKind {
     Mysql,
     Mariadb,
     Mssql,
+    Mongodb,
 }
 
 impl DatabaseKind {
@@ -16,6 +17,7 @@ impl DatabaseKind {
             DatabaseKind::Mysql => 3306,
             DatabaseKind::Mariadb => 3306,
             DatabaseKind::Mssql => 1433,
+            DatabaseKind::Mongodb => 27017,
         }
     }
 
@@ -25,6 +27,7 @@ impl DatabaseKind {
             DatabaseKind::Mysql => "benchmarks_db/mysql",
             DatabaseKind::Mariadb => "benchmarks_db/mariadb",
             DatabaseKind::Mssql => "benchmarks_db/mssql",
+            DatabaseKind::Mongodb => "benchmarks_db/mongodb",
         }
     }
 
@@ -34,6 +37,7 @@ impl DatabaseKind {
             DatabaseKind::Mysql => "mysql",
             DatabaseKind::Mariadb => "mariadb",
             DatabaseKind::Mssql => "mssql",
+            DatabaseKind::Mongodb => "mongodb",
         }
     }
 }
@@ -47,6 +51,7 @@ impl TryFrom<&str> for DatabaseKind {
             "mysql" => Ok(DatabaseKind::Mysql),
             "mariadb" => Ok(DatabaseKind::Mariadb),
             "mssql" | "sqlserver" | "microsoft sql server" => Ok(DatabaseKind::Mssql),
+            "mongo" | "mongodb" => Ok(DatabaseKind::Mongodb),
             other => Err(format!("Unsupported database: {}", other)),
         }
     }

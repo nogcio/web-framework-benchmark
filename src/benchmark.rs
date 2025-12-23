@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use humanize_bytes::humanize_bytes_binary;
 
 use crate::benchmark_environment::{BenchmarkEnvironment, run_adaptive_connections};
+use crate::database::DatabaseKind;
 use crate::db::benchmarks::Benchmark;
 use crate::prelude::*;
 use crate::wrk::WrkResult;
@@ -112,10 +113,22 @@ pub async fn run_benchmark(
         let script = match test {
             BenchmarkTests::HelloWorld => "scripts/wrk_hello.lua",
             BenchmarkTests::Json => "scripts/wrk_json.lua",
-            BenchmarkTests::DbReadOne => "scripts/wrk_db_read_one.lua",
-            BenchmarkTests::DbReadPaging => "scripts/wrk_db_read_paging.lua",
-            BenchmarkTests::TweetService => "scripts/wrk_tweet_service.lua",
-            BenchmarkTests::DbWrite => "scripts/wrk_db_write.lua",
+            BenchmarkTests::DbReadOne => match bench.database {
+                Some(DatabaseKind::Mongodb) => "scripts/wrk_db_read_one_mongo.lua",
+                _ => "scripts/wrk_db_read_one.lua",
+            },
+            BenchmarkTests::DbReadPaging => match bench.database {
+                Some(DatabaseKind::Mongodb) => "scripts/wrk_db_read_paging_mongo.lua",
+                _ => "scripts/wrk_db_read_paging.lua",
+            },
+            BenchmarkTests::TweetService => match bench.database {
+                Some(DatabaseKind::Mongodb) => "scripts/wrk_tweet_service_mongo.lua",
+                _ => "scripts/wrk_tweet_service.lua",
+            },
+            BenchmarkTests::DbWrite => match bench.database {
+                Some(DatabaseKind::Mongodb) => "scripts/wrk_db_write_mongo.lua",
+                _ => "scripts/wrk_db_write.lua",
+            },
             BenchmarkTests::StaticFilesSmall => "scripts/wrk_static_files_small.lua",
             BenchmarkTests::StaticFilesMedium => "scripts/wrk_static_files_medium.lua",
             BenchmarkTests::StaticFilesLarge => "scripts/wrk_static_files_large.lua",

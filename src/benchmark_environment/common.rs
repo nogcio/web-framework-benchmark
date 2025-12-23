@@ -82,6 +82,11 @@ pub fn get_db_env_vars(db: DatabaseKind) -> Vec<(String, String)> {
             ),
             ("MSSQL_PID".to_string(), "Developer".to_string()),
         ],
+        DatabaseKind::Mongodb => vec![
+            ("MONGO_INITDB_DATABASE".to_string(), "benchmark".to_string()),
+            ("MONGO_INITDB_ROOT_USERNAME".to_string(), "benchmark".to_string()),
+            ("MONGO_INITDB_ROOT_PASSWORD".to_string(), "benchmark".to_string()),
+        ],
     }
 }
 
@@ -100,6 +105,21 @@ pub fn get_app_env_vars(db: DatabaseKind, db_host: &str, db_port: u16) -> Vec<(S
                 ("DB_PASSWORD".to_string(), "benchmark".to_string()),
                 ("DB_NAME".to_string(), "benchmark".to_string()),
                 ("DB_KIND".to_string(), "postgres".to_string()),
+            ]
+        }
+        DatabaseKind::Mongodb => {
+            let db_url = format!(
+                "mongodb://benchmark:benchmark@{}:{}/benchmark?authSource=admin",
+                db_host, db_port
+            );
+            vec![
+                ("DATABASE_URL".to_string(), db_url),
+                ("DB_HOST".to_string(), db_host.to_string()),
+                ("DB_PORT".to_string(), db_port.to_string()),
+                ("DB_USER".to_string(), "benchmark".to_string()),
+                ("DB_PASSWORD".to_string(), "benchmark".to_string()),
+                ("DB_NAME".to_string(), "benchmark".to_string()),
+                ("DB_KIND".to_string(), "mongodb".to_string()),
             ]
         }
         DatabaseKind::Mysql => {

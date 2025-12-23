@@ -161,3 +161,22 @@
     db_lib_version: "9.0.0"
   path: benchmarks/csharp/aspnetcore-efcore
   database: mssql
+
+- name: aspnetcore-mongodb
+  language: C#
+  language_version: "10.0"
+  framework: aspnetcore
+  framework_version: "10.0"
+  tests:
+    - db_read_one
+    - db_read_paging
+    - db_write
+    - tweet_service
+  tags:
+    platform: dotnet
+    dotnet: "10.0"
+    db_lib: mongodb-driver
+    db_lib_version: "3.5.2"
+  path: benchmarks/csharp/aspnetcore-mongodb
+  database: mongodb
+

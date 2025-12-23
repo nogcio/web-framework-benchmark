@@ -47,6 +47,11 @@ jobs:
             image_tag: wfb-aspnetcore-mssql
             tests: db_read_one,db_read_paging,db_write
             database: mssql
+          - name: aspnetcore-mongodb
+            framework_path: benchmarks/csharp/aspnetcore-mongodb
+            image_tag: wfb-aspnetcore-mongodb
+            tests: db_read_one,db_read_paging,db_write,tweet_service
+            database: mongodb
           - name: aspnetcore-efcore-postgres
             framework_path: benchmarks/csharp/aspnetcore-efcore
             image_tag: wfb-aspnetcore-efcore-postgres

@@ -143,19 +143,9 @@ impl Db {
                         .join(&fw_run.framework);
                     
                     let test_str = test.to_string();
-                    let has_transcript = transcript_path.join(format!("{}.md", test_str)).exists() || {
-                        if let Ok(entries) = std::fs::read_dir(&transcript_path) {
-                            entries.flatten().any(|entry| {
-                                if let Some(name) = entry.file_name().to_str() {
-                                    name.starts_with(&test_str) && name.ends_with(".md") && name[test_str.len()..].starts_with('.')
-                                } else {
-                                    false
-                                }
-                            })
-                        } else {
-                            false
-                        }
-                    };
+                    let has_transcript = transcript_path.join(format!("{}.md", test_str)).exists()
+                        || transcript_path.join(format!("{}.en.md", test_str)).exists()
+                        || transcript_path.join(format!("{}.ru.md", test_str)).exists();
 
                     results.push(runs::RunResult {
                         name: fw_run.framework.clone(),

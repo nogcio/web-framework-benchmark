@@ -23,7 +23,9 @@ function App() {
   // Fetch benchmarks when filters change
   useEffect(() => {
     if (selectedRunId && selectedEnvironment && selectedTest) {
-      fetchBenchmarks(selectedRunId)
+      const controller = new AbortController()
+      fetchBenchmarks(selectedRunId, controller.signal)
+      return () => controller.abort()
     }
   }, [selectedRunId, selectedEnvironment, selectedTest, fetchBenchmarks])
 

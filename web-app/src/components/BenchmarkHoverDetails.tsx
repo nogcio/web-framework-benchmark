@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import ReactMarkdown, { type Components } from 'react-markdown'
-import { HoverCardContent } from './ui/hover-card'
 import type { Benchmark } from '../types'
 import { cn, getDatabaseColor, getSortedTags } from '../lib/utils'
 import { Tag } from './Tag'
@@ -54,27 +53,54 @@ export function BenchmarkHoverDetails({ benchmark, langColor }: BenchmarkHoverDe
   const selectedRunId = useAppStore(s => s.selectedRunId)
   const selectedEnvironment = useAppStore(s => s.selectedEnvironment)
   const selectedTest = useAppStore(s => s.selectedTest)
+  const benchmarksLoading = useAppStore(s => s.benchmarksLoading)
+  const transcripts = useAppStore(s => s.transcripts)
+  const addTranscript = useAppStore(s => s.addTranscript)
 
   useEffect(() => {
-    if (benchmark.hasTranscript && selectedRunId && selectedEnvironment && selectedTest) {
-      setLoading(true)
+    if (benchmark.hasTranscript && selectedRunId && selectedEnvironment && selectedTest && !benchmarksLoading) {
       const lang = navigator.language.split('-')[0]
+      const cacheKey = `${selectedRunId}:${selectedEnvironment}:${selectedTest}:${benchmark.name}:${lang}`
+      
+      if (transcripts[cacheKey]) {
+        setTranscript(transcripts[cacheKey])
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      const controller = new AbortController()
+      
       axios.get(`/api/runs/${selectedRunId}/environments/${selectedEnvironment}/tests/${selectedTest}/frameworks/${benchmark.name}/transcript`, {
         params: { lang },
-        responseType: 'text'
+        responseType: 'text',
+        signal: controller.signal
       })
-      .then(res => setTranscript(res.data))
-      .catch(() => setTranscript(null))
-      .finally(() => setLoading(false))
+      .then(res => {
+        setTranscript(res.data)
+        addTranscript(cacheKey, res.data)
+      })
+      .catch((err) => {
+        if (!axios.isCancel(err)) {
+          setTranscript(null)
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      })
+
+      return () => controller.abort()
     } else {
       setTranscript(null)
     }
-  }, [benchmark, selectedRunId, selectedEnvironment, selectedTest])
+  }, [benchmark, selectedRunId, selectedEnvironment, selectedTest, benchmarksLoading, transcripts, addTranscript])
 
-  const showTranscript = benchmark.hasTranscript && (loading || transcript)
+  const showTranscript = benchmark.hasTranscript
 
   return (
-    <HoverCardContent className={cn("w-80", showTranscript && "w-[1000px]")}>
+    <div className={cn("w-80 p-4", showTranscript && "w-[1000px]")}>
       <div className={cn("flex gap-4", showTranscript && "h-[500px]")}>
         <div className={cn("space-y-2", showTranscript ? "w-1/3 shrink-0 min-w-[300px]" : "w-full")}>
           <div className="font-semibold flex flex-col gap-1">
@@ -127,19 +153,23 @@ export function BenchmarkHoverDetails({ benchmark, langColor }: BenchmarkHoverDe
             <div className="w-px bg-border" />
             <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin">
               <div className="text-xs font-semibold mb-2 sticky top-0 bg-popover pb-2 border-b z-10">AI Analysis</div>
-              {loading ? (
-                <div className="text-xs text-muted-foreground">Loading...</div>
-              ) : transcript ? (
+              {loading || !transcript ? (
+                <div className="space-y-2">
+                  <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+                  <div className="h-4 w-full bg-muted animate-pulse rounded" />
+                  <div className="h-4 w-5/6 bg-muted animate-pulse rounded" />
+                  <div className="h-4 w-full bg-muted animate-pulse rounded" />
+                  <div className="h-4 w-2/3 bg-muted animate-pulse rounded" />
+                </div>
+              ) : (
                 <div className="text-xs text-zinc-400">
                   <ReactMarkdown components={markdownComponents}>{transcript}</ReactMarkdown>
                 </div>
-              ) : (
-                 <div className="text-xs text-muted-foreground">No transcript available</div>
               )}
             </div>
           </>
         )}
       </div>
-    </HoverCardContent>
+    </div>
   )
 }

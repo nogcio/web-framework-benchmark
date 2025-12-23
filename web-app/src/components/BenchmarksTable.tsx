@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from './ui/table'
 import { Skeleton } from './ui/skeleton'
 import { Empty, EmptyTitle, EmptyDescription, EmptyMedia } from './ui/empty'
-import { HoverCard, HoverCardTrigger } from './ui/hover-card'
+import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
 import { BarChart3 } from 'lucide-react'
 import type { Benchmark, VisibleColumns } from '../types'
 import { useAppStore, type AppState } from '../store/useAppStore'
@@ -188,7 +188,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
             const frameworkHref = framework?.url
 
             return (
-              <HoverCard>
+              <HoverCard openDelay={300} closeDelay={300}>
                 <HoverCardTrigger asChild>
                   <TableRow
                     key={benchmark.language + '-' + benchmark.framework}
@@ -349,7 +349,9 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                     <TableCell className="w-[var(--spacing)] p-0"></TableCell>
                   </TableRow>
                 </HoverCardTrigger>
-                <BenchmarkHoverDetails benchmark={benchmark} langColor={langColor} />
+                <HoverCardContent className="w-auto p-0">
+                  <BenchmarkHoverDetails benchmark={benchmark} langColor={langColor} />
+                </HoverCardContent>
               </HoverCard>
             )
           })}

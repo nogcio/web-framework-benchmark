@@ -20,7 +20,7 @@ export type AppState = {
   setSelectedRunId: (id: number | null) => void
   benchmarks: Benchmark[]
   benchmarksLoading: boolean
-  fetchBenchmarks: (runId: number | null) => Promise<void>
+  fetchBenchmarks: (runId: number | null, signal?: AbortSignal) => Promise<void>
   environments: Environment[]
   environmentsLoading: boolean
   fetchEnvironments: () => Promise<void>
@@ -34,6 +34,8 @@ export type AppState = {
   visibleColumns: VisibleColumns
   setVisibleColumns: (columns: VisibleColumns) => void
   toggleColumn: (column: keyof VisibleColumns) => void
+  transcripts: Record<string, string>
+  addTranscript: (key: string, content: string) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -48,6 +50,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   tests: [],
   testsLoading: false,
   selectedTest: null,
+  transcripts: {},
+  addTranscript: (key, content) => set((state) => ({
+    transcripts: { ...state.transcripts, [key]: content }
+  })),
   visibleColumns: {
     rank: true,
     framework: true,
@@ -98,11 +104,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   selectedRunId: null,
   setSelectedRunId: (id: number | null) => {
-    set({ selectedRunId: id })
+    const { selectedEnvironment, selectedTest } = get()
+    const shouldLoad = id !== null && selectedEnvironment !== null && selectedTest !== null
+    set({ selectedRunId: id, benchmarksLoading: shouldLoad })
   },
   benchmarks: [],
   benchmarksLoading: false,
-  fetchBenchmarks: async (runId: number | null): Promise<void> => {
+  fetchBenchmarks: async (runId: number | null, signal?: AbortSignal): Promise<void> => {
     if (!runId) {
       set({ benchmarks: [], benchmarksLoading: false })
       return
@@ -114,17 +122,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ benchmarks: [], benchmarksLoading: false })
       return
     }
-    set({ benchmarksLoading: true })
+    // Don't set loading true here if it was already set by the filter change
+    // But we need to ensure it's true if called directly
+    set({ benchmarksLoading: true }) 
+    
     try {
       const url = `${API_BASE}/runs/${runId}/environments/${selectedEnv}/tests/${selectedTest}`
-      const res = await axios.get<BenchmarkResponse[]>(url)
+      const res = await axios.get<BenchmarkResponse[]>(url, { signal })
       const benchmarks = (res.data || []).map((item) => ({
         ...item,
         tags: item.tags || {},
       }))
       set({ benchmarks, benchmarksLoading: false })
-    } catch {
-      set({ benchmarks: [], benchmarksLoading: false })
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        set({ benchmarks: [], benchmarksLoading: false })
+      }
     }
   },
   fetchEnvironments: async (): Promise<void> => {
@@ -157,10 +170,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   setSelectedEnvironment: (env: string | null) => {
-    set({ selectedEnvironment: env })
+    const { selectedRunId, selectedTest } = get()
+    const shouldLoad = env !== null && selectedRunId !== null && selectedTest !== null
+    set({ selectedEnvironment: env, benchmarksLoading: shouldLoad })
   },
   setSelectedTest: (test: string | null) => {
-    set({ selectedTest: test })
+    const { selectedRunId, selectedEnvironment } = get()
+    const shouldLoad = test !== null && selectedRunId !== null && selectedEnvironment !== null
+    set({ selectedTest: test, benchmarksLoading: shouldLoad })
   },
 }))
 

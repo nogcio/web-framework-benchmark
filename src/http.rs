@@ -119,6 +119,7 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, Sta
         BenchmarkTests::StaticFilesSmall,
         BenchmarkTests::StaticFilesMedium,
         BenchmarkTests::StaticFilesLarge,
+        BenchmarkTests::TweetService,
     ]
     .into_iter()
     .map(|t| TestInfo {
@@ -139,6 +140,7 @@ fn readable_test_name(test: &BenchmarkTests) -> String {
         BenchmarkTests::StaticFilesSmall => "Files Small".to_string(),
         BenchmarkTests::StaticFilesMedium => "Files Medium".to_string(),
         BenchmarkTests::StaticFilesLarge => "Files Large".to_string(),
+        BenchmarkTests::TweetService => "Tweet Service".to_string(),
     }
 }
 

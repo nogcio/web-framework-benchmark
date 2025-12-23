@@ -34,7 +34,6 @@ end
 
 function response(status, headers, body)
   if status ~= 200 then
-    errors = (errors or 0) + 1
     return
   end
   local reqid = nil

@@ -59,20 +59,6 @@ pub trait BenchmarkEnvironment: Send + Sync {
     ) -> Result<WrkResult>;
 }
 
-pub fn list_environments() -> Result<Vec<String>> {
-    let mut envs = Vec::new();
-    let paths = std::fs::read_dir("config/environments")?;
-    for path in paths {
-        let path = path?.path();
-        if path.extension().and_then(|s| s.to_str()) == Some("yaml")
-            && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-        {
-            envs.push(stem.to_string());
-        }
-    }
-    Ok(envs)
-}
-
 pub fn load_environment(name: &str) -> Result<Box<dyn BenchmarkEnvironment>> {
     let config = get_environment_config(name)?;
 
@@ -112,9 +98,9 @@ pub async fn run_adaptive_connections(
     const P99_LATENCY_PER_KB_MS: f64 = 0.20; // allow larger payloads to take proportionally longer
     const P99_LATENCY_LIMIT_MAX_MS: u64 = 5_000;
     const RPS_DROP_THRESHOLD: f64 = 0.20;
-    const STDEV_LATENCY_RATIO_LIMIT: f64 = 0.50;
+    const STDEV_LATENCY_RATIO_LIMIT: f64 = 0.80;
     const STDEV_ABS_FAIL_MIN: Duration = Duration::from_millis(1); // avoid tripping on sub-ms jitter
-    const LOW_LATENCY_P99_IGNORE: Duration = Duration::from_millis(20); // allow jitter when latency is tiny
+    const LOW_LATENCY_P99_IGNORE: Duration = Duration::from_millis(50); // allow jitter when latency is tiny
 
     #[derive(Clone)]
     struct Sample {

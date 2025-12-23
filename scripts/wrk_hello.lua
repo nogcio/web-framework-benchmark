@@ -21,7 +21,6 @@ end
 function response(status, headers, body)
   responses = responses + 1
   if status ~= 200 then
-    errors = errors + 1
     return
   end
   if body ~= "Hello, World!" then

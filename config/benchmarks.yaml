@@ -65,7 +65,7 @@
   path: benchmarks/csharp/aspnetcore-mssql
   database: mssql
 
-- name: aspnetcore-efcore-postgres 
+- name: aspnetcore-efcore-postgres
   language: C#
   language_version: "10.0"
   framework: aspnetcore
@@ -74,6 +74,7 @@
     - db_read_one
     - db_read_paging
     - db_write
+    - tweet_service
   tags:
     platform: dotnet
     dotnet: "10.0"
@@ -93,6 +94,7 @@
     - db_read_one
     - db_read_paging
     - db_write
+    - tweet_service
   tags:
     platform: dotnet
     dotnet: "10.0"
@@ -112,6 +114,7 @@
     - db_read_one
     - db_read_paging
     - db_write
+    - tweet_service
   tags:
     platform: dotnet
     dotnet: "10.0"

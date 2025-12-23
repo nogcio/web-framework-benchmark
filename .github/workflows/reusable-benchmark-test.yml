@@ -209,7 +209,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        tests=$(python3 scripts/ci_parse_tests.py "$TESTS_INPUT")
+        tests=$(python3 .github/scripts/ci_parse_tests.py "$TESTS_INPUT")
         if [ -z "$tests" ]; then
           echo "No tests provided" >&2
           exit 1

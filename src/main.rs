@@ -44,11 +44,19 @@ async fn main() -> Result<()> {
 
     let cli = cli::Cli::parse();
     match cli.command {
-        cli::Commands::Run { id, environment } => {
+        cli::Commands::Run {
+            id,
+            environment,
+            filter,
+        } => {
             let db = db::Db::open()?;
             let benchmarks = db.get_benchmarks()?;
             let has_only = benchmarks.iter().any(|b| b.only);
             for benchmark in benchmarks {
+                if let Some(filter) = &filter
+                    && !benchmark.name.contains(filter) {
+                        continue;
+                    }
                 if has_only && !benchmark.only {
                     debug!(
                         "Skipping benchmark {} because other benchmarks are marked as only",
@@ -60,12 +68,20 @@ async fn main() -> Result<()> {
                     info!("Skipping disabled benchmark {}", benchmark.name);
                     continue;
                 }
-                if db.has_framework_results(id, &environment, &benchmark.language, &benchmark.name)? {
-                    info!("Skipping benchmark {} because it already has data", benchmark.name);
+
+                let completed_tests = db.get_completed_tests(id, &environment, &benchmark.language, &benchmark.name)?;
+                let allowed_tests: Vec<_> = benchmark.tests.iter()
+                    .filter(|t| !completed_tests.contains(t))
+                    .cloned()
+                    .collect();
+
+                if allowed_tests.is_empty() {
+                    info!("Skipping benchmark {} because all tests are already completed", benchmark.name);
                     continue;
                 }
+
                 let mut env = crate::benchmark_environment::load_environment(&environment)?;
-                let benchmark_results = benchmark::run_benchmark(&mut *env, &benchmark).await?;
+                let benchmark_results = benchmark::run_benchmark(&mut *env, &benchmark, &allowed_tests).await?;
                 db.save_run(id, &environment, &benchmark, &benchmark_results)?;
             }
         }

@@ -45,17 +45,17 @@ jobs:
           - name: aspnetcore-efcore-postgres
             framework_path: benchmarks/csharp/aspnetcore-efcore
             image_tag: wfb-aspnetcore-efcore-postgres
-            tests: db_read_one,db_read_paging,db_write
+            tests: db_read_one,db_read_paging,db_write,tweet_service
             database: postgres
           - name: aspnetcore-efcore-mysql
             framework_path: benchmarks/csharp/aspnetcore-efcore
             image_tag: wfb-aspnetcore-efcore-mysql
-            tests: db_read_one,db_read_paging,db_write
+            tests: db_read_one,db_read_paging,db_write,tweet_service
             database: mysql
           - name: aspnetcore-efcore-mssql
             framework_path: benchmarks/csharp/aspnetcore-efcore
             image_tag: wfb-aspnetcore-efcore-mssql
-            tests: db_read_one,db_read_paging,db_write
+            tests: db_read_one,db_read_paging,db_write,tweet_service
             database: mssql
 
     name: ${{ matrix.name }}

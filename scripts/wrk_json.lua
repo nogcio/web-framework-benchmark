@@ -156,7 +156,6 @@ end
 
 function response(status, headers, body)
   if status ~= 200 then
-    errors = errors + 1
     return
   end
   local reqid = nil

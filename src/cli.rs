@@ -14,6 +14,8 @@ pub enum Commands {
         id: u32,
         #[arg(short, long, default_value = "local")]
         environment: String,
+        #[arg(short, long)]
+        filter: Option<String>,
     },
 
     Serve {

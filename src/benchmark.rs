@@ -35,6 +35,7 @@ pub enum BenchmarkTests {
     DbReadOne,
     DbReadPaging,
     DbWrite,
+    TweetService,
     StaticFilesSmall,
     StaticFilesMedium,
     StaticFilesLarge,
@@ -50,6 +51,7 @@ impl TryFrom<&str> for BenchmarkTests {
             "db_read_one" => Ok(BenchmarkTests::DbReadOne),
             "db_read_paging" => Ok(BenchmarkTests::DbReadPaging),
             "db_write" => Ok(BenchmarkTests::DbWrite),
+            "tweet_service" => Ok(BenchmarkTests::TweetService),
             "static_files_small" => Ok(BenchmarkTests::StaticFilesSmall),
             "static_files_medium" => Ok(BenchmarkTests::StaticFilesMedium),
             "static_files_large" => Ok(BenchmarkTests::StaticFilesLarge),
@@ -61,11 +63,12 @@ impl TryFrom<&str> for BenchmarkTests {
 pub async fn run_benchmark(
     env: &mut dyn BenchmarkEnvironment,
     bench: &Benchmark,
+    allowed_tests: &[BenchmarkTests],
 ) -> Result<BenchmarkResults> {
     let path = Path::new(&bench.path);
     info!(
-        "Running benchmark for {:?} ({} / {})",
-        path, bench.language, bench.framework
+        "Running benchmark for {} {:?} ({} / {})",
+        bench.name, path, bench.language, bench.framework
     );
     let app_env: Vec<(String, String)> = bench
         .env
@@ -85,6 +88,10 @@ pub async fn run_benchmark(
 
     let mut results = HashMap::new();
     for test in tests {
+        if !allowed_tests.contains(&test) {
+            info!("Skipping test {:?} because it is not in the allowed list", test);
+            continue;
+        }
         info!("Running benchmark test: {:?}", test);
         let requires_db = test_requires_db(&test);
         if requires_db && !db_configured {
@@ -107,6 +114,7 @@ pub async fn run_benchmark(
             BenchmarkTests::Json => "scripts/wrk_json.lua",
             BenchmarkTests::DbReadOne => "scripts/wrk_db_read_one.lua",
             BenchmarkTests::DbReadPaging => "scripts/wrk_db_read_paging.lua",
+            BenchmarkTests::TweetService => "scripts/wrk_tweet_service.lua",
             BenchmarkTests::DbWrite => "scripts/wrk_db_write.lua",
             BenchmarkTests::StaticFilesSmall => "scripts/wrk_static_files_small.lua",
             BenchmarkTests::StaticFilesMedium => "scripts/wrk_static_files_medium.lua",
@@ -147,7 +155,7 @@ pub async fn run_benchmark(
 fn test_requires_db(test: &BenchmarkTests) -> bool {
     matches!(
         test,
-        BenchmarkTests::DbReadOne | BenchmarkTests::DbReadPaging | BenchmarkTests::DbWrite
+        BenchmarkTests::DbReadOne | BenchmarkTests::DbReadPaging | BenchmarkTests::DbWrite | BenchmarkTests::TweetService   
     )
 }
 
@@ -155,6 +163,7 @@ impl std::fmt::Display for BenchmarkTests {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             BenchmarkTests::HelloWorld => "hello_world",
+            BenchmarkTests::TweetService => "tweet_service",
             BenchmarkTests::Json => "json",
             BenchmarkTests::DbReadOne => "db_read_one",
             BenchmarkTests::DbReadPaging => "db_read_paging",

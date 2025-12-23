@@ -100,6 +100,7 @@ pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
         Regex::new(r"(?i)^\s*Req/Sec\s+([\d.]+[kM]?)\s+([\d.]+[kM]?)\s+([\d.]+[kM]?)\s+([+\-]?(?:[\d.]+|nan|inf))%$")
             .unwrap();
     let re_errors = Regex::new(r"^\s*(Errors):\s+(\d+)$").unwrap();
+    let re_non_2xx = Regex::new(r"Non-2xx or 3xx responses:\s+(\d+)").unwrap();
     let re_socket_errors = Regex::new(
         r"^\s*Socket errors:\s+connect\s+(\d+),\s+read\s+(\d+),\s+write\s+(\d+),\s+timeout\s+(\d+)",
     )
@@ -132,6 +133,10 @@ pub fn parse_wrk_output(lines: &[String]) -> Result<WrkResult> {
             latency_stdev_pct = Some(0.0);
         } else if let Some(cap) = re_errors.captures(line) {
             if let Some(value) = cap.get(2).and_then(|m| m.as_str().parse::<i64>().ok()) {
+                errors_total += value;
+            }
+        } else if let Some(cap) = re_non_2xx.captures(line) {
+            if let Some(value) = cap.get(1).and_then(|m| m.as_str().parse::<i64>().ok()) {
                 errors_total += value;
             }
         } else if let Some(cap) = re_socket_errors.captures(line) {
@@ -222,5 +227,29 @@ mod tests {
         let result = parse_wrk_output(&lines).expect("failed to parse wrk output");
 
         assert_eq!(result.errors, 1176);
+    }
+
+    #[test]
+    fn parses_non_2xx_errors() {
+        let lines = vec![
+            "Running 10s test @ http://127.0.0.1:8080".to_string(),
+            "  2 threads and 10 connections".to_string(),
+            "  Thread Stats   Avg      Stdev     Max   +/- Stdev".to_string(),
+            "    Latency     1.00ms    0.50ms   2.00ms   10%".to_string(),
+            "    Req/Sec     1000.00   50.00    1100.00   5%".to_string(),
+            "  Latency Distribution".to_string(),
+            "     50%   1.00ms".to_string(),
+            "     75%   1.50ms".to_string(),
+            "     99%   3.00ms".to_string(),
+            "Requests/sec: 1000.00".to_string(),
+            "Transfer/sec: 1.00MB".to_string(),
+            "  Non-2xx or 3xx responses: 6".to_string(),
+            "  Errors: 3".to_string(),
+            "Socket errors: connect 0, read 1171, write 0, timeout 2".to_string(),
+        ];
+
+        let result = parse_wrk_output(&lines).expect("failed to parse wrk output");
+        // 6 (non-2xx) + 3 (errors) + 1171 (read) + 2 (timeout) = 1182
+        assert_eq!(result.errors, 1182);
     }
 }

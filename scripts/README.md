@@ -16,7 +16,3 @@ This directory contains Lua scripts used by `wrk` to generate load and measure p
 ## Usage
 
 These scripts are automatically used by the Rust CLI runner when executing benchmarks. You generally do not need to run them manually unless you are debugging or developing new test scenarios.
-
-## Helper Scripts
-
-- **ci_parse_tests.py**: A Python script used in CI/CD pipelines to parse test results.

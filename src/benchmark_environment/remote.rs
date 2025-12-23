@@ -456,9 +456,11 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
 
         debug!("Running wrk command: {}", cmd);
         let output = Self::ssh_output(wrk_host, &cmd).await?;
-        debug!("Wrk output: {}", output);
-
+        
         let wrk_output_vec: Vec<String> = output.lines().map(|s| s.to_string()).collect();
+        for line in &wrk_output_vec {
+            debug!("{}", line);
+        }
         let wrk_result = crate::wrk::parse_wrk_output(&wrk_output_vec)
             .map_err(|e| Error::WrkParseError(e.to_string()))?;
 
@@ -499,9 +501,11 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
 
         debug!("Running wrk command: {}", cmd);
         let output = Self::ssh_output(wrk_host, &cmd).await?;
-        debug!("Wrk output: {}", output);
 
         let wrk_output_vec: Vec<String> = output.lines().map(|s| s.to_string()).collect();
+        for line in &wrk_output_vec {
+            debug!("{}", line);
+        }
         let wrk_result = crate::wrk::parse_wrk_output(&wrk_output_vec)
             .map_err(|e| Error::WrkParseError(e.to_string()))?;
 

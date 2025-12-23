@@ -172,6 +172,26 @@ impl Db {
         Ok(false)
     }
 
+    pub fn get_completed_tests(
+        &self,
+        run_id: u32,
+        environment: &str,
+        language: &str,
+        benchmark_name: &str,
+    ) -> Result<Vec<BenchmarkTests>> {
+        let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
+        if let Some(run) = inner.runs.iter().find(|r| r.id == run_id)
+            && let Some(fw_run) = run.frameworks.iter().find(|fw| {
+                fw.environment == environment
+                    && fw.language == language
+                    && fw.framework == benchmark_name
+            })
+        {
+            return Ok(fw_run.results.keys().cloned().collect());
+        }
+        Ok(Vec::new())
+    }
+
     pub fn save_run(
         &self,
         run_id: u32,

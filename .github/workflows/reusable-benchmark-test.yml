@@ -138,7 +138,15 @@ jobs:
             echo "Postgres did not become ready" && exit 1
             ;;
           mysql)
-           ariadb)
+            for _ in $(seq 1 60); do
+              if docker exec wfb-db mysqladmin ping -h127.0.0.1 -P"${DB_PORT}" -ubenchmark -pbenchmark --silent; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "MySQL did not become ready" && exit 1
+            ;;
+          mariadb)
             for _ in $(seq 1 60); do
               if docker exec wfb-db mariadb-admin ping -h127.0.0.1 -P"${DB_PORT}" -ubenchmark -pbenchmark --silent; then
                 exit 0
@@ -147,7 +155,8 @@ jobs:
             done
             echo "MariaDB did not become ready" && exit 1
             ;;
-          m for _ in $(seq 1 60); do
+          mssql)
+            for _ in $(seq 1 60); do
               if docker exec wfb-db mysqladmin ping -h127.0.0.1 -P"${DB_PORT}" -ubenchmark -pbenchmark --silent; then
                 exit 0
               fi
@@ -156,7 +165,7 @@ jobs:
             echo "MySQL did not become ready" && exit 1
             ;;
           mssql)
-            for _ in $(seq 1 90); do
+            for _ in $(seq 1 60); do
               if docker exec -e MSSQL_SA_PASSWORD=Benchmark!12345 wfb-db /usr/config/check_ready.sh >/dev/null 2>&1; then
                 exit 0
               fi

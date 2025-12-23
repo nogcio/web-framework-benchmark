@@ -157,15 +157,6 @@ jobs:
             ;;
           mssql)
             for _ in $(seq 1 60); do
-              if docker exec wfb-db mysqladmin ping -h127.0.0.1 -P"${DB_PORT}" -ubenchmark -pbenchmark --silent; then
-                exit 0
-              fi
-              sleep 2
-            done
-            echo "MySQL did not become ready" && exit 1
-            ;;
-          mssql)
-            for _ in $(seq 1 60); do
               if docker exec -e MSSQL_SA_PASSWORD=Benchmark!12345 wfb-db /usr/config/check_ready.sh >/dev/null 2>&1; then
                 exit 0
               fi
@@ -280,6 +271,11 @@ jobs:
               ;;
             static_files_large)
               curl -v -f "${base_url}/files/10mb.bin" > /dev/null
+              ;;
+            tweet_service)
+              curl -v -f -X POST -H "Content-Type: application/json" \
+                -d '{"username":"ci_user","password":"password"}' \
+                "${base_url}/api/auth/register"
               ;;
             *)
               echo "Unknown test name: $test" >&2

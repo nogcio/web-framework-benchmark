@@ -22,6 +22,7 @@ benchmarks/
 - **aspnetcore-mssql**: ASP.NET Core using MSSQL.
 - **aspnetcore-mysql**: ASP.NET Core using MySQL.
 - **aspnetcore-mariadb**: ASP.NET Core using MariaDB.
+- **aspnetcore-mongodb**: ASP.NET Core using MongoDB.
 - **aspnetcore-npgsql**: ASP.NET Core using PostgreSQL (Npgsql).
 
 ## Adding a New Benchmark

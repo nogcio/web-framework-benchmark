@@ -93,7 +93,7 @@ Define the specific benchmark configuration in `config/benchmarks.yaml`. This li
 
 **Database Example:**
 
-If your benchmark uses a database, specify the `database` field (e.g., `postgres`, `mysql`, `mssql`) and include the relevant database tests.
+If your benchmark uses a database, specify the `database` field (e.g., `postgres`, `mysql`, `mssql`, `mongodb`) and include the relevant database tests.
 
 ```yaml
 - name: fastapi-pg
@@ -310,6 +310,51 @@ CREATE TABLE likes (
 CREATE INDEX idx_likes_tweet_id ON likes(tweet_id);
 ```
 
+### MongoDB Schema
+
+For MongoDB, the collections should follow this structure. Note that `_id` is an `ObjectId`.
+
+**Collection: `hello_world`**
+```json
+{
+  "_id": ObjectId("..."),
+  "name": "name_1",
+  "created_at": ISODate("..."),
+  "updated_at": ISODate("...")
+}
+```
+
+**Collection: `users`**
+```json
+{
+  "_id": ObjectId("..."),
+  "username": "user_1",
+  "password_hash": "..."
+}
+```
+*Index: `username` (unique)*
+
+**Collection: `tweets`**
+```json
+{
+  "_id": ObjectId("..."),
+  "user_id": ObjectId("..."), // Reference to users._id
+  "content": "...",
+  "created_at": ISODate("...")
+}
+```
+*Index: `user_id`*
+
+**Collection: `likes`**
+```json
+{
+  "_id": ObjectId("..."),
+  "user_id": ObjectId("..."), // Reference to users._id
+  "tweet_id": ObjectId("...") // Reference to tweets._id
+}
+```
+*Index: `user_id`, `tweet_id` (unique compound)*
+
 ---
 
 ## 8. Step 7: Running and Verifying
@@ -387,12 +432,20 @@ wrk -t2 -c100 -d10s -s scripts/wrk_json.lua http://localhost:8000/json/1/2
 
 **Example: Database Read One**
 ```bash
+# For SQL databases
 wrk -t2 -c100 -d10s -s scripts/wrk_db_read_one.lua "http://localhost:8000/db/read/one?id=1"
+
+# For MongoDB (uses different ID format)
+wrk -t2 -c100 -d10s -s scripts/wrk_db_read_one_mongo.lua "http://localhost:8000/db/read/one?id=000000000000000000000001"
 ```
 
 **Example: Tweet Service**
 ```bash
+# For SQL databases
 wrk -t2 -c100 -d10s -s scripts/wrk_tweet_service.lua http://localhost:8000/api
+
+# For MongoDB
+wrk -t2 -c100 -d10s -s scripts/wrk_tweet_service_mongo.lua http://localhost:8000/api
 ```
 
 ### 5. Cleanup

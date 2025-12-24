@@ -1,8 +1,8 @@
 # Stage 1: Build Rust backend
-FROM rust:1.92-slim-bookworm as backend-builder
+FROM rust:1.92-alpine AS backend-builder
 WORKDIR /app
 # Install build dependencies
-RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 # Create a new empty shell project
 RUN cargo new --bin wfb
 WORKDIR /app/wfb
@@ -16,15 +16,13 @@ RUN rm src/*.rs
 
 # Copy the source code
 COPY src ./src
-# Copy other necessary files for compilation if any
-# (None identified as strictly necessary for compilation, but config might be needed at runtime)
 
 # Build for release
 RUN rm ./target/release/deps/wfb*
 RUN cargo build --release
 
 # Stage 2: Build Frontend
-FROM node:20-slim as frontend-builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 COPY web-app/package.json web-app/package-lock.json ./
@@ -34,12 +32,11 @@ COPY web-app ./
 RUN npm run build
 
 # Stage 3: Final Image
-FROM debian:bookworm-slim
+FROM alpine:3.23
 WORKDIR /app
 
 # Install necessary runtime dependencies (e.g. ca-certificates, openssl if needed)
-# Also install docker CLI so the app can spawn sibling containers
-RUN apt-get update && apt-get install -y ca-certificates docker.io && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates libssl3
 
 # Copy the binary
 COPY --from=backend-builder /app/wfb/target/release/wfb .
@@ -56,4 +53,4 @@ COPY scripts ./scripts
 # Expose port
 EXPOSE 8080
 
-CMD ["./wfb", "serve", "--host", "0.0.0.0", "--port", "8080"]
+ENTRYPOINT ["./wfb"]

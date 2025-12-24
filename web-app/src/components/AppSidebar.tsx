@@ -52,8 +52,7 @@ export function AppSidebar() {
             className="h-8 w-8 rounded-xl shadow-sm"
           />
           <h1 className="flex items-baseline text-lg font-bold tracking-tight leading-none">
-            <span>WF</span>
-            <span className="text-primary">B</span>
+            <span>WF</span><span className="text-primary">B</span>
           </h1>
         </div>
       </SidebarHeader>

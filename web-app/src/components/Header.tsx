@@ -16,7 +16,7 @@ export default function Header() {
             />
             <div className="flex flex-col gap-0.5">
               <h1 className="text-lg md:text-xl font-bold tracking-tight">
-                <span>Web Framework </span><span className="text-primary">Benchmarks</span>
+                <span>WF</span><span className="text-primary">B</span>
               </h1>
               <p className="hidden md:block text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                 Performance Analysis Tool

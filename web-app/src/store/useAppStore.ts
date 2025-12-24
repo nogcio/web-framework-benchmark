@@ -104,7 +104,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   selectedRunId: null,
   setSelectedRunId: (id: number | null) => {
-    const { selectedEnvironment, selectedTest } = get()
+    const { selectedRunId, selectedEnvironment, selectedTest } = get()
+    if (selectedRunId === id) return
     const shouldLoad = id !== null && selectedEnvironment !== null && selectedTest !== null
     set({ selectedRunId: id, benchmarksLoading: shouldLoad })
   },
@@ -170,12 +171,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   setSelectedEnvironment: (env: string | null) => {
-    const { selectedRunId, selectedTest } = get()
+    const { selectedEnvironment, selectedRunId, selectedTest } = get()
+    if (selectedEnvironment === env) return
     const shouldLoad = env !== null && selectedRunId !== null && selectedTest !== null
     set({ selectedEnvironment: env, benchmarksLoading: shouldLoad })
   },
   setSelectedTest: (test: string | null) => {
-    const { selectedRunId, selectedEnvironment } = get()
+    const { selectedTest, selectedRunId, selectedEnvironment } = get()
+    if (selectedTest === test) return
     const shouldLoad = test !== null && selectedRunId !== null && selectedEnvironment !== null
     set({ selectedTest: test, benchmarksLoading: shouldLoad })
   },

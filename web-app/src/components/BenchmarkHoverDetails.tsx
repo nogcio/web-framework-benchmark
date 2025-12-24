@@ -63,12 +63,14 @@ export function BenchmarkHoverDetails({ benchmark, langColor }: BenchmarkHoverDe
       const cacheKey = `${selectedRunId}:${selectedEnvironment}:${selectedTest}:${benchmark.name}:${lang}`
       
       if (transcripts[cacheKey]) {
-        setTranscript(transcripts[cacheKey])
-        setLoading(false)
+        setTimeout(() => {
+          setTranscript(transcripts[cacheKey])
+          setLoading(false)
+        }, 0)
         return
       }
 
-      setLoading(true)
+      setTimeout(() => setLoading(true), 0)
       const controller = new AbortController()
       
       axios.get(`/api/runs/${selectedRunId}/environments/${selectedEnvironment}/tests/${selectedTest}/frameworks/${benchmark.name}/transcript`, {
@@ -93,7 +95,7 @@ export function BenchmarkHoverDetails({ benchmark, langColor }: BenchmarkHoverDe
 
       return () => controller.abort()
     } else {
-      setTranscript(null)
+      setTimeout(() => setTranscript(null), 0)
     }
   }, [benchmark, selectedRunId, selectedEnvironment, selectedTest, benchmarksLoading, transcripts, addTranscript])
 

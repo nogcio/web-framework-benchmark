@@ -21,7 +21,7 @@ export default function EnvironmentDetails() {
   // Re-open when environment changes
   useEffect(() => {
     if (selectedEnvironmentName) {
-      setIsOpen(true)
+      setTimeout(() => setIsOpen(true), 0)
     }
   }, [selectedEnvironmentName])
 

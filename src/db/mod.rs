@@ -1,8 +1,8 @@
 pub mod benchmarks;
+pub mod environments;
 pub mod frameworks;
 pub mod languages;
 pub mod runs;
-pub mod environments;
 
 use std::{
     sync::{Arc, RwLock},
@@ -49,7 +49,11 @@ impl Db {
 
     pub fn get_environment(&self, id: &str) -> Result<Option<EnvironmentFile>> {
         let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
-        Ok(inner.environments.iter().find(|e| e.id == id).map(|e| e.config.clone()))
+        Ok(inner
+            .environments
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.config.clone()))
     }
 
     pub fn get_languages(&self) -> Result<Vec<languages::Language>> {
@@ -141,7 +145,7 @@ impl Db {
                         .join(&fw_run.environment)
                         .join(&manifest.language)
                         .join(&fw_run.framework);
-                    
+
                     let test_str = test.to_string();
                     let has_transcript = transcript_path.join(format!("{}.md", test_str)).exists()
                         || transcript_path.join(format!("{}.en.md", test_str)).exists()

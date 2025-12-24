@@ -1,3 +1,5 @@
+mod analysis;
+mod analysis_context;
 mod benchmark;
 mod benchmark_environment;
 mod cli;
@@ -10,8 +12,6 @@ mod http;
 mod http_probe;
 mod parsers;
 mod wrk;
-mod analysis;
-mod analysis_context;
 
 pub mod prelude {
     pub use crate::error::*;

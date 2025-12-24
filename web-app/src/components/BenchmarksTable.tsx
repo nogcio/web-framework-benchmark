@@ -29,7 +29,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
       const timer = setTimeout(() => setLocalLoading(true), 200)
       return () => clearTimeout(timer)
     } else {
-      setLocalLoading(false)
+      setTimeout(() => setLocalLoading(false), 0)
     }
   }, [benchmarksLoading])
   const sorted = useMemo(() => {

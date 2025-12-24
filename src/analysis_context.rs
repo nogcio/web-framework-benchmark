@@ -1,8 +1,7 @@
+use crate::benchmark_environment::config::EnvironmentFile;
+use crate::db::{benchmarks, frameworks, languages, runs};
 use clap::ValueEnum;
 use serde::Serialize;
-use crate::db::{frameworks, languages, benchmarks, runs};
-use crate::benchmark_environment::config::EnvironmentFile;
-
 
 #[derive(Debug, Clone, ValueEnum, PartialEq, Eq)]
 pub enum AnalysisLanguage {

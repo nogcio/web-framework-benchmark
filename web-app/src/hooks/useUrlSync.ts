@@ -81,7 +81,7 @@ export function useUrlSync() {
     
     // Only serialize visible columns
     const activeCols = Object.entries(visibleColumns)
-      .filter(([_, visible]) => visible)
+      .filter(([, visible]) => visible)
       .map(([key]) => key)
       .join(',')
       

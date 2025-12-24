@@ -54,15 +54,33 @@ pub enum BenchmarkTests {
 impl BenchmarkTests {
     pub fn description(&self) -> &'static str {
         match self {
-            BenchmarkTests::HelloWorld => "This test measures the raw throughput of the web framework with minimal overhead. It sends a GET request to `/plaintext` which returns a 'Hello, World!' string. No database or complex logic is involved. This primarily tests the efficiency of the HTTP parser, routing, and basic request handling pipeline. It is CPU-bound and sensitive to overhead in the framework's core.",
-            BenchmarkTests::Json => "This test measures the performance of JSON serialization. It sends a GET request to `/json` which returns a JSON object `{\"message\": \"Hello, World!\"}`. This tests the framework's ability to instantiate an object and serialize it to JSON. It is CPU-bound and stresses the JSON serializer and memory allocation.",
-            BenchmarkTests::DbReadOne => "This test measures the performance of a single database query. It sends a GET request to `/db/read/one` (or similar) which fetches a single random row from the database and serializes it to JSON. This tests the framework's ORM or database driver, connection pooling, and the overhead of a network round-trip to the database. It is a mix of CPU and I/O bound.",
-            BenchmarkTests::DbReadPaging => "This test measures the performance of fetching multiple rows from the database. It sends a GET request to `/db/read/many?offset=N&limit=50` which fetches 50 rows from the database and serializes them to a JSON list. This puts more load on the database driver and the JSON serializer than the single-read test. It tests the efficiency of handling multiple database queries or batch queries.",
-            BenchmarkTests::DbWrite => "This test measures the performance of database writes. It sends a request to `/db/write/insert` (or similar) which inserts a new row into the database and returns the result as JSON. This tests the framework's ability to handle write operations and transaction overhead. It is heavily I/O bound and stresses the database's write capabilities.",
-            BenchmarkTests::TweetService => "This is a complex scenario simulating a microblogging service. It involves user registration, login, creating tweets, and fetching timelines. It tests the framework's ability to handle complex business logic, multiple dependent database queries, authentication, and state management. It represents a realistic application workload.",
-            BenchmarkTests::StaticFilesSmall => "This test measures the performance of serving a small static file (e.g., 1KB). It sends a GET request to retrieve a file from the disk. This tests the framework's static file handler, file I/O, and the efficiency of sending small payloads. It is often limited by the framework's overhead for handling requests.",
-            BenchmarkTests::StaticFilesMedium => "This test measures the performance of serving a medium-sized static file (e.g., 100KB). It tests the framework's ability to handle larger payloads and efficiently stream data to the client. It shifts the bottleneck slightly more towards network bandwidth and memory copying compared to the small file test.",
-            BenchmarkTests::StaticFilesLarge => "This test measures the performance of serving a large static file (e.g., 1MB). It stresses the network bandwidth and the framework's ability to handle long-lived connections and large data transfers. Efficiency in zero-copy file sending (sendfile) is critical here.",
+            BenchmarkTests::HelloWorld => {
+                "This test measures the raw throughput of the web framework with minimal overhead. It sends a GET request to `/plaintext` which returns a 'Hello, World!' string. No database or complex logic is involved. This primarily tests the efficiency of the HTTP parser, routing, and basic request handling pipeline. It is CPU-bound and sensitive to overhead in the framework's core."
+            }
+            BenchmarkTests::Json => {
+                "This test measures the performance of JSON serialization. It sends a GET request to `/json` which returns a JSON object `{\"message\": \"Hello, World!\"}`. This tests the framework's ability to instantiate an object and serialize it to JSON. It is CPU-bound and stresses the JSON serializer and memory allocation."
+            }
+            BenchmarkTests::DbReadOne => {
+                "This test measures the performance of a single database query. It sends a GET request to `/db/read/one` (or similar) which fetches a single random row from the database and serializes it to JSON. This tests the framework's ORM or database driver, connection pooling, and the overhead of a network round-trip to the database. It is a mix of CPU and I/O bound."
+            }
+            BenchmarkTests::DbReadPaging => {
+                "This test measures the performance of fetching multiple rows from the database. It sends a GET request to `/db/read/many?offset=N&limit=50` which fetches 50 rows from the database and serializes them to a JSON list. This puts more load on the database driver and the JSON serializer than the single-read test. It tests the efficiency of handling multiple database queries or batch queries."
+            }
+            BenchmarkTests::DbWrite => {
+                "This test measures the performance of database writes. It sends a request to `/db/write/insert` (or similar) which inserts a new row into the database and returns the result as JSON. This tests the framework's ability to handle write operations and transaction overhead. It is heavily I/O bound and stresses the database's write capabilities."
+            }
+            BenchmarkTests::TweetService => {
+                "This is a complex scenario simulating a microblogging service. It involves user registration, login, creating tweets, and fetching timelines. It tests the framework's ability to handle complex business logic, multiple dependent database queries, authentication, and state management. It represents a realistic application workload."
+            }
+            BenchmarkTests::StaticFilesSmall => {
+                "This test measures the performance of serving a small static file (e.g., 1KB). It sends a GET request to retrieve a file from the disk. This tests the framework's static file handler, file I/O, and the efficiency of sending small payloads. It is often limited by the framework's overhead for handling requests."
+            }
+            BenchmarkTests::StaticFilesMedium => {
+                "This test measures the performance of serving a medium-sized static file (e.g., 100KB). It tests the framework's ability to handle larger payloads and efficiently stream data to the client. It shifts the bottleneck slightly more towards network bandwidth and memory copying compared to the small file test."
+            }
+            BenchmarkTests::StaticFilesLarge => {
+                "This test measures the performance of serving a large static file (e.g., 1MB). It stresses the network bandwidth and the framework's ability to handle long-lived connections and large data transfers. Efficiency in zero-copy file sending (sendfile) is critical here."
+            }
         }
     }
 }

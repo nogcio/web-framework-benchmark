@@ -1,9 +1,9 @@
 use axum::{
     Router,
+    body::Body,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{Json, Response},
-    body::Body,
     routing::get,
 };
 use serde::{Deserialize, Serialize};
@@ -100,7 +100,8 @@ pub fn create_router(db: db::Db) -> Router {
         .with_state(db);
 
     if std::path::Path::new("static").exists() {
-        router = router.fallback_service(ServeDir::new("static").append_index_html_on_directories(true));
+        router =
+            router.fallback_service(ServeDir::new("static").append_index_html_on_directories(true));
     }
 
     router
@@ -262,7 +263,9 @@ async fn get_run_transcript(
 
     match transcript_path {
         Some(path) => {
-            let file = File::open(path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let file = File::open(path)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             let stream = ReaderStream::new(file);
             let body = Body::from_stream(stream);
 

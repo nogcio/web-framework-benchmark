@@ -1,11 +1,11 @@
-use crate::prelude::*;
-use crate::db::Db;
 use crate::analysis_context::{AnalysisContext, AnalysisLanguage};
-use std::path::PathBuf;
-use std::fs;
-use std::collections::HashSet;
-use serde_json::json;
+use crate::db::Db;
+use crate::prelude::*;
 use reqwest::Client;
+use serde_json::json;
+use std::collections::HashSet;
+use std::fs;
+use std::path::PathBuf;
 
 pub async fn run_analysis(
     db: Db,
@@ -23,14 +23,18 @@ pub async fn run_analysis(
     let client = Client::new();
 
     for run in runs {
-        if let Some(id) = run_id && run.id != id {
+        if let Some(id) = run_id
+            && run.id != id
+        {
             continue;
         }
 
         info!("Analyzing run {}", run.id);
 
         // Get unique environments and sort them
-        let mut environments: Vec<String> = run.frameworks.iter()
+        let mut environments: Vec<String> = run
+            .frameworks
+            .iter()
             .map(|f| f.environment.clone())
             .collect::<HashSet<_>>()
             .into_iter()
@@ -41,11 +45,11 @@ pub async fn run_analysis(
             // Iterate benchmarks in order
             for benchmark_config in &benchmarks_info {
                 // Find corresponding framework run
-                let framework_run = match run.frameworks.iter().find(|f| 
-                    f.environment == environment && 
-                    f.framework == benchmark_config.name && 
-                    f.language == benchmark_config.language
-                ) {
+                let framework_run = match run.frameworks.iter().find(|f| {
+                    f.environment == environment
+                        && f.framework == benchmark_config.name
+                        && f.language == benchmark_config.language
+                }) {
                     Some(f) => f,
                     None => continue,
                 };
@@ -56,7 +60,7 @@ pub async fn run_analysis(
                 // Find framework info
                 let framework_info = frameworks_info.iter().find(|f| f.name == *framework);
                 let language_info = languages_info.iter().find(|l| l.name == *language);
-                
+
                 // Load environment info
                 let env_info = db.get_environment(&environment)?;
 
@@ -67,7 +71,11 @@ pub async fn run_analysis(
                         None => continue,
                     };
 
-                    let test_name = serde_json::to_value(test).unwrap().as_str().unwrap().to_string();
+                    let test_name = serde_json::to_value(test)
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string();
                     let test_description = test.description();
 
                     let file_path = PathBuf::from("data")
@@ -76,18 +84,26 @@ pub async fn run_analysis(
                         .join(language)
                         .join(framework)
                         .join(format!("{}.yaml", test_name));
-                    
+
                     for lang_config in &languages {
                         let extension = format!("{}.md", lang_config.as_str());
                         // If the original file is test.yaml, with_extension("en.md") makes it test.en.md
                         let md_path = file_path.with_extension(&extension);
 
                         if md_path.exists() {
-                            debug!("Skipping {}, {} file exists", file_path.display(), extension);
+                            debug!(
+                                "Skipping {}, {} file exists",
+                                file_path.display(),
+                                extension
+                            );
                             continue;
                         }
 
-                        info!("Analyzing {} for {}", file_path.display(), lang_config.as_str());
+                        info!(
+                            "Analyzing {} for {}",
+                            file_path.display(),
+                            lang_config.as_str()
+                        );
 
                         let context = AnalysisContext {
                             framework,
@@ -105,7 +121,11 @@ pub async fn run_analysis(
                         let json_content = match serde_json::to_string(&context) {
                             Ok(content) => content,
                             Err(e) => {
-                                error!("Failed to serialize context for {}: {}", file_path.display(), e);
+                                error!(
+                                    "Failed to serialize context for {}: {}",
+                                    file_path.display(),
+                                    e
+                                );
                                 continue;
                             }
                         };
@@ -138,7 +158,11 @@ pub async fn run_analysis(
                             Ok(response) => {
                                 // Save to MD
                                 if let Err(e) = fs::write(&md_path, response) {
-                                    error!("Failed to write analysis to {}: {}", md_path.display(), e);
+                                    error!(
+                                        "Failed to write analysis to {}: {}",
+                                        md_path.display(),
+                                        e
+                                    );
                                 } else {
                                     info!("Saved analysis to {}", md_path.display());
                                 }
@@ -178,7 +202,8 @@ async fn call_ai(
         "stream": false
     });
 
-    let response = client.post(format!("{}/chat/completions", api_url))
+    let response = client
+        .post(format!("{}/chat/completions", api_url))
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&request_body)
@@ -191,10 +216,13 @@ async fn call_ai(
         return Err(Error::System(format!("AI API error: {}", error_text)));
     }
 
-    let response_json: serde_json::Value = response.json().await
+    let response_json: serde_json::Value = response
+        .json()
+        .await
         .map_err(|e| Error::System(format!("Failed to parse AI response: {}", e)))?;
 
-    let content = response_json["choices"][0]["message"]["content"].as_str()
+    let content = response_json["choices"][0]["message"]["content"]
+        .as_str()
         .ok_or_else(|| Error::System("Invalid AI response format".to_string()))?;
 
     Ok(content.to_string())

@@ -4,7 +4,7 @@ import { Skeleton } from './ui/skeleton'
 import { Empty, EmptyTitle, EmptyDescription, EmptyMedia } from './ui/empty'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
 import { BarChart3, ChevronDown } from 'lucide-react'
-import type { Benchmark, VisibleColumns } from '../types'
+import type { Benchmark, VisibleColumns, Test } from '../types'
 import { useAppStore, type AppState } from '../store/useAppStore'
 import { TagsInline } from './TagsInline'
 import { getColorForLanguage, formatNumber, cn, getDatabaseColor } from '../lib/utils'
@@ -16,6 +16,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "./ui/dropdown-menu"
 
 interface Props {
@@ -36,7 +39,21 @@ export default function BenchmarksTable({ benchmarks }: Props) {
   const selectedTestId = useAppStore((s: AppState) => s.selectedTest)
   const setSelectedTest = useAppStore((s: AppState) => s.setSelectedTest)
   const tests = useAppStore((s: AppState) => s.tests)
-  const selectedTest = tests.find(t => t.id === selectedTestId)
+
+  // Helper to find test recursively
+  const findTest = (id: string | null, list: Test[]): Test | undefined => {
+    if (!id) return undefined
+    for (const t of list) {
+      if (t.id === id) return t
+      if (t.children) {
+        const found = findTest(id, t.children)
+        if (found) return found
+      }
+    }
+    return undefined
+  }
+
+  const selectedTest = findTest(selectedTestId, tests)
 
   const [localLoading, setLocalLoading] = useState(false)
 
@@ -64,19 +81,41 @@ export default function BenchmarksTable({ benchmarks }: Props) {
 
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-1 hover:text-foreground transition-colors outline-none">
-          <span>{selectedTest?.name}</span>
+          <span>{selectedTest?.name || 'Select Test'}</span>
           <ChevronDown className="h-3 w-3 opacity-50" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          {tests.map((test) => (
-            <DropdownMenuItem 
-              key={test.id} 
-              onClick={() => setSelectedTest(test.id)}
-              className={selectedTestId === test.id ? "bg-accent" : ""}
-            >
-              {test.name}
-            </DropdownMenuItem>
-          ))}
+          {tests.map((test) => {
+            if (test.children && test.children.length > 0) {
+              return (
+                <DropdownMenuSub key={test.name}>
+                  <DropdownMenuSubTrigger>
+                    <span>{test.name}</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {test.children.map((child) => (
+                      <DropdownMenuItem 
+                        key={child.id} 
+                        onClick={() => child.id && setSelectedTest(child.id)}
+                        className={selectedTestId === child.id ? "bg-accent" : ""}
+                      >
+                        {child.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )
+            }
+            return (
+              <DropdownMenuItem 
+                key={test.id} 
+                onClick={() => test.id && setSelectedTest(test.id)}
+                className={selectedTestId === test.id ? "bg-accent" : ""}
+              >
+                {test.name}
+              </DropdownMenuItem>
+            )
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -325,7 +364,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
 
                     {visibleColumns.rps && <TableCell className="w-auto">
                       <div className="flex items-center gap-3">
-                        <div className="text-xs ml-auto font-mono">{(benchmark.rps || 0).toLocaleString()}</div>
+                        <div className="w-20 text-right text-xs font-mono shrink-0">{Math.round(benchmark.rps || 0).toLocaleString()}</div>
                         <div className="flex-1 hidden md:block">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                             <div

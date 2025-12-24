@@ -24,9 +24,11 @@ use crate::{
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TestInfo {
-    id: String,
+    id: Option<String>,
     name: String,
     icon: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    children: Vec<TestInfo>,
 }
 
 #[derive(Serialize)]
@@ -144,34 +146,75 @@ async fn get_environments(
 
 async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, StatusCode> {
     let tests = vec![
-        BenchmarkTests::HelloWorld,
-        BenchmarkTests::Json,
-        BenchmarkTests::DbReadOne,
-        BenchmarkTests::DbReadPaging,
-        BenchmarkTests::DbWrite,
-        BenchmarkTests::TweetService,
-        BenchmarkTests::StaticFilesSmall,
-        BenchmarkTests::StaticFilesMedium,
-        BenchmarkTests::StaticFilesLarge,
-    ]
-    .into_iter()
-    .map(|t| TestInfo {
-        id: t.to_string(),
-        name: readable_test_name(&t),
-        icon: match t {
-            BenchmarkTests::HelloWorld => "zap",
-            BenchmarkTests::Json => "braces",
-            BenchmarkTests::DbReadOne => "database",
-            BenchmarkTests::DbReadPaging => "list",
-            BenchmarkTests::DbWrite => "pen-tool",
-            BenchmarkTests::TweetService => "message-circle",
-            BenchmarkTests::StaticFilesSmall => "file",
-            BenchmarkTests::StaticFilesMedium => "file-text",
-            BenchmarkTests::StaticFilesLarge => "files",
-        }
-        .to_string(),
-    })
-    .collect();
+        TestInfo {
+            id: Some(BenchmarkTests::HelloWorld.to_string()),
+            name: "Plain Text".to_string(),
+            icon: "zap".to_string(),
+            children: vec![],
+        },
+        TestInfo {
+            id: Some(BenchmarkTests::Json.to_string()),
+            name: "JSON".to_string(),
+            icon: "braces".to_string(),
+            children: vec![],
+        },
+        TestInfo {
+            id: None,
+            name: "Database".to_string(),
+            icon: "database".to_string(),
+            children: vec![
+                TestInfo {
+                    id: Some(BenchmarkTests::DbReadOne.to_string()),
+                    name: "Read One".to_string(),
+                    icon: "database".to_string(),
+                    children: vec![],
+                },
+                TestInfo {
+                    id: Some(BenchmarkTests::DbReadPaging.to_string()),
+                    name: "Read Paging".to_string(),
+                    icon: "list".to_string(),
+                    children: vec![],
+                },
+                TestInfo {
+                    id: Some(BenchmarkTests::DbWrite.to_string()),
+                    name: "Write".to_string(),
+                    icon: "pen-tool".to_string(),
+                    children: vec![],
+                },
+            ],
+        },
+        TestInfo {
+            id: Some(BenchmarkTests::TweetService.to_string()),
+            name: "Tweet Service".to_string(),
+            icon: "message-circle".to_string(),
+            children: vec![],
+        },
+        TestInfo {
+            id: None,
+            name: "Files".to_string(),
+            icon: "file".to_string(),
+            children: vec![
+                TestInfo {
+                    id: Some(BenchmarkTests::StaticFilesSmall.to_string()),
+                    name: "Small".to_string(),
+                    icon: "file".to_string(),
+                    children: vec![],
+                },
+                TestInfo {
+                    id: Some(BenchmarkTests::StaticFilesMedium.to_string()),
+                    name: "Medium".to_string(),
+                    icon: "file-text".to_string(),
+                    children: vec![],
+                },
+                TestInfo {
+                    id: Some(BenchmarkTests::StaticFilesLarge.to_string()),
+                    name: "Large".to_string(),
+                    icon: "files".to_string(),
+                    children: vec![],
+                },
+            ],
+        },
+    ];
     Ok(Json(tests))
 }
 

@@ -1,38 +1,61 @@
 import { useAppStore, type AppState } from '../store/useAppStore'
 import { getIcon } from '../lib/utils'
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Button } from './ui/button'
+import { createElement } from 'react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { ChevronDown } from 'lucide-react'
 
 export default function EnvironmentSelector() {
   const environments = useAppStore((s: AppState) => s.environments)
   const selectedEnvironment = useAppStore((s: AppState) => s.selectedEnvironment)
   const setSelectedEnvironment = useAppStore((s: AppState) => s.setSelectedEnvironment)
 
+  const currentEnv = environments.find(e => e.name === selectedEnvironment)
+  const CurrentIcon = currentEnv ? getIcon(currentEnv.icon) : null
+
+  if (!currentEnv || !CurrentIcon) return null
+
   return (
-    <div className="flex rounded-lg border border-border bg-muted/50 p-1">
-      {environments.map((env) => {
-        const Icon = getIcon(env.icon)
-        const isSelected = selectedEnvironment === env.name
-        return (
-          <Tooltip key={env.name}>
-            <TooltipTrigger asChild>
-              <button
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                  isSelected
-                    ? 'bg-background text-foreground shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                }`}
-                onClick={() => setSelectedEnvironment(env.name)}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="hidden min-[1750px]:inline">{env.displayName}</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="min-[1750px]:hidden">
-              <p>{env.displayName}</p>
-            </TooltipContent>
-          </Tooltip>
-        )
-      })}
-    </div>
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              {createElement(CurrentIcon, { className: "h-4 w-4" })}
+              <span className="hidden 2xl:inline font-semibold">{currentEnv.displayName}</span>
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{currentEnv.displayName}</p>
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end">
+        {environments.map((env) => {
+          const Icon = getIcon(env.icon)
+          return (
+            <DropdownMenuItem 
+              key={env.name} 
+              onClick={() => setSelectedEnvironment(env.name)}
+              className="gap-2"
+            >
+              {createElement(Icon, { className: "h-4 w-4" })}
+              <span>{env.displayName}</span>
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

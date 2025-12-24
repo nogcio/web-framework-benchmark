@@ -9,12 +9,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useAppStore, type AppState } from '../store/useAppStore'
 import { ChevronDown, FlaskConical, History, Server } from 'lucide-react'
 import { getIcon } from '../lib/utils'
+import { createElement } from 'react'
 
 export function AppSidebar() {
   const { setOpenMobile } = useSidebar()
@@ -68,13 +72,48 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {tests.map((test) => {
                     const Icon = getIcon(test.icon)
+                    
+                    if (test.children && test.children.length > 0) {
+                      return (
+                        <Collapsible key={test.name} asChild defaultOpen className="group/sub">
+                          <SidebarMenuItem>
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuButton tooltip={test.name}>
+                                {createElement(Icon)}
+                                <span>{test.name}</span>
+                                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/sub:rotate-180" />
+                              </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <SidebarMenuSub>
+                                {test.children.map((child) => {
+                                  const ChildIcon = getIcon(child.icon)
+                                  return (
+                                    <SidebarMenuSubItem key={child.id}>
+                                      <SidebarMenuSubButton
+                                        isActive={selectedTest === child.id}
+                                        onClick={() => handleSelection(() => child.id && setSelectedTest(child.id))}
+                                      >
+                                        {createElement(ChildIcon)}
+                                        <span>{child.name}</span>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  )
+                                })}
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </SidebarMenuItem>
+                        </Collapsible>
+                      )
+                    }
+
                     return (
                       <SidebarMenuItem key={test.id}>
                         <SidebarMenuButton 
                           isActive={selectedTest === test.id}
-                          onClick={() => handleSelection(() => setSelectedTest(test.id))}
+                          onClick={() => handleSelection(() => test.id && setSelectedTest(test.id))}
                         >
-                          <Icon />
+                          {createElement(Icon)}
                           <span>{test.name}</span>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

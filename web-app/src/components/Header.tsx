@@ -1,6 +1,7 @@
 import TestSelector from './TestSelector'
 import EnvironmentSelector from './EnvironmentSelector'
 import { SidebarTrigger } from './ui/sidebar'
+import { GitHubStars } from './GitHubStars'
 
 export default function Header() {
   return (
@@ -15,7 +16,7 @@ export default function Header() {
             />
             <div className="flex flex-col gap-0.5">
               <h1 className="text-lg md:text-xl font-bold tracking-tight">
-                <span className="hidden lg:inline">Web Framework </span><span className="text-primary">Benchmarks</span>
+                <span>Web Framework </span><span className="text-primary">Benchmarks</span>
               </h1>
               <p className="hidden md:block text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                 Performance Analysis Tool
@@ -28,13 +29,14 @@ export default function Header() {
             <TestSelector />
           </div>
 
-          <div className="hidden md:flex items-center gap-2">
-            <EnvironmentSelector />
-          </div>
-
-          {/* Mobile Navigation */}
-          <div className="md:hidden">
-            <SidebarTrigger />
+          <div className="flex items-center gap-2">
+            <div className="hidden md:block">
+              <EnvironmentSelector />
+            </div>
+            <GitHubStars />
+            <div className="md:hidden">
+              <SidebarTrigger />
+            </div>
           </div>
         </div>
       </div>

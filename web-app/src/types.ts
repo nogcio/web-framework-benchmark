@@ -58,9 +58,10 @@ export interface BenchmarkDefinition {
 }
 
 export interface Test {
-  id: string
+  id: string | null
   name: string
   icon: string
+  children?: Test[]
 }
 
 export interface VisibleColumns {

@@ -1,11 +1,15 @@
 - name: Go
   url: https://golang.org
+  color: "#00ADD8"
 
 - name: JS
   url: https://nodejs.org
+  color: "#F7DF1E"
 
 - name: Rust
   url: https://www.rust-lang.org
+  color: "#DEA584"
 
 - name: C#
   url: https://dotnet.microsoft.com/
+  color: "#512BD4"

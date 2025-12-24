@@ -8,12 +8,14 @@ use crate::prelude::*;
 pub struct LanguageRecord {
     pub name: String,
     pub url: String,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Language {
     pub name: String,
     pub url: String,
+    pub color: String,
 }
 
 impl From<&LanguageRecord> for Language {
@@ -21,6 +23,7 @@ impl From<&LanguageRecord> for Language {
         Self {
             name: record.name.clone(),
             url: record.url.clone(),
+            color: record.color.clone().unwrap_or_else(|| "#808080".to_string()),
         }
     }
 }

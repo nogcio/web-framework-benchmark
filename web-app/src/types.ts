@@ -35,6 +35,7 @@ export interface Benchmark {
 export interface Language {
   name: string
   url: string
+  color: string
 }
 
 export interface Framework {

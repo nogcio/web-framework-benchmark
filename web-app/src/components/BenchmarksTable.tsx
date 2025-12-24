@@ -285,10 +285,12 @@ export default function BenchmarksTable({ benchmarks }: Props) {
 
         <TableBody>
           {sorted.map((benchmark, index) => {
-            const langColor = getColorForLanguage(benchmark.language || 'unknown')
             // Resolve language/framework URLs from the global store lists
             const language = languages.find((l) => l.name === benchmark.language)
             const framework = frameworks.find((f) => f.name === benchmark.framework)
+            
+            const langColor = language?.color || getColorForLanguage(benchmark.language || 'unknown')
+            
             const languageHref = language?.url
             const frameworkHref = framework?.url
             const rpsPercent = maxRps > 0 ? (benchmark.rps / maxRps) * 100 : 0

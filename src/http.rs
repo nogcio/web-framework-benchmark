@@ -35,6 +35,7 @@ struct TestInfo {
 struct LanguageInfo {
     name: String,
     url: String,
+    color: String,
 }
 
 #[derive(Serialize)]
@@ -226,6 +227,7 @@ async fn get_languages(State(db): State<db::Db>) -> Result<Json<Vec<LanguageInfo
         .map(|l| LanguageInfo {
             name: l.name,
             url: l.url,
+            color: l.color,
         })
         .collect();
     Ok(Json(languages))

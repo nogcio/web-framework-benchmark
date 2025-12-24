@@ -310,14 +310,12 @@ pub async fn run_adaptive_connections(
     let mut final_runs = Vec::new();
 
     for connections in candidates {
-        info!("Running final benchmark with {} connections...", connections);
+        info!(
+            "Running final benchmark with {} connections...",
+            connections
+        );
         let result = env
-            .exec_wrk_with_connections(
-                app_endpoint,
-                script.clone(),
-                connections,
-                full_duration,
-            )
+            .exec_wrk_with_connections(app_endpoint, script.clone(), connections, full_duration)
             .await?;
 
         let p99_latency = percentile_latency(&result, 99).ok_or_else(|| {
@@ -344,15 +342,13 @@ pub async fn run_adaptive_connections(
     }
 
     // Select best result: prefer valid, then highest RPS
-    final_runs.sort_by(|a, b| {
-        match (a.3, b.3) {
-            (true, false) => std::cmp::Ordering::Greater,
-            (false, true) => std::cmp::Ordering::Less,
-            _ => a
-                .1
-                .requests_per_sec
+    final_runs.sort_by(|a, b| match (a.3, b.3) {
+        (true, false) => std::cmp::Ordering::Greater,
+        (false, true) => std::cmp::Ordering::Less,
+        _ => {
+            a.1.requests_per_sec
                 .partial_cmp(&b.1.requests_per_sec)
-                .unwrap_or(std::cmp::Ordering::Equal),
+                .unwrap_or(std::cmp::Ordering::Equal)
         }
     });
 

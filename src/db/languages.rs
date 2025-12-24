@@ -23,7 +23,10 @@ impl From<&LanguageRecord> for Language {
         Self {
             name: record.name.clone(),
             url: record.url.clone(),
-            color: record.color.clone().unwrap_or_else(|| "#808080".to_string()),
+            color: record
+                .color
+                .clone()
+                .unwrap_or_else(|| "#808080".to_string()),
         }
     }
 }

@@ -218,20 +218,6 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, Sta
     Ok(Json(tests))
 }
 
-fn readable_test_name(test: &BenchmarkTests) -> String {
-    match test {
-        BenchmarkTests::HelloWorld => "Plain Text".to_string(),
-        BenchmarkTests::Json => "JSON".to_string(),
-        BenchmarkTests::DbReadOne => "DB Read One".to_string(),
-        BenchmarkTests::DbReadPaging => "DB Read Paging".to_string(),
-        BenchmarkTests::DbWrite => "DB Write".to_string(),
-        BenchmarkTests::StaticFilesSmall => "Files Small".to_string(),
-        BenchmarkTests::StaticFilesMedium => "Files Medium".to_string(),
-        BenchmarkTests::StaticFilesLarge => "Files Large".to_string(),
-        BenchmarkTests::TweetService => "Tweet Service".to_string(),
-    }
-}
-
 async fn get_languages(State(db): State<db::Db>) -> Result<Json<Vec<LanguageInfo>>, StatusCode> {
     let languages = db
         .get_languages()

@@ -43,6 +43,7 @@ pub struct ContainerOptions {
     pub mount: Option<String>,
     pub envs: Option<Vec<(String, String)>>,
     pub args: Option<Vec<String>>,
+    pub ulimit: Option<String>,
 }
 
 pub async fn exec_run_container(
@@ -71,6 +72,9 @@ pub async fn exec_run_container(
     if let Some(mount_str) = options.mount {
         cmd.arg("-v").arg(mount_str);
     }
+    if let Some(ulimit_str) = options.ulimit {
+        cmd.arg("--ulimit").arg(ulimit_str);
+    }
     if let Some(env_vars) = options.envs {
         for (key, value) in env_vars {
             cmd.arg("-e").arg(format!("{}={}", key, value));
@@ -89,6 +93,13 @@ pub async fn exec_run_container(
 pub async fn exec_stop_container(container_id: &str) -> Result<()> {
     let mut cmd = Command::new("docker");
     cmd.arg("stop").arg(container_id);
+    exec(&mut cmd).await?;
+    Ok(())
+}
+
+pub async fn exec_rm_container(container_id: &str) -> Result<()> {
+    let mut cmd = Command::new("docker");
+    cmd.arg("rm").arg("-f").arg(container_id);
     exec(&mut cmd).await?;
     Ok(())
 }

@@ -26,6 +26,7 @@ use crate::{
 struct TestInfo {
     id: String,
     name: String,
+    icon: String,
 }
 
 #[derive(Serialize)]
@@ -157,6 +158,18 @@ async fn get_tests(State(_db): State<db::Db>) -> Result<Json<Vec<TestInfo>>, Sta
     .map(|t| TestInfo {
         id: t.to_string(),
         name: readable_test_name(&t),
+        icon: match t {
+            BenchmarkTests::HelloWorld => "zap",
+            BenchmarkTests::Json => "braces",
+            BenchmarkTests::DbReadOne => "database",
+            BenchmarkTests::DbReadPaging => "list",
+            BenchmarkTests::DbWrite => "pen-tool",
+            BenchmarkTests::TweetService => "message-circle",
+            BenchmarkTests::StaticFilesSmall => "file",
+            BenchmarkTests::StaticFilesMedium => "file-text",
+            BenchmarkTests::StaticFilesLarge => "files",
+        }
+        .to_string(),
     })
     .collect();
     Ok(Json(tests))

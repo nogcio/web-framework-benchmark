@@ -15,7 +15,7 @@ export default function RunsTabs() {
       orientation="vertical"
       className="flex flex-row w-full h-full gap-0"
     >
-      <TabsList className="relative flex flex-col h-auto w-auto space-y-0 bg-transparent p-0 border-0 ml-2 mr-0 z-30 mt-7 overflow-visible">
+      <TabsList className="relative hidden md:flex flex-col h-auto w-auto space-y-0 bg-transparent p-0 border-0 ml-2 mr-0 z-30 mt-7 overflow-visible">
         {[...runs].sort((a, b) => b.id - a.id).map((run) => (
           <TabsTrigger 
             key={run.id} 

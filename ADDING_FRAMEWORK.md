@@ -143,10 +143,14 @@ Your application must implement the endpoints required for the tests you enabled
 ### General Requirements
 
 *   **Port**: Listen on port **8000**.
+*   **Health Check**:
+    *   **Endpoint**: `GET /health`
+    *   **Response**: `200 OK` with body `OK`
 *   **Headers**:
     *   **X-Request-ID**: If the request contains an `X-Request-ID` header, the response **MUST** include the same header with the same value. This is used to verify that responses match requests.
 *   **Database Connection**:
     *   Use environment variables for connection details:
+        *   `DB_TYPE` (e.g., `postgres`, `mysql`, `mssql`, `mongodb`)
         *   `DB_HOST` (default: `db` or `localhost`)
         *   `DB_PORT` (default: `5432`, `3306`, or `1433`)
         *   `DB_NAME` (default: `benchmark`)

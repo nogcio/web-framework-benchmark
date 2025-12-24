@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      - name: Build project
+        run: cargo build --verbose
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -53,8 +56,13 @@ jobs:
         working-directory: web-app
         run: npm run lint
 
+      - name: Build Frontend
+        working-directory: web-app
+        run: npm run build
+
   build:
     needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read

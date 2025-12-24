@@ -58,10 +58,16 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
         app_env: &[(String, String)],
         app_args: &[String],
     ) -> Result<()> {
-        let app_image = format!("benchmark_app:{}", uuid::Uuid::new_v4());
-        let app_container = format!("app-{}", uuid::Uuid::new_v4());
-        let db_image = database.map(|_| format!("benchmark_db:{}", uuid::Uuid::new_v4()));
-        let db_container = database.map(|_| format!("db-{}", uuid::Uuid::new_v4()));
+        let app_image = "benchmark_app:latest".to_string();
+        let app_container = "benchmark_app".to_string();
+        let db_image = database.map(|k| format!("benchmark_db:{:?}", k).to_lowercase());
+        let db_container = database.map(|k| format!("benchmark_db_{:?}", k).to_lowercase());
+
+        // Cleanup potential leftovers
+        let _ = crate::docker::exec_rm_container(&app_container).await;
+        if let Some(ref c) = db_container {
+            let _ = crate::docker::exec_rm_container(c).await;
+        }
 
         let _ = crate::docker::exec_build(framework_path, &app_image).await;
         if let Some(db_kind) = database {
@@ -111,6 +117,7 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                 mount: None::<String>,
                 envs: Some(get_db_env_vars(db_kind)),
                 args: None,
+                ulimit: Some("nofile=1000000:1000000".to_string()),
             },
         )
         .await?;
@@ -159,6 +166,7 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                     envs
                 }),
                 args: Some(state.app_args.clone()),
+                ulimit: Some("nofile=1000000:1000000".to_string()),
             },
         )
         .await?;

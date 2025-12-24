@@ -1,5 +1,15 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import * as LucideIcons from 'lucide-react'
+
+export function getIcon(name: string) {
+  const { FlaskConical } = LucideIcons
+  if (!name) return FlaskConical
+  // Convert kebab-case to PascalCase (e.g. "pen-tool" -> "PenTool")
+  const pascalName = name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (LucideIcons as any)[pascalName] || FlaskConical
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

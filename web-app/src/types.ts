@@ -60,6 +60,7 @@ export interface BenchmarkDefinition {
 export interface Test {
   id: string
   name: string
+  icon: string
 }
 
 export interface VisibleColumns {

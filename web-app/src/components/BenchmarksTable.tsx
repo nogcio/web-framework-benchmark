@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Skeleton } from './ui/skeleton'
 import { Empty, EmptyTitle, EmptyDescription, EmptyMedia } from './ui/empty'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, ChevronDown } from 'lucide-react'
 import type { Benchmark, VisibleColumns } from '../types'
 import { useAppStore, type AppState } from '../store/useAppStore'
 import { TagsInline } from './TagsInline'
@@ -11,6 +11,12 @@ import { getColorForLanguage, formatNumber, cn, getDatabaseColor } from '../lib/
 import { TableSettings } from './TableSettings'
 import { BenchmarkHoverDetails } from './BenchmarkHoverDetails'
 import { REPO_URL } from '../lib/constants'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu"
 
 interface Props {
   benchmarks: Benchmark[]
@@ -22,7 +28,59 @@ export default function BenchmarksTable({ benchmarks }: Props) {
   const benchmarksLoading = useAppStore((s: AppState) => s.benchmarksLoading)
   const visibleColumns = useAppStore((s: AppState) => s.visibleColumns)
   const toggleColumn = useAppStore((s: AppState) => s.toggleColumn)
+  
+  const runs = useAppStore((s: AppState) => s.runs)
+  const selectedRunId = useAppStore((s: AppState) => s.selectedRunId)
+  const setSelectedRunId = useAppStore((s: AppState) => s.setSelectedRunId)
+  
+  const selectedTestId = useAppStore((s: AppState) => s.selectedTest)
+  const setSelectedTest = useAppStore((s: AppState) => s.setSelectedTest)
+  const tests = useAppStore((s: AppState) => s.tests)
+  const selectedTest = tests.find(t => t.id === selectedTestId)
+
   const [localLoading, setLocalLoading] = useState(false)
+
+  const mobileHeader = (
+    <div className="md:hidden px-4 py-2 border-b bg-muted/20 text-xs font-medium flex items-center gap-2 text-muted-foreground">
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex items-center gap-1 hover:text-foreground transition-colors outline-none">
+          <span>Run #{selectedRunId}</span>
+          <ChevronDown className="h-3 w-3 opacity-50" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="max-h-[300px]">
+          {[...runs].sort((a, b) => b.id - a.id).map((run) => (
+            <DropdownMenuItem 
+              key={run.id} 
+              onClick={() => setSelectedRunId(run.id)}
+              className={selectedRunId === run.id ? "bg-accent" : ""}
+            >
+              Run #{run.id} <span className="ml-2 text-muted-foreground text-[10px]">{new Date(run.createdAt).toLocaleDateString()}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <span>•</span>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex items-center gap-1 hover:text-foreground transition-colors outline-none">
+          <span>{selectedTest?.name}</span>
+          <ChevronDown className="h-3 w-3 opacity-50" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {tests.map((test) => (
+            <DropdownMenuItem 
+              key={test.id} 
+              onClick={() => setSelectedTest(test.id)}
+              className={selectedTestId === test.id ? "bg-accent" : ""}
+            >
+              {test.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
 
   useEffect(() => {
     if (benchmarksLoading) {
@@ -50,54 +108,60 @@ export default function BenchmarksTable({ benchmarks }: Props) {
 
   if (localLoading) {
     return (
-      <Table containerClassName="h-full overflow-auto bg-[linear-gradient(90deg,var(--primary)_1px,transparent_1px)]" className="w-full text-xs">
-        <TableHeader className="sticky top-0 z-20 bg-background">
-          <TableRow>
-            {visibleColumns.rank && <TableHead className="w-8 pl-4">#</TableHead>}
-            {visibleColumns.framework && <TableHead className="w-[20%] pl-4">Framework</TableHead>}
-            {visibleColumns.rps && <TableHead className="w-auto">Requests/sec</TableHead>}
-            {visibleColumns.memory && <TableHead className="w-px whitespace-nowrap px-2">Memory</TableHead>}
-            {visibleColumns.memoryBar && <TableHead className="w-[15%]"></TableHead>}
-            {visibleColumns.tps && <TableHead className="w-px whitespace-nowrap px-2">TPS</TableHead>}
-            {visibleColumns.tpsBar && <TableHead className="w-[15%]"></TableHead>}
-            {visibleColumns.errors && <TableHead className="w-px text-right whitespace-nowrap">Errors</TableHead>}
-            {visibleColumns.tags && <TableHead className="w-24 pr-4">Tags</TableHead>}
-            <TableHead className="w-[var(--spacing)] p-0"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <TableRow key={i}>
-              {visibleColumns.rank && <TableCell className="w-8 pl-4"><Skeleton className="h-4 w-4" /></TableCell>}
-              {visibleColumns.framework && <TableCell className="w-[20%] pl-4">
-                <div className="flex items-center">
-                  <Skeleton className="w-3 h-3 rounded-sm mr-2" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              </TableCell>}
-              {visibleColumns.rps && <TableCell className="w-auto">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="flex-1 h-2 rounded" />
-                  <Skeleton className="w-12 h-3" />
-                </div>
-              </TableCell>}
-              {visibleColumns.memory && <TableCell className="w-px whitespace-nowrap px-2"><Skeleton className="h-4 w-16" /></TableCell>}
-              {visibleColumns.memoryBar && <TableCell className="w-[15%]"><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.tps && <TableCell className="w-px whitespace-nowrap px-2"><Skeleton className="h-4 w-16" /></TableCell>}
-              {visibleColumns.tpsBar && <TableCell className="w-[15%]"><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.errors && <TableCell className="w-px whitespace-nowrap"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>}
-              {visibleColumns.tags && <TableCell className="w-24 pr-4">
-                <div className="flex gap-2">
-                  <Skeleton className="h-5 w-12 rounded-full" />
-                  <Skeleton className="h-5 w-10 rounded-full" />
-                </div>
-              </TableCell>}
-              <TableCell className="w-[var(--spacing)] p-0"></TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-        <TableCaption>Loading...</TableCaption>
-      </Table>
+      <div className="h-full flex flex-col">
+        {mobileHeader}
+        <div className="flex-1 min-h-0">
+          <Table containerClassName="h-full overflow-auto md:bg-[linear-gradient(90deg,var(--primary)_1px,transparent_1px)]" className="w-full text-xs">
+            <TableHeader className="sticky top-0 z-20 bg-background">
+              <TableRow>
+                {visibleColumns.rank && <TableHead className="w-8 pl-4 hidden md:table-cell">#</TableHead>}
+                {visibleColumns.framework && <TableHead className="w-full md:w-[20%] pl-4">Framework</TableHead>}
+                {visibleColumns.rps && <TableHead className="w-auto">Requests/sec</TableHead>}
+                {visibleColumns.memory && <TableHead className="w-px whitespace-nowrap px-2 hidden md:table-cell">Memory</TableHead>}
+                {visibleColumns.memoryBar && <TableHead className="w-[15%] hidden md:table-cell"></TableHead>}
+                {visibleColumns.tps && <TableHead className="w-px whitespace-nowrap px-2 hidden md:table-cell">TPS</TableHead>}
+                {visibleColumns.tpsBar && <TableHead className="w-[15%] hidden md:table-cell"></TableHead>}
+                {visibleColumns.errors && <TableHead className="w-px text-right whitespace-nowrap hidden md:table-cell">Errors</TableHead>}
+                {visibleColumns.tags && <TableHead className="w-24 pr-4 hidden md:table-cell">Tags</TableHead>}
+                <TableHead className="w-[var(--spacing)] p-0"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={i}>
+                  {visibleColumns.rank && <TableCell className="w-8 pl-4 hidden md:table-cell"><Skeleton className="h-4 w-4" /></TableCell>}
+                  {visibleColumns.framework && <TableCell className="w-full md:w-[20%] pl-4">
+                    <div className="flex items-center">
+                      <Skeleton className="w-3 h-3 rounded-sm mr-2" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </TableCell>}
+                  {visibleColumns.rps && <TableCell className="w-auto">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-16 h-3 ml-auto" />
+                      <Skeleton className="flex-1 h-2 rounded hidden md:block" />
+                      <Skeleton className="w-12 h-3 hidden md:block" />
+                    </div>
+                  </TableCell>}
+                  {visibleColumns.memory && <TableCell className="w-px whitespace-nowrap px-2 hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>}
+                  {visibleColumns.memoryBar && <TableCell className="w-[15%] hidden md:table-cell"><Skeleton className="h-4 w-full" /></TableCell>}
+                  {visibleColumns.tps && <TableCell className="w-px whitespace-nowrap px-2 hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>}
+                  {visibleColumns.tpsBar && <TableCell className="w-[15%] hidden md:table-cell"><Skeleton className="h-4 w-full" /></TableCell>}
+                  {visibleColumns.errors && <TableCell className="w-px whitespace-nowrap hidden md:table-cell"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>}
+                  {visibleColumns.tags && <TableCell className="w-24 pr-4 hidden md:table-cell">
+                    <div className="flex gap-2">
+                      <Skeleton className="h-5 w-12 rounded-full" />
+                      <Skeleton className="h-5 w-10 rounded-full" />
+                    </div>
+                  </TableCell>}
+                  <TableCell className="w-[var(--spacing)] p-0"></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableCaption>Loading...</TableCaption>
+          </Table>
+        </div>
+      </div>
     )
   }
 
@@ -116,17 +180,19 @@ export default function BenchmarksTable({ benchmarks }: Props) {
   }
 
   return (
-    <div className="h-full">
-      <Table containerClassName="h-full overflow-auto bg-[linear-gradient(90deg,var(--primary)_1px,transparent_1px)]" className="w-full text-xs">
+    <div className="h-full flex flex-col">
+      {mobileHeader}
+      <div className="flex-1 min-h-0">
+        <Table containerClassName="h-full overflow-auto md:bg-[linear-gradient(90deg,var(--primary)_1px,transparent_1px)]" className="w-full text-xs">
         <TableHeader className="sticky top-0 z-20 bg-background">
           <TableRow className="border-b-primary border-b-2 hover:bg-transparent">
-            {visibleColumns.rank && <TableHead className="w-8 pl-4">
+            {visibleColumns.rank && <TableHead className="w-8 pl-4 hidden md:table-cell">
               <div className="flex items-center justify-between">
                 <span>#</span>
                 {lastVisibleColumn === 'rank' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.framework && <TableHead className="w-[20%] pl-4">
+            {visibleColumns.framework && <TableHead className="w-full md:w-[20%] pl-4">
               <div className="flex items-center justify-between">
                 <span>Framework</span>
                 {lastVisibleColumn === 'framework' && settingsMenu}
@@ -138,37 +204,37 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                 {lastVisibleColumn === 'rps' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.memory && <TableHead className="w-px whitespace-nowrap px-2">
+            {visibleColumns.memory && <TableHead className="w-px whitespace-nowrap px-2 hidden md:table-cell">
               <div className="flex items-center justify-between">
                 <span>Memory</span>
                 {lastVisibleColumn === 'memory' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.memoryBar && <TableHead className="w-[15%]">
+            {visibleColumns.memoryBar && <TableHead className="w-[15%] hidden md:table-cell">
               <div className="flex items-center justify-between">
                 <span></span>
                 {lastVisibleColumn === 'memoryBar' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.tps && <TableHead className="w-px whitespace-nowrap px-2">
+            {visibleColumns.tps && <TableHead className="w-px whitespace-nowrap px-2 hidden md:table-cell">
               <div className="flex items-center justify-between">
                 <span>TPS</span>
                 {lastVisibleColumn === 'tps' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.tpsBar && <TableHead className="w-[15%]">
+            {visibleColumns.tpsBar && <TableHead className="w-[15%] hidden md:table-cell">
               <div className="flex items-center justify-between">
                 <span></span>
                 {lastVisibleColumn === 'tpsBar' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.errors && <TableHead className="w-px text-right whitespace-nowrap">
+            {visibleColumns.errors && <TableHead className="w-px text-right whitespace-nowrap hidden md:table-cell">
               <div className="flex items-center justify-end">
                 <span>Errors</span>
                 {lastVisibleColumn === 'errors' && settingsMenu}
               </div>
             </TableHead>}
-            {visibleColumns.tags && <TableHead className="w-24 pr-4">
+            {visibleColumns.tags && <TableHead className="w-24 pr-4 hidden md:table-cell">
               <div className="flex items-center justify-between">
                 <span>Tags</span>
                 {lastVisibleColumn === 'tags' && settingsMenu}
@@ -186,25 +252,35 @@ export default function BenchmarksTable({ benchmarks }: Props) {
             const framework = frameworks.find((f) => f.name === benchmark.framework)
             const languageHref = language?.url
             const frameworkHref = framework?.url
+            const rpsPercent = maxRps > 0 ? (benchmark.rps / maxRps) * 100 : 0
+            
+            // Add opacity to the color for the background row
+            const rowColor = langColor.startsWith('hsl') 
+              ? langColor.replace(')', ', 0.2)') 
+              : langColor
 
             return (
               <HoverCard openDelay={300} closeDelay={300}>
                 <HoverCardTrigger asChild>
                   <TableRow
                     key={benchmark.language + '-' + benchmark.framework}
-                    className="hover:cursor-pointer"
+                    className="hover:cursor-pointer bg-[linear-gradient(to_right,var(--row-color)_var(--row-progress),transparent_var(--row-progress))] md:bg-none"
+                    style={{
+                      '--row-progress': `${rpsPercent}%`,
+                      '--row-color': rowColor
+                    } as React.CSSProperties}
                     onClick={() => {
                       if (benchmark.path) {
                         window.open(`${REPO_URL}/tree/main/${benchmark.path}`, '_blank')
                       }
                     }}
                   >
-                    {visibleColumns.rank && <TableCell className="w-8 pl-4 font-mono text-muted-foreground">
+                    {visibleColumns.rank && <TableCell className="w-8 pl-4 font-mono text-muted-foreground hidden md:table-cell">
                       {index + 1}
                     </TableCell>}
-                    {visibleColumns.framework && <TableCell className="w-[20%] pl-4">
+                    {visibleColumns.framework && <TableCell className="w-full md:w-[20%] pl-4">
                       <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center min-w-0">
+                        <div className="flex items-center min-w-0 hidden md:flex">
                           <span
                             className="inline-block w-3 h-3 rounded-sm mr-2 shrink-0"
                             style={{ backgroundColor: langColor }}
@@ -235,16 +311,22 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                             )}
                           </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground ml-2 truncate min-w-0 flex-1 text-right">
-                          {benchmark.name}
-                        </span>
+                        <div className="flex items-center min-w-0 flex-1 md:justify-end">
+                          <span
+                            className="inline-block w-2 h-2 rounded-full mr-2 shrink-0 md:hidden"
+                            style={{ backgroundColor: langColor }}
+                          />
+                          <span className="text-sm md:text-[10px] md:text-muted-foreground md:ml-2 truncate min-w-0 text-left md:text-right font-medium md:font-normal">
+                            {benchmark.name}
+                          </span>
+                        </div>
                       </div>
                     </TableCell>}
 
                     {visibleColumns.rps && <TableCell className="w-auto">
                       <div className="flex items-center gap-3">
                         <div className="text-xs ml-auto font-mono">{(benchmark.rps || 0).toLocaleString()}</div>
-                        <div className="flex-1">
+                        <div className="flex-1 hidden md:block">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                             <div
                               className="h-2"
@@ -258,7 +340,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                             />
                           </div>
                         </div>
-                        <div className="w-12 text-left text-[10px] font-mono text-muted-foreground leading-none">
+                        <div className="w-12 text-left text-[10px] font-mono text-muted-foreground leading-none hidden md:block">
                           {(() => {
                             const rpsPercent = maxRps > 0 ? (benchmark.rps / maxRps) * 100 : 0
                             return `${Math.round(rpsPercent)}%`
@@ -267,13 +349,13 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.memory && <TableCell className="w-px whitespace-nowrap px-2">
+                    {visibleColumns.memory && <TableCell className="w-px whitespace-nowrap px-2 hidden md:table-cell">
                       <span className="text-xs font-mono text-muted-foreground">
                         {(benchmark.memoryUsage / (1024 * 1024)).toFixed(1)}MB
                       </span>
                     </TableCell>}
 
-                    {visibleColumns.memoryBar && <TableCell className="w-[15%]">
+                    {visibleColumns.memoryBar && <TableCell className="w-[15%] hidden md:table-cell">
                       <div className="flex items-center gap-3">
                         <div className="flex-1">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
@@ -303,13 +385,13 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.tps && <TableCell className="w-px whitespace-nowrap px-2">
+                    {visibleColumns.tps && <TableCell className="w-px whitespace-nowrap px-2 hidden md:table-cell">
                       <span className="text-xs font-mono text-muted-foreground">
                         {formatNumber(benchmark.tps)}/s
                       </span>
                     </TableCell>}
 
-                    {visibleColumns.tpsBar && <TableCell className="w-[15%]">
+                    {visibleColumns.tpsBar && <TableCell className="w-[15%] hidden md:table-cell">
                       <div className="flex items-center gap-3">
                         <div className="flex-1">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
@@ -337,13 +419,13 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                       </div>
                     </TableCell>}
 
-                    {visibleColumns.errors && <TableCell className="w-px text-right whitespace-nowrap">
+                    {visibleColumns.errors && <TableCell className="w-px text-right whitespace-nowrap hidden md:table-cell">
                       <span className={benchmark.errors === 0 ? 'text-muted-foreground' : 'text-red-500'}>
                         {benchmark.errors}
                       </span>
                     </TableCell>}
 
-                    {visibleColumns.tags && <TableCell className="w-24 pr-4">
+                    {visibleColumns.tags && <TableCell className="w-24 pr-4 hidden md:table-cell">
                       <TagsInline tags={benchmark.tags} />
                     </TableCell>}
                     <TableCell className="w-[var(--spacing)] p-0"></TableCell>
@@ -359,6 +441,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
 
         <TableCaption>{sorted.length} results</TableCaption>
       </Table>
+      </div>
     </div>
   )
 }

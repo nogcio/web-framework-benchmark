@@ -119,10 +119,10 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
         app_args: &[String],
     ) -> Result<()> {
         debug!("Preparing remote environment...");
-        let app_image = format!("benchmark_app:{}", uuid::Uuid::new_v4());
-        let app_container = format!("app-{}", uuid::Uuid::new_v4());
-        let db_image = database.map(|_| format!("benchmark_db:{}", uuid::Uuid::new_v4()));
-        let db_container = database.map(|_| format!("db-{}", uuid::Uuid::new_v4()));
+        let app_image = "benchmark_app:latest".to_string();
+        let app_container = "benchmark_app".to_string();
+        let db_image = database.map(|k| format!("benchmark_db:{:?}", k).to_lowercase());
+        let db_container = database.map(|k| format!("benchmark_db_{:?}", k).to_lowercase());
 
         let app_host = self
             .config
@@ -236,7 +236,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
             };
 
         let mut cmd_str = format!(
-            "sudo docker run --name {} -d -p {port}:{port}",
+            "sudo docker run --name {} -d -p {port}:{port} --ulimit nofile=1000000:1000000",
             db_container,
             port = db_kind.port()
         );
@@ -337,7 +337,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
             .ok_or_else(|| Error::System("Missing app host config".to_string()))?;
 
         let mut cmd_str = format!(
-            "sudo docker run --name {} -d -p 8000:8000 -v ~/benchmarks_data:/app/benchmarks_data",
+            "sudo docker run --name {} -d -p 8000:8000 -v ~/benchmarks_data:/app/benchmarks_data --ulimit nofile=1000000:1000000",
             state.app_container
         );
         let mut all_env = Vec::new();

@@ -6,6 +6,8 @@ import EnvironmentDetails from './components/EnvironmentDetails'
 import { useEffect } from 'react'
 import { useAppStore, type AppState } from './store/useAppStore'
 import { useUrlSync } from './hooks/useUrlSync'
+import { SidebarProvider } from './components/ui/sidebar'
+import { AppSidebar } from './components/AppSidebar'
 
 let appInitialized = false
 
@@ -45,17 +47,22 @@ function App() {
   }, [fetchLanguages, fetchRuns, fetchEnvironments, fetchTests])
 
   return (
-    <div className="h-screen bg-background text-foreground w-full p-4 flex flex-col overflow-hidden">
-      <Header />
+    <SidebarProvider>
+      <div className="md:hidden">
+        <AppSidebar />
+      </div>
+      <div className="h-screen bg-background text-foreground w-full p-4 flex flex-col overflow-hidden">
+        <Header />
 
-      <div className="-mx-4 flex-1 overflow-hidden flex flex-col">
-        <RunsTabs />
+        <div className="-mx-4 flex-1 overflow-hidden flex flex-col">
+          <RunsTabs />
+        </div>
+        <EnvironmentDetails />
+        <div className="-mx-4 -mb-4">
+          <Footer />
+        </div>
       </div>
-      <EnvironmentDetails />
-      <div className="-mx-4 -mb-4">
-        <Footer />
-      </div>
-    </div>
+    </SidebarProvider>
   )
 }
 

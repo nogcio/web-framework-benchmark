@@ -299,10 +299,9 @@ export default function BenchmarksTable({ benchmarks }: Props) {
               : langColor
 
             return (
-              <HoverCard openDelay={300} closeDelay={300}>
+              <HoverCard key={benchmark.name} openDelay={300} closeDelay={300}>
                 <HoverCardTrigger asChild>
                   <TableRow
-                    key={benchmark.language + '-' + benchmark.framework}
                     className="hover:cursor-pointer bg-[linear-gradient(to_right,var(--row-color)_var(--row-progress),transparent_var(--row-progress))] md:bg-none"
                     style={{
                       '--row-progress': `${rpsPercent}%`,

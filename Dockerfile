@@ -2,7 +2,7 @@
 FROM rust:1.92-alpine AS backend-builder
 WORKDIR /app
 # Install build dependencies
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+RUN apk add --no-cache musl-dev
 # Create a new empty shell project
 RUN cargo new --bin wfb
 WORKDIR /app/wfb
@@ -36,7 +36,7 @@ FROM alpine:3.23
 WORKDIR /app
 
 # Install necessary runtime dependencies (e.g. ca-certificates, openssl if needed)
-RUN apk add --no-cache ca-certificates libssl3
+RUN apk add --no-cache ca-certificates
 
 # Copy the binary
 COPY --from=backend-builder /app/wfb/target/release/wfb .

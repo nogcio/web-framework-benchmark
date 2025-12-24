@@ -25,7 +25,7 @@ thiserror = "2.0.17"
 clap = {version = "4.5.53", features = ["derive", "env"]}
 uuid = {version = "1.19.0", features = ["v4"] }
 
-reqwest = { version = "0.12.26", features = ["json"] }
+reqwest = { version = "0.12.26", default-features = false, features = ["json", "rustls-tls", "http2", "charset"] }
 regex = "1.12.2"
 humanize-bytes = "1.0.6"
 chrono = { version = "0.4.42", features = ["serde"] }

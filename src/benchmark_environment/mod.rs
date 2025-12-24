@@ -286,39 +286,88 @@ pub async fn run_adaptive_connections(
         .or_else(|| samples.iter().min_by_key(|s| s.connections).cloned())
         .ok_or_else(|| Error::System("No benchmark samples collected".to_string()))?;
 
-    if let Some(reason) = &final_sample.fail_reason {
-        warn!(
-            "No successful benchmark run found. Using fallback run with {} connections (Reason: {}).",
-            final_sample.connections, reason
-        );
-    } else {
-        info!(
-            "Selected best run: {} connections, {:.2} rps. Running full benchmark ({}s)...",
-            final_sample.connections, final_sample.result.requests_per_sec, full_duration
-        );
+    let best_idx = samples
+        .iter()
+        .position(|s| s.connections == final_sample.connections)
+        .expect("Best sample must be in samples");
+
+    let mut candidates = Vec::new();
+    if best_idx > 0 {
+        candidates.push(samples[best_idx - 1].connections);
     }
-
-    let final_result = env
-        .exec_wrk_with_connections(
-            app_endpoint,
-            script.clone(),
-            final_sample.connections,
-            full_duration,
-        )
-        .await?;
-
-    let final_p99 = percentile_latency(&final_result, 99).ok_or_else(|| {
-        Error::System("Missing 99th percentile latency from wrk output".to_string())
-    })?;
+    candidates.push(samples[best_idx].connections);
+    if best_idx < samples.len() - 1 {
+        candidates.push(samples[best_idx + 1].connections);
+    }
+    candidates.sort();
+    candidates.dedup();
 
     info!(
-        "Final result: {} connections -> {:.2} rps, avg {:.2}ms, p99 {}ms, errors {}",
-        final_sample.connections,
-        final_result.requests_per_sec,
-        final_result.latency_avg.as_secs_f64() * 1000.0,
-        final_p99.as_millis(),
-        final_result.errors
+        "Selected best run from probe: {} connections. Running final benchmarks for candidates: {:?} ({}s)...",
+        final_sample.connections, candidates, full_duration
     );
 
-    Ok((final_result, samples))
+    let mut final_runs = Vec::new();
+
+    for connections in candidates {
+        info!("Running final benchmark with {} connections...", connections);
+        let result = env
+            .exec_wrk_with_connections(
+                app_endpoint,
+                script.clone(),
+                connections,
+                full_duration,
+            )
+            .await?;
+
+        let p99_latency = percentile_latency(&result, 99).ok_or_else(|| {
+            Error::System("Missing 99th percentile latency from wrk output".to_string())
+        })?;
+
+        let latency_limit_ms = std::cmp::max(
+            LATENCY_LIMIT_MS,
+            result.transfer_per_sec / BYTES_PER_MS_LIMIT_SCALE,
+        );
+
+        let is_valid = result.errors == 0 && (p99_latency.as_millis() as u64) <= latency_limit_ms;
+
+        info!(
+            "Final run candidate: {} conn -> {:.2} rps, p99 {}ms, errors {}, valid: {}",
+            connections,
+            result.requests_per_sec,
+            p99_latency.as_millis(),
+            result.errors,
+            is_valid
+        );
+
+        final_runs.push((connections, result, p99_latency, is_valid));
+    }
+
+    // Select best result: prefer valid, then highest RPS
+    final_runs.sort_by(|a, b| {
+        match (a.3, b.3) {
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
+            _ => a
+                .1
+                .requests_per_sec
+                .partial_cmp(&b.1.requests_per_sec)
+                .unwrap_or(std::cmp::Ordering::Equal),
+        }
+    });
+
+    let (best_conn, best_result, best_p99, _) = final_runs
+        .pop()
+        .ok_or_else(|| Error::System("No final runs executed".to_string()))?;
+
+    info!(
+        "Final selected result: {} connections -> {:.2} rps, avg {:.2}ms, p99 {}ms, errors {}",
+        best_conn,
+        best_result.requests_per_sec,
+        best_result.latency_avg.as_secs_f64() * 1000.0,
+        best_p99.as_millis(),
+        best_result.errors
+    );
+
+    Ok((best_result, samples))
 }

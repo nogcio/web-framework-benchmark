@@ -180,3 +180,35 @@
   path: benchmarks/csharp/aspnetcore-mongodb
   database: mongodb
 
+- name: axum
+  language: Rust
+  language_version: "1.92"
+  framework: axum
+  framework_version: "0.8.8"
+  tests:
+    - hello_world
+    - json
+    - static_files_small
+    - static_files_medium
+    - static_files_large
+  tags:
+    platform: axum
+  path: benchmarks/rust/axum
+
+- name: axum-sqlx-postgres
+  language: Rust
+  language_version: "1.92"
+  framework: axum
+  framework_version: "0.8.8"
+  tests:
+    - db_read_one
+    - db_read_paging
+    - db_write
+    - tweet_service
+  tags:
+    platform: rust
+    orm: sqlx
+    orm_version: "0.8.6"
+  path: benchmarks/rust/axum-sqlx-postgres
+  database: postgres
+

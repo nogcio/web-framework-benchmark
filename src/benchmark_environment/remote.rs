@@ -236,7 +236,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
             };
 
         let mut cmd_str = format!(
-            "sudo docker run --name {} -d -p {port}:{port} --ulimit nofile=1000000:1000000",
+            "sudo docker run --name {} -d -p {port}:{port}",
             db_container,
             port = db_kind.port()
         );

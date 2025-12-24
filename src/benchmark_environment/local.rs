@@ -117,7 +117,7 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                 mount: None::<String>,
                 envs: Some(get_db_env_vars(db_kind)),
                 args: None,
-                ulimit: Some("nofile=1000000:1000000".to_string()),
+                ulimit: None::<String>,
             },
         )
         .await?;

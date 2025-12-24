@@ -325,7 +325,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                             className="inline-block w-3 h-3 rounded-sm mr-2 shrink-0"
                             style={{ backgroundColor: langColor }}
                           />
-                          <div className="font-medium flex items-center gap-x-2 gap-y-1 min-w-0">
+                          <div className="font-medium flex items-center gap-x-2 gap-y-1 min-w-0 h-5">
                             <div className="flex items-center whitespace-nowrap">
                               {languageHref ? (
                                 <a href={languageHref} target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline hover:text-primary">

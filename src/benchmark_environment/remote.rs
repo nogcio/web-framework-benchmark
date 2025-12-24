@@ -84,6 +84,7 @@ impl RemoteBenchmarkEnvironment {
         debug!("Rsync {:?} to {}:{}", src, host.ip, dest);
         let mut cmd = Command::new("rsync");
         cmd.arg("-avz")
+            .arg("--delete")
             .arg("-e")
             .arg(format!(
                 "ssh -i {} -o StrictHostKeyChecking=no",

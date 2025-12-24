@@ -223,7 +223,8 @@ These tests require a database connection.
 ### 6.4. Static Files
 *   **Test Name**: `static_files_small`, `static_files_medium`, `static_files_large`
 *   **Endpoint**: `GET /files/{filename}`
-*   **Logic**: Serve the requested file from the `benchmarks_data` directory (mounted at runtime).
+*   **Logic**: Serve the requested file from the directory specified by the `DATA_DIR` environment variable. If `DATA_DIR` is not set, default to `benchmarks_data` in the current working directory.
+    *   **Important**: Do NOT use absolute paths like `/benchmarks_data` unless `DATA_DIR` is set to that. The directory is mounted into the container, but the location might vary.
 *   **Security**: Ensure no directory traversal attacks (e.g., `../`).
 *   **Status Code**: 200 OK
 
@@ -236,40 +237,46 @@ These tests require a database connection.
 *   **Tweets**: `id`, `user_id`, `content`, `created_at`
 *   **Likes**: `user_id`, `tweet_id` (unique pair)
 
-#### Endpoints (Auth Required via JWT Bearer)
+#### Endpoints
 
 All endpoints **MUST** handle the `X-Request-ID` header: if present in the request, it must be echoed back in the response.
 
 1.  **Register**
     *   `POST /api/auth/register`
+    *   **Auth**: None
     *   Body: `{"username": "...", "password": "..."}`
     *   Logic: Create user. **MUST** use **SHA256** for password hashing.
     *   Response: `201 Created`
 
 2.  **Login**
     *   `POST /api/auth/login`
+    *   **Auth**: None
     *   Body: `{"username": "...", "password": "..."}`
     *   Logic: Verify credentials (SHA256). Return JWT with `sub` (user_id) and `name` (username).
     *   Response: `200 OK` `{"token": "..."}`
 
 3.  **Feed**
     *   `GET /api/feed`
+    *   **Auth**: Required (JWT Bearer)
     *   Logic: Return 20 most recent tweets from *any* user.
     *   Response: `200 OK` `[{"id": 1, "username": "...", "content": "...", "likes": 5}, ...]`
 
 4.  **Get Tweet**
     *   `GET /api/tweets/{id}`
+    *   **Auth**: Required (JWT Bearer)
     *   Logic: Return tweet details.
     *   Response: `200 OK`
 
 5.  **Create Tweet**
     *   `POST /api/tweets`
+    *   **Auth**: Required (JWT Bearer)
     *   Body: `{"content": "..."}`
     *   Logic: Create tweet for current user.
     *   Response: `201 Created`
 
 6.  **Like Tweet**
     *   `POST /api/tweets/{id}/like`
+    *   **Auth**: Required (JWT Bearer)
     *   Logic: Toggle like (Add if missing, Remove if exists).
     *   Response: `200 OK`
 

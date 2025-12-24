@@ -243,6 +243,13 @@ impl Db {
         framework: &str,
         lang: Option<&str>,
     ) -> Result<Option<std::path::PathBuf>> {
+        if test.contains('/') || test.contains('\\') || test.contains("..") {
+            return Ok(None);
+        }
+        if lang.is_some_and(|l| l.contains('/') || l.contains('\\') || l.contains("..")) {
+            return Ok(None);
+        }
+
         let inner = self.inner.read().map_err(|_| Error::PoisonError)?;
         if let Some(run) = inner.runs.iter().find(|r| r.id == run_id) {
             for fw_run in &run.frameworks {

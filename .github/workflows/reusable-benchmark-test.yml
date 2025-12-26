@@ -195,6 +195,10 @@ jobs:
         dd if=/dev/zero of=benchmarks_data/1mb.bin bs=1024 count=1024
         dd if=/dev/zero of=benchmarks_data/10mb.bin bs=1024 count=10240
 
+    - name: Copy test data fixtures to framework directory
+      run: |
+        cp -r benchmarks_data "${{ inputs.framework_path }}/"
+
     - name: Build Docker image for benchmark
       uses: docker/build-push-action@v5
       with:

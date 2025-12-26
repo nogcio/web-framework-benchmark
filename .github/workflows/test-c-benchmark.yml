@@ -27,11 +27,6 @@ jobs:
             image_tag: wfb-c-nginx
             tests: hello_world,static_files_small,static_files_medium,static_files_large
             database: ""
-          - name: haproxy
-            framework_path: benchmarks/c/haproxy
-            image_tag: wfb-c-haproxy
-            tests: hello_world
-            database: ""
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml

@@ -148,6 +148,14 @@ Your application must implement the endpoints required for the tests you enabled
     *   **Response**: `200 OK` with body `OK`
 *   **Headers**:
     *   **X-Request-ID**: If the request contains an `X-Request-ID` header, the response **MUST** include the same header with the same value. This is used to verify that responses match requests.
+        *   **EXCEPTION**: This is **NOT** required for `hello_world` and `static_files` tests.
+*   **Data Format**:
+    *   **JSON**: All JSON responses must be strictly valid JSON.
+    *   **Extra Fields**: Responses **MUST NOT** contain any extra fields not specified in the requirements.
+    *   **Date Format**: All date/time fields must be in **ISO 8601** format (e.g., `2023-01-01T12:00:00Z`).
+    *   **Field Naming**:
+        *   Standard fields use `snake_case` (e.g., `user_id`, `password_hash`) in database schemas.
+        *   **EXCEPTION**: For `hello_world` related endpoints (`db_read_one`, `db_read_paging`, `db_write`), the date fields in the JSON response **MUST** be `camelCase`: `createdAt` and `updatedAt`.
 *   **Database Connection**:
     *   Use environment variables for connection details:
         *   `DB_TYPE` (e.g., `postgres`, `mysql`, `mssql`, `mongodb`)
@@ -190,13 +198,13 @@ These tests require a database connection.
 *   **Endpoint**: `GET /db/read/one?id={id}`
 *   **Query Parameter**: `id` (integer, 1-1000)
 *   **Logic**: Fetch a single row from the `hello_world` table where `id` matches the parameter.
-*   **Response Body**: JSON representation of the row.
+*   **Response Body**: JSON representation of the row. **Strictly no extra fields.**
     ```json
     {
       "id": 123,
       "name": "name_123",
-      "created_at": "2023-01-01T00:00:00Z",
-      "updated_at": "2023-01-01T00:00:00Z"
+      "createdAt": "2023-01-01T00:00:00Z",
+      "updatedAt": "2023-01-01T00:00:00Z"
     }
     ```
 *   **Status Code**: 200 OK
@@ -207,7 +215,7 @@ These tests require a database connection.
     *   `offset` (integer)
     *   `limit` (integer, default 50)
 *   **Logic**: Fetch rows from the `hello_world` table ordered by `id`, using the specified limit and offset.
-*   **Response Body**: JSON array of rows.
+*   **Response Body**: JSON array of rows. Each object must follow the structure above (`createdAt`, `updatedAt`). **Strictly no extra fields.**
 *   **Status Code**: 200 OK
 
 #### Database Write (`db_write`)
@@ -217,7 +225,7 @@ These tests require a database connection.
     1.  Insert a new row into the `hello_world` table with the provided `name`.
     2.  Set `created_at` and `updated_at` to the current timestamp.
     3.  Return the inserted row.
-*   **Response Body**: JSON representation of the inserted row (including the generated `id`).
+*   **Response Body**: JSON representation of the inserted row (including the generated `id`). Must use `createdAt` and `updatedAt`. **Strictly no extra fields.**
 *   **Status Code**: 200 OK
 
 ### 6.4. Static Files
@@ -253,19 +261,19 @@ All endpoints **MUST** handle the `X-Request-ID` header: if present in the reque
     *   **Auth**: None
     *   Body: `{"username": "...", "password": "..."}`
     *   Logic: Verify credentials (SHA256). Return JWT with `sub` (user_id) and `name` (username).
-    *   Response: `200 OK` `{"token": "..."}`
+    *   Response: `200 OK` `{"token": "..."}`. **Strictly no extra fields.**
 
 3.  **Feed**
     *   `GET /api/feed`
     *   **Auth**: Required (JWT Bearer)
     *   Logic: Return 20 most recent tweets from *any* user.
-    *   Response: `200 OK` `[{"id": 1, "username": "...", "content": "...", "likes": 5}, ...]`
+    *   Response: `200 OK` `[{"id": 1, "username": "...", "content": "...", "createdAt": "...", "likes": 5}, ...]`. **Strictly no extra fields.**
 
 4.  **Get Tweet**
     *   `GET /api/tweets/{id}`
     *   **Auth**: Required (JWT Bearer)
     *   Logic: Return tweet details.
-    *   Response: `200 OK`
+    *   Response: `200 OK` `{"id": 1, "username": "...", "content": "...", "createdAt": "...", "likes": 5}`. **Strictly no extra fields.**
 
 5.  **Create Tweet**
     *   `POST /api/tweets`
@@ -278,7 +286,7 @@ All endpoints **MUST** handle the `X-Request-ID` header: if present in the reque
     *   `POST /api/tweets/{id}/like`
     *   **Auth**: Required (JWT Bearer)
     *   Logic: Toggle like (Add if missing, Remove if exists).
-    *   Response: `200 OK`
+    *   Response: `200 OK`. **Empty body.**
 
 ---
 

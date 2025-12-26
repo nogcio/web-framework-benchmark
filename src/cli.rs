@@ -2,6 +2,14 @@ use clap::{Parser, Subcommand};
 
 use crate::analysis_context::AnalysisLanguage;
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum StaticFilesMode {
+    /// Recommended: run static-files tests on a fixed connection matrix (clean methodology)
+    Fixed,
+    /// Legacy: adaptive connection search with a dynamic p99 budget
+    Adaptive,
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "wfb")]
 #[command(about = "Web framework benchmark tool", long_about = None)]
@@ -18,6 +26,12 @@ pub enum Commands {
         environment: String,
         #[arg(short, long)]
         filter: Option<String>,
+        #[arg(long, default_value_t = false)]
+        verification: bool,
+
+        /// How to run static-files benchmarks (static_files_small/medium/large)
+        #[arg(long, value_enum, default_value_t = StaticFilesMode::Fixed)]
+        static_files_mode: StaticFilesMode,
     },
 
     Serve {

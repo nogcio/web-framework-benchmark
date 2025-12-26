@@ -6,13 +6,17 @@ use serde::{Deserialize, Serialize};
 
 use humanize_bytes::humanize_bytes_binary;
 
-use crate::benchmark_environment::{BenchmarkEnvironment, run_adaptive_connections};
+use crate::benchmark_environment::{
+    BenchmarkEnvironment, run_adaptive_connections, run_fixed_connections_matrix,
+};
+use crate::cli::StaticFilesMode;
 use crate::database::DatabaseKind;
 use crate::db::benchmarks::Benchmark;
 use crate::prelude::*;
 use crate::wrk::WrkResult;
 
 const BENCHMARK_WARMUP_COOL_DOWN_SECS: u64 = 2;
+const BENCHMARK_WARMUP_DURATION_SECS: u64 = 10;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -55,10 +59,10 @@ impl BenchmarkTests {
     pub fn description(&self) -> &'static str {
         match self {
             BenchmarkTests::HelloWorld => {
-                "This test measures the raw throughput of the web framework with minimal overhead. It sends a GET request to `/plaintext` which returns a 'Hello, World!' string. No database or complex logic is involved. This primarily tests the efficiency of the HTTP parser, routing, and basic request handling pipeline. It is CPU-bound and sensitive to overhead in the framework's core."
+                "This test measures the raw throughput of the web framework with minimal overhead. It sends a GET request to `/` which returns a 'Hello, World!' string. No database or complex logic is involved. This primarily tests the efficiency of the HTTP parser, routing, and basic request handling pipeline. It is CPU-bound and sensitive to overhead in the framework's core."
             }
             BenchmarkTests::Json => {
-                "This test measures the performance of JSON serialization. It sends a GET request to `/json` which returns a JSON object `{\"message\": \"Hello, World!\"}`. This tests the framework's ability to instantiate an object and serialize it to JSON. It is CPU-bound and stresses the JSON serializer and memory allocation."
+                "This test measures the performance of JSON serialization. It sends a POST request to `/json/{from}/{to}` with a JSON body. The server should parse the JSON, find the servlet with `servlet-name` equal to `{from}`, change it to `{to}`, and return the modified JSON. This tests the framework's ability to handle JSON input, routing parameters, object manipulation, and response serialization."
             }
             BenchmarkTests::DbReadOne => {
                 "This test measures the performance of a single database query. It sends a GET request to `/db/read/one` (or similar) which fetches a single random row from the database and serializes it to JSON. This tests the framework's ORM or database driver, connection pooling, and the overhead of a network round-trip to the database. It is a mix of CPU and I/O bound."
@@ -104,10 +108,92 @@ impl TryFrom<&str> for BenchmarkTests {
     }
 }
 
+pub async fn verify_benchmark(
+    env: &mut dyn BenchmarkEnvironment,
+    bench: &Benchmark,
+    allowed_tests: &[BenchmarkTests],
+) -> Result<()> {
+    let path = Path::new(&bench.path);
+    info!(
+        "Verifying benchmark for {} {:?} ({} / {})",
+        bench.name, path, bench.language, bench.framework
+    );
+    let app_env: Vec<(String, String)> = bench
+        .env
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    env.prepare(path, bench.database, &app_env, &bench.arguments)
+        .await?;
+
+    let mut tests = bench.tests.clone();
+    tests.sort();
+    tests.dedup();
+
+    let db_configured = bench.database.is_some();
+
+    let db_ep = if db_configured {
+        env.start_db().await?
+    } else {
+        None
+    };
+
+    let app_ep = match env.start_app(db_ep.as_ref()).await {
+        Ok(ep) => ep,
+        Err(e) => {
+            if db_configured {
+                let _ = env.stop_db().await;
+            }
+            return Err(e);
+        }
+    };
+
+    let verification_url = env.resolve_verification_url(&app_ep);
+    let mut first_error = None;
+
+    for test in tests {
+        if !allowed_tests.contains(&test) {
+            continue;
+        }
+
+        let requires_db = test_requires_db(&test);
+        if requires_db && !db_configured {
+            info!(
+                "Skipping verification for {:?} because database is not configured",
+                test
+            );
+            continue;
+        }
+
+        info!("Verifying test: {:?}", test);
+        if let Err(e) =
+            crate::verification::verify_test(&test, &verification_url, bench.database).await
+        {
+            error!("Verification failed for test: {:?}: {}", test, e);
+            first_error = Some(e);
+            break;
+        } else {
+            info!("Verification passed for test: {:?}", test);
+        }
+    }
+
+    let _ = env.stop_app().await;
+    if db_configured {
+        let _ = env.stop_db().await;
+    }
+
+    if let Some(e) = first_error {
+        return Err(e);
+    }
+
+    Ok(())
+}
+
 pub async fn run_benchmark(
     env: &mut dyn BenchmarkEnvironment,
     bench: &Benchmark,
     allowed_tests: &[BenchmarkTests],
+    static_files_mode: StaticFilesMode,
 ) -> Result<BenchmarkResults> {
     let path = Path::new(&bench.path);
     info!(
@@ -156,6 +242,9 @@ pub async fn run_benchmark(
         };
         let app_ep = env.start_app(db_ep.as_ref()).await?;
 
+        let verification_url = env.resolve_verification_url(&app_ep);
+        crate::verification::verify_test(&test, &verification_url, bench.database).await?;
+
         let script = match test {
             BenchmarkTests::HelloWorld => "scripts/wrk_hello.lua",
             BenchmarkTests::Json => "scripts/wrk_json.lua",
@@ -181,12 +270,45 @@ pub async fn run_benchmark(
         };
 
         info!("Warmup run (10s) with {:?}", test);
-        let _ = env.exec_wrk_warmup(&app_ep, script, 10).await?;
+        let _ = env
+            .exec_wrk_warmup(&app_ep, script, BENCHMARK_WARMUP_DURATION_SECS)
+            .await?;
         tokio::time::sleep(Duration::from_secs(BENCHMARK_WARMUP_COOL_DOWN_SECS)).await;
 
         info!("Starting adaptive benchmark run for test: {:?}", test);
-        let (wrk_result, samples) =
-            run_adaptive_connections(env, &app_ep, script.to_string()).await?;
+        let (wrk_result, samples) = match test {
+            BenchmarkTests::StaticFilesSmall
+            | BenchmarkTests::StaticFilesMedium
+            | BenchmarkTests::StaticFilesLarge => match static_files_mode {
+                StaticFilesMode::Fixed => {
+                    let static_files_connections = match test {
+                        BenchmarkTests::StaticFilesSmall => vec![64, 256, 512, 1024, 1536, 2048],
+                        BenchmarkTests::StaticFilesMedium => vec![16, 32, 64, 128, 256, 512],
+                        BenchmarkTests::StaticFilesLarge => vec![16, 24, 32, 64, 128],
+                        _ => vec![],
+                    };
+                    info!(
+                        "Starting fixed-matrix benchmark run for test: {:?} (connections: {:?})",
+                        test, static_files_connections
+                    );
+                    run_fixed_connections_matrix(
+                        env,
+                        &app_ep,
+                        script.to_string(),
+                        &static_files_connections,
+                    )
+                    .await?
+                }
+                StaticFilesMode::Adaptive => {
+                    info!(
+                        "Starting legacy adaptive benchmark run for test: {:?}",
+                        test
+                    );
+                    run_adaptive_connections(env, &app_ep, script.to_string()).await?
+                }
+            },
+            _ => run_adaptive_connections(env, &app_ep, script.to_string()).await?,
+        };
 
         let usage = env.stop_app().await?;
         if db_configured {

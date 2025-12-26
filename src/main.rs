@@ -11,6 +11,7 @@ mod exec_utils;
 mod http;
 mod http_probe;
 mod parsers;
+mod verification;
 mod wrk;
 
 pub mod prelude {
@@ -48,6 +49,8 @@ async fn main() -> Result<()> {
             id,
             environment,
             filter,
+            verification,
+            static_files_mode,
         } => {
             ensure_benchmark_files().await?;
             let db = db::Db::open()?;
@@ -73,12 +76,16 @@ async fn main() -> Result<()> {
 
                 let completed_tests =
                     db.get_completed_tests(id, &environment, &benchmark.language, &benchmark.name)?;
-                let allowed_tests: Vec<_> = benchmark
-                    .tests
-                    .iter()
-                    .filter(|t| !completed_tests.contains(t))
-                    .cloned()
-                    .collect();
+                let allowed_tests: Vec<_> = if verification {
+                    benchmark.tests.clone()
+                } else {
+                    benchmark
+                        .tests
+                        .iter()
+                        .filter(|t| !completed_tests.contains(t))
+                        .cloned()
+                        .collect()
+                };
 
                 if allowed_tests.is_empty() {
                     info!(
@@ -89,9 +96,18 @@ async fn main() -> Result<()> {
                 }
 
                 let mut env = crate::benchmark_environment::load_environment(&environment)?;
-                let benchmark_results =
-                    benchmark::run_benchmark(&mut *env, &benchmark, &allowed_tests).await?;
-                db.save_run(id, &environment, &benchmark, &benchmark_results)?;
+                if verification {
+                    benchmark::verify_benchmark(&mut *env, &benchmark, &allowed_tests).await?;
+                } else {
+                    let benchmark_results = benchmark::run_benchmark(
+                        &mut *env,
+                        &benchmark,
+                        &allowed_tests,
+                        static_files_mode,
+                    )
+                    .await?;
+                    db.save_run(id, &environment, &benchmark, &benchmark_results)?;
+                }
             }
         }
         cli::Commands::Serve { host, port } => {

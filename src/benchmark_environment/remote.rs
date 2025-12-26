@@ -155,9 +155,14 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
         debug!("Syncing framework code to app host...");
         Self::rsync(app_host, Path::new(&src_path_with_slash), &remote_app_path).await?;
 
-        debug!("Syncing benchmarks_data to app host...");
-        Self::ssh(app_host, "mkdir -p ~/benchmarks_data").await?;
-        Self::rsync(app_host, Path::new("benchmarks_data/"), "~/benchmarks_data").await?;
+        debug!("Syncing benchmarks_data to app host build context...");
+        let remote_benchmarks_data_path = format!("{}/benchmarks_data", remote_app_path);
+        Self::rsync(
+            app_host,
+            Path::new("benchmarks_data/"),
+            &remote_benchmarks_data_path,
+        )
+        .await?;
 
         let wrk_host = self
             .config
@@ -338,7 +343,7 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
             .ok_or_else(|| Error::System("Missing app host config".to_string()))?;
 
         let mut cmd_str = format!(
-            "sudo docker run --name {} -d -p 8000:8000 -v ~/benchmarks_data:/app/benchmarks_data --ulimit nofile=1000000:1000000",
+            "sudo docker run --name {} -d -p 8000:8000 --ulimit nofile=1000000:1000000",
             state.app_container
         );
         let mut all_env = Vec::new();
@@ -526,6 +531,15 @@ impl BenchmarkEnvironment for RemoteBenchmarkEnvironment {
 
         debug!("Wrk warmup completed.");
         Ok(wrk_result)
+    }
+
+    fn resolve_verification_url(&self, endpoint: &Endpoint) -> String {
+        if let Some(app_host) = self.config.hosts.get("app")
+            && endpoint.address == app_host.internal_ip
+        {
+            return format!("http://{}:{}", app_host.ip, endpoint.port);
+        }
+        format!("http://{}:{}", endpoint.address, endpoint.port)
     }
 
     fn wrk_duration(&self) -> u64 {

@@ -69,7 +69,30 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
             let _ = crate::docker::exec_rm_container(c).await;
         }
 
-        let _ = crate::docker::exec_build(framework_path, &app_image).await;
+        // Copy benchmarks_data to framework directory to include it in the build context
+        let benchmarks_data_src = Path::new("benchmarks_data");
+        let benchmarks_data_dst = framework_path.join("benchmarks_data");
+        if benchmarks_data_src.exists() {
+            let _ = std::process::Command::new("cp")
+                .arg("-r")
+                .arg(benchmarks_data_src)
+                .arg(&benchmarks_data_dst)
+                .status();
+        }
+
+        let build_result = crate::docker::exec_build(framework_path, &app_image).await;
+
+        // Cleanup benchmarks_data from framework directory
+        if benchmarks_data_dst.exists() {
+            let _ = std::process::Command::new("rm")
+                .arg("-rf")
+                .arg(&benchmarks_data_dst)
+                .status();
+        }
+
+        // Propagate build error if any
+        build_result?;
+
         if let Some(db_kind) = database {
             let _ = crate::docker::exec_build(Path::new(db_kind.dir()), db_image.as_ref().unwrap())
                 .await;
@@ -156,7 +179,7 @@ impl BenchmarkEnvironment for LocalBenchmarkEnvironment {
                     .db_container
                     .as_ref()
                     .map(|c| format!("{}:{}", c, DB_LINK_NAME)),
-                mount: Some("./benchmarks_data:/app/benchmarks_data".to_string()),
+                mount: None,
                 envs: Some({
                     let mut envs = Vec::new();
                     if let (Some(kind), Some(db_ep)) = (state.db_kind, db_endpoint) {

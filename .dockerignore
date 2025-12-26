@@ -1,6 +1,3 @@
-# Benchmark static files directory (created at runtime)
-benchmarks_data/*.bin
-
 data/**/*.yaml
 data/**/*.md
 

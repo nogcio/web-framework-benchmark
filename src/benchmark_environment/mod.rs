@@ -58,6 +58,10 @@ pub trait BenchmarkEnvironment: Send + Sync {
         connections: u32,
         duration: u64,
     ) -> Result<WrkResult>;
+
+    fn resolve_verification_url(&self, endpoint: &Endpoint) -> String {
+        format!("http://{}:{}", endpoint.address, endpoint.port)
+    }
 }
 
 pub fn load_environment(name: &str) -> Result<Box<dyn BenchmarkEnvironment>> {
@@ -90,7 +94,7 @@ pub async fn run_adaptive_connections(
     script: String,
 ) -> Result<(WrkResult, Vec<BenchmarkSample>)> {
     const START_CONNECTIONS: u32 = 16;
-    const MAX_CONNECTIONS: u32 = 16_384;
+    const MAX_CONNECTIONS: u32 = 4096;
     const PROBE_DURATION: u64 = 10;
     const LATENCY_LIMIT_MS: u64 = 100;
     const BYTES_PER_MS_LIMIT_SCALE: u64 = 10 * 1024 * 1024; // 10 MB/ms
@@ -366,4 +370,102 @@ pub async fn run_adaptive_connections(
     );
 
     Ok((best_result, samples))
+}
+
+pub async fn run_fixed_connections_matrix(
+    env: &dyn BenchmarkEnvironment,
+    app_endpoint: &Endpoint,
+    script: String,
+    connections_matrix: &[u32],
+) -> Result<(WrkResult, Vec<BenchmarkSample>)> {
+    let full_duration = env.wrk_duration();
+
+    let mut matrix: Vec<u32> = connections_matrix.to_vec();
+    matrix.sort_unstable();
+    matrix.dedup();
+
+    if matrix.is_empty() {
+        return Err(Error::System(
+            "static-files fixed connections matrix is empty".to_string(),
+        ));
+    }
+
+    let mut samples: Vec<BenchmarkSample> = Vec::with_capacity(matrix.len());
+
+    for connections in matrix {
+        info!("Fixed benchmark: {} connections", connections);
+        let result = env
+            .exec_wrk_with_connections(app_endpoint, script.clone(), connections, full_duration)
+            .await?;
+
+        let p99_latency = percentile_latency(&result, 99).ok_or_else(|| {
+            Error::System("Missing 99th percentile latency from wrk output".to_string())
+        })?;
+
+        let fail_reason = if result.errors > 0 {
+            Some(format!("errors detected ({})", result.errors))
+        } else {
+            None
+        };
+
+        info!(
+            "Result: {} conn -> {:.2} rps, tps {}, p99 {}ms, {}",
+            connections,
+            result.requests_per_sec,
+            result.transfer_per_sec,
+            p99_latency.as_millis(),
+            fail_reason.as_deref().unwrap_or("pass")
+        );
+
+        samples.push(BenchmarkSample {
+            connections,
+            result,
+            p99_latency,
+            fail_reason,
+        });
+    }
+
+    // For static files, throughput (transfer/sec) is the primary metric.
+    // Prefer error-free runs; then highest transfer/sec; then highest RPS.
+    let best = samples
+        .iter()
+        .filter(|s| s.result.errors == 0)
+        .max_by(|a, b| {
+            a.result
+                .transfer_per_sec
+                .cmp(&b.result.transfer_per_sec)
+                .then_with(|| {
+                    a.result
+                        .requests_per_sec
+                        .partial_cmp(&b.result.requests_per_sec)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        })
+        .or_else(|| {
+            samples.iter().max_by(|a, b| {
+                a.result
+                    .transfer_per_sec
+                    .cmp(&b.result.transfer_per_sec)
+                    .then_with(|| {
+                        a.result
+                            .requests_per_sec
+                            .partial_cmp(&b.result.requests_per_sec)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+            })
+        })
+        .cloned()
+        .ok_or_else(|| Error::System("No benchmark samples collected".to_string()))?;
+
+    info!(
+        "Fixed selected result: {} connections -> {:.2} rps, tps {}, avg {:.2}ms, p99 {}ms, errors {}",
+        best.connections,
+        best.result.requests_per_sec,
+        best.result.transfer_per_sec,
+        best.result.latency_avg.as_secs_f64() * 1000.0,
+        best.p99_latency.as_millis(),
+        best.result.errors
+    );
+
+    Ok((best.result, samples))
 }

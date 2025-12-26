@@ -69,5 +69,4 @@ function done(summary, latency, requests)
     local thread_errors = thread:get("errors") or 0
     total_errors = total_errors + thread_errors
   end
-  print("Errors: " .. total_errors)
 end

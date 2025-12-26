@@ -277,7 +277,7 @@ jobs:
               ;;
             json)
               curl -v -f -X POST -H "Content-Type: application/json" \
-                -d '{"web-app":{"servlet":[{"servlet-name":"old"}]}}' \
+                -d '{"web-app":{"servlet":[{"servlet-name":"old","servlet-class":"org.example.OldServlet","init-param":{"param1":"value1"}}],"servlet-mapping":{"cofaxCDS":"/","cofaxEmail":"/cofaxutil/aemail/*","cofaxAdmin":"/admin/*","fileServlet":"/static/*","cofaxTools":"/tools/*"},"taglib":{"taglib-uri":"tlds/c.tld","taglib-location":"/WEB-INF/tlds/c.tld"}}}' \
                 "${base_url}/json/old/new"
               ;;
             db_read_one)

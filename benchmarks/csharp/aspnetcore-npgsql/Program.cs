@@ -82,8 +82,8 @@ app.MapGet("/db/read/one", async (int id, HttpContext ctx, NpgsqlDataSource db) 
         {
             id = reader.GetInt32(0),
             name = reader.GetString(1),
-            created_at = reader.GetDateTime(2),
-            updated_at = reader.GetDateTime(3)
+            createdAt = reader.GetDateTime(2),
+            updatedAt = reader.GetDateTime(3)
         };
         return Results.Json(row);
     }
@@ -105,8 +105,8 @@ app.MapGet("/db/read/many", async (int offset, int? limit, HttpContext ctx, Npgs
         {
             id = reader.GetInt32(0),
             name = reader.GetString(1),
-            created_at = reader.GetDateTime(2),
-            updated_at = reader.GetDateTime(3)
+            createdAt = reader.GetDateTime(2),
+            updatedAt = reader.GetDateTime(3)
         });
     }
     return Results.Json(results);
@@ -145,8 +145,8 @@ app.MapPost("/db/write/insert", async (HttpRequest request, HttpContext ctx, Npg
         {
             id = reader.GetInt32(0),
             name = reader.GetString(1),
-            created_at = reader.GetDateTime(2),
-            updated_at = reader.GetDateTime(3)
+            createdAt = reader.GetDateTime(2),
+            updatedAt = reader.GetDateTime(3)
         };
         return Results.Json(row);
     }

@@ -1,0 +1,11 @@
+:8000 {
+    respond /health "OK" 200
+    respond / "Hello, World!" 200
+    
+    handle /files/* {
+        uri strip_prefix /files
+        file_server {
+            root /app/benchmarks_data
+        }
+    }
+}

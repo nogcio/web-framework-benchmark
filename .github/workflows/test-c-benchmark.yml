@@ -1,0 +1,42 @@
+name: Test C Benchmark
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/c/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/c/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: nginx
+            framework_path: benchmarks/c/nginx
+            image_tag: wfb-c-nginx
+            tests: hello_world,static_files_small,static_files_medium,static_files_large
+            database: ""
+          - name: haproxy
+            framework_path: benchmarks/c/haproxy
+            image_tag: wfb-c-haproxy
+            tests: hello_world
+            database: ""
+
+    name: ${{ matrix.name }}
+    uses: ./.github/workflows/reusable-benchmark-test.yml
+    with:
+      framework_path: ${{ matrix.framework_path }}
+      image_tag: ${{ matrix.image_tag }}
+      tests: ${{ matrix.tests }}
+      database: ${{ matrix.database }}

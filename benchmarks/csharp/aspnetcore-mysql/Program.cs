@@ -83,8 +83,8 @@ app.MapGet("/db/read/one", async (int id, HttpContext ctx, MySqlDataSource db) =
         {
             id = reader.GetInt32(0),
             name = reader.GetString(1),
-            created_at = reader.GetDateTime(2),
-            updated_at = reader.GetDateTime(3)
+            createdAt = reader.GetDateTime(2),
+            updatedAt = reader.GetDateTime(3)
         };
         return Results.Json(row);
     }
@@ -109,8 +109,8 @@ app.MapGet("/db/read/many", async (int offset, int? limit, HttpContext ctx, MySq
         {
             id = reader.GetInt32(0),
             name = reader.GetString(1),
-            created_at = reader.GetDateTime(2),
-            updated_at = reader.GetDateTime(3)
+            createdAt = reader.GetDateTime(2),
+            updatedAt = reader.GetDateTime(3)
         });
     }
 
@@ -162,8 +162,8 @@ app.MapPost("/db/write/insert", async (HttpRequest request, HttpContext ctx, MyS
         {
             id = reader.GetInt32(0),
             name = reader.GetString(1),
-            created_at = reader.GetDateTime(2),
-            updated_at = reader.GetDateTime(3)
+            createdAt = reader.GetDateTime(2),
+            updatedAt = reader.GetDateTime(3)
         };
         return Results.Json(row);
     }

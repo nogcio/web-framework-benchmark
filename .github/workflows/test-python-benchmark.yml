@@ -1,0 +1,42 @@
+name: Test Python Benchmark
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/python/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/python/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fastapi
+            framework_path: benchmarks/python/fastapi
+            image_tag: wfb-python-fastapi
+            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
+            database: ""
+          - name: fastapi-pg
+            framework_path: benchmarks/python/fastapi-pg
+            image_tag: wfb-python-fastapi-pg
+            tests: db_read_one,db_read_paging,db_write,tweet_service
+            database: postgres
+
+    name: ${{ matrix.name }}
+    uses: ./.github/workflows/reusable-benchmark-test.yml
+    with:
+      framework_path: ${{ matrix.framework_path }}
+      image_tag: ${{ matrix.image_tag }}
+      tests: ${{ matrix.tests }}
+      database: ${{ matrix.database }}

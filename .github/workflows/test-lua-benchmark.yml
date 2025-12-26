@@ -1,0 +1,37 @@
+name: Test Lua Benchmark
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/lua/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/lua/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: openresty
+            framework_path: benchmarks/lua/nginx
+            image_tag: wfb-lua-nginx
+            tests: hello_world,json
+            database: ""
+
+    name: ${{ matrix.name }}
+    uses: ./.github/workflows/reusable-benchmark-test.yml
+    with:
+      framework_path: ${{ matrix.framework_path }}
+      image_tag: ${{ matrix.image_tag }}
+      tests: ${{ matrix.tests }}
+      database: ${{ matrix.database }}

@@ -1,4 +1,4 @@
-ALTER SYSTEM SET max_connections = 256;
+ALTER SYSTEM SET max_connections = 1024;
 
 -- Create table and populate with 1000 rows for benchmarks
 CREATE TABLE IF NOT EXISTS hello_world (

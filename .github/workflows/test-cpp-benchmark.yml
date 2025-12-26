@@ -1,0 +1,37 @@
+name: Test C++ Benchmark
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/cpp/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/cpp/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: envoy
+            framework_path: benchmarks/cpp/envoy
+            image_tag: wfb-cpp-envoy
+            tests: hello_world
+            database: ""
+
+    name: ${{ matrix.name }}
+    uses: ./.github/workflows/reusable-benchmark-test.yml
+    with:
+      framework_path: ${{ matrix.framework_path }}
+      image_tag: ${{ matrix.image_tag }}
+      tests: ${{ matrix.tests }}
+      database: ${{ matrix.database }}

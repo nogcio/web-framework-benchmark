@@ -60,9 +60,6 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-app.UseAuthentication();
-app.UseAuthorization();
-
 app.Use(async (context, next) =>
 {
     if (context.Request.Headers.TryGetValue("x-request-id", out var requestId))
@@ -71,6 +68,9 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/health", async (IMongoDatabase db) =>
 {

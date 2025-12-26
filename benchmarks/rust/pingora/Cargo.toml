@@ -1,0 +1,12 @@
+[package]
+name = "pingora_bench"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pingora = { version = "0.6", features = ["lb"] }
+async-trait = "0.1"
+bytes = "1"
+http = "1"
+mimalloc = "0.1.48"
+

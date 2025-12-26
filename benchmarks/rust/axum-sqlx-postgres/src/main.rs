@@ -11,11 +11,15 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{postgres::{PgConnectOptions, PgPoolOptions}, ConnectOptions, PgPool};
-use std::{env, net::SocketAddr, str::FromStr};
+use std::{env, net::SocketAddr, str::FromStr, sync::OnceLock};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
+static DECODING_KEY: OnceLock<DecodingKey> = OnceLock::new();
+static ENCODING_KEY: OnceLock<EncodingKey> = OnceLock::new();
+static VALIDATION: OnceLock<Validation> = OnceLock::new();
 
 #[derive(Clone)]
 struct AppState {
@@ -23,6 +27,7 @@ struct AppState {
 }
 
 #[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
 struct HelloWorld {
     id: i32,
     name: String,
@@ -93,7 +98,9 @@ async fn db_read_one(
     State(state): State<AppState>,
     Query(params): Query<ReadOneParams>,
 ) -> impl IntoResponse {
-    let row = sqlx::query_as::<_, HelloWorld>("SELECT * FROM hello_world WHERE id = $1")
+    let row = sqlx::query_as::<_, HelloWorld>(
+        "SELECT id, name, created_at, updated_at FROM hello_world WHERE id = $1",
+    )
         .bind(params.id)
         .fetch_one(&state.pool)
         .await;
@@ -117,7 +124,9 @@ async fn db_read_many(
     let limit = params.limit.unwrap_or(50);
     let offset = params.offset.unwrap_or(0);
 
-    let rows = sqlx::query_as::<_, HelloWorld>("SELECT * FROM hello_world ORDER BY id LIMIT $1 OFFSET $2")
+    let rows = sqlx::query_as::<_, HelloWorld>(
+        "SELECT id, name, created_at, updated_at FROM hello_world ORDER BY id LIMIT $1 OFFSET $2",
+    )
         .bind(limit)
         .bind(offset)
         .fetch_all(&state.pool)
@@ -140,7 +149,7 @@ async fn db_write_insert(
 ) -> impl IntoResponse {
     let now = chrono::Utc::now().naive_utc();
     let row = sqlx::query_as::<_, HelloWorld>(
-        "INSERT INTO hello_world (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING *"
+        "INSERT INTO hello_world (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id, name, created_at, updated_at",
     )
     .bind(payload.name)
     .bind(now)
@@ -192,10 +201,11 @@ where
         }
 
         let token = &auth_header[7..];
+        let decoding_key = DECODING_KEY.get_or_init(|| DecodingKey::from_secret("secret".as_ref()));
         let token_data = decode::<Claims>(
             token,
-            &DecodingKey::from_secret("secret".as_ref()),
-            &Validation::default(),
+            decoding_key,
+            VALIDATION.get_or_init(Validation::default),
         )
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
@@ -256,10 +266,11 @@ async fn login(
                 exp: 10000000000, // Far future
             };
 
+            let encoding_key = ENCODING_KEY.get_or_init(|| EncodingKey::from_secret("secret".as_ref()));
             let token = encode(
                 &Header::default(),
                 &claims,
-                &EncodingKey::from_secret("secret".as_ref()),
+                encoding_key,
             )
             .unwrap();
 
@@ -271,27 +282,23 @@ async fn login(
 }
 
 #[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
 struct Tweet {
     id: i32,
     username: String,
     content: String,
+    created_at: NaiveDateTime,
     likes: i64,
 }
 
-async fn get_feed(State(state): State<AppState>) -> impl IntoResponse {
+async fn get_feed(State(state): State<AppState>, _claims: Claims) -> impl IntoResponse {
     let tweets = sqlx::query_as::<_, Tweet>(
         r#"
-        SELECT t.id, u.username, t.content, COUNT(l.user_id) as likes
-        FROM (
-            SELECT id, user_id, content, created_at
-            FROM tweets
-            ORDER BY created_at DESC
-            LIMIT 20
-        ) t
+        SELECT t.id, u.username, t.content, t.created_at, (SELECT COUNT(*) FROM likes l WHERE l.tweet_id = t.id) as likes
+        FROM tweets t
         JOIN users u ON t.user_id = u.id
-        LEFT JOIN likes l ON t.id = l.tweet_id
-        GROUP BY t.id, u.username, t.content, t.created_at
         ORDER BY t.created_at DESC
+        LIMIT 20
         "#,
     )
     .fetch_all(&state.pool)
@@ -305,16 +312,15 @@ async fn get_feed(State(state): State<AppState>) -> impl IntoResponse {
 
 async fn get_tweet(
     State(state): State<AppState>,
+    _claims: Claims,
     Path(id): Path<i32>,
 ) -> impl IntoResponse {
     let tweet = sqlx::query_as::<_, Tweet>(
         r#"
-        SELECT t.id, u.username, t.content, COUNT(l.user_id) as likes
+        SELECT t.id, u.username, t.content, t.created_at, (SELECT COUNT(*) FROM likes l WHERE l.tweet_id = t.id) as likes
         FROM tweets t
         JOIN users u ON t.user_id = u.id
-        LEFT JOIN likes l ON t.id = l.tweet_id
         WHERE t.id = $1
-        GROUP BY t.id, u.username, t.content
         "#,
     )
     .bind(id)

@@ -10,6 +10,71 @@
   language: Rust
   url: https://github.com/tokio-rs/axum
 
+- name: actix-web
+  language: Rust
+  url: https://actix.rs/
+
 - name: aspnetcore
   language: C#
   url: https://dotnet.microsoft.com/apps/aspnet
+
+- name: gin
+  language: Go
+  url: https://gin-gonic.com/
+
+- name: fiber
+  language: Go
+  url: https://gofiber.io/
+
+- name: fastify
+  language: JS
+  url: https://www.fastify.io/
+
+- name: fastapi
+  language: Python
+  url: https://fastapi.tiangolo.com/
+
+- name: ktor
+  language: Kotlin
+  url: https://ktor.io/
+
+- name: nginx
+  language: C
+  url: https://nginx.org/
+
+- name: envoy
+  language: C++
+  url: https://www.envoyproxy.io/
+
+- name: haproxy
+  language: C
+  url: https://www.haproxy.org/
+
+- name: caddy
+  language: Go
+  url: https://caddyserver.com/
+
+- name: pingora
+  language: Rust
+  url: https://github.com/cloudflare/pingora
+
+- name: traefik
+  language: Go
+  url: https://traefik.io/
+
+- name: openresty
+  language: Lua
+  url: https://openresty.org/
+
+- name: spring-boot
+  language: Java
+  url: https://spring.io/projects/spring-boot
+
+- name: express
+  language: JS
+  url: https://expressjs.com/
+
+- name: hono
+  language: JS
+  url: https://hono.dev/
+

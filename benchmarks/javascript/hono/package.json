@@ -1,0 +1,8 @@
+{
+  "name": "hono-benchmark",
+  "module": "src/index.ts",
+  "type": "module",
+  "dependencies": {
+    "hono": "4.11.2"
+  }
+}

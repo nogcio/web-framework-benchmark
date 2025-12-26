@@ -1,0 +1,52 @@
+name: Test Go Benchmark
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/go/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'benchmarks/go/**'
+      - 'benchmarks_db/**'
+      - 'config/benchmarks.yaml'
+      - '.github/workflows/reusable-benchmark-test.yml'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gin
+            framework_path: benchmarks/go/gin
+            image_tag: wfb-go-gin
+            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
+            database: ""
+          - name: gin-pgx
+            framework_path: benchmarks/go/gin-pgx
+            image_tag: wfb-go-gin-pgx
+            tests: db_read_one,db_read_paging,db_write,tweet_service
+            database: postgres
+          - name: caddy
+            framework_path: benchmarks/go/caddy
+            image_tag: wfb-go-caddy
+            tests: hello_world,static_files_small,static_files_medium,static_files_large
+            database: ""
+          - name: fiber
+            framework_path: benchmarks/go/fiber
+            image_tag: wfb-go-fiber
+            tests: hello_world,static_files_small,static_files_medium,static_files_large
+            database: ""
+
+    name: ${{ matrix.name }}
+    uses: ./.github/workflows/reusable-benchmark-test.yml
+    with:
+      framework_path: ${{ matrix.framework_path }}
+      image_tag: ${{ matrix.image_tag }}
+      tests: ${{ matrix.tests }}
+      database: ${{ matrix.database }}

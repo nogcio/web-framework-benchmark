@@ -1,12 +1,11 @@
 use axum::{
-    body::Body,
     extract::{Path, Request},
-    http::{HeaderName, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use tower_http::services::ServeDir;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, net::SocketAddr, sync::OnceLock};
 use mimalloc::MiMalloc;
@@ -27,7 +26,7 @@ async fn main() {
         .route("/", get(hello_world))
         .route("/health", get(health_check))
         .route("/json/{from}/{to}", post(json_handler))
-        .route("/files/{*filename}", get(file_handler))
+        .nest_service("/files", ServeDir::new(DATA_DIR.get().unwrap()))
         .layer(middleware::from_fn(x_request_id_middleware));
 
     println!("Listening on {}", addr);
@@ -35,43 +34,7 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn file_handler(Path(filename): Path<String>) -> impl IntoResponse {
-    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
-        return StatusCode::FORBIDDEN.into_response();
-    }
 
-    let path = std::path::Path::new(DATA_DIR.get().unwrap()).join(&filename);
-
-    match tokio::fs::File::open(path).await {
-        Ok(file) => {
-            let size = match file.metadata().await {
-                Ok(metadata) => metadata.len(),
-                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            };
-
-            let stream = tokio_util::io::ReaderStream::with_capacity(file, 1024 * 128);
-            let body = Body::from_stream(stream);
-
-            let mut response = body.into_response();
-            response.headers_mut().insert(
-                axum::http::header::CONTENT_TYPE,
-                axum::http::HeaderValue::from_static("application/octet-stream"),
-            );
-            response.headers_mut().insert(
-                axum::http::header::CONTENT_LENGTH,
-                axum::http::HeaderValue::from_str(&size.to_string()).unwrap(),
-            );
-            response
-        }
-        Err(err) => {
-            if err.kind() == std::io::ErrorKind::NotFound {
-                StatusCode::NOT_FOUND.into_response()
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR.into_response()
-            }
-        }
-    }
-}
 
 async fn x_request_id_middleware(req: Request, next: Next) -> Response {
     let request_id = req.headers().get("x-request-id").cloned();

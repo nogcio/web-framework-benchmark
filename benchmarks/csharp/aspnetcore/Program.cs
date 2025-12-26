@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 
 ThreadPool.SetMinThreads(Environment.ProcessorCount * 32, Environment.ProcessorCount * 32);
@@ -32,6 +33,17 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+
+if (Directory.Exists(dataDir))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(Path.GetFullPath(dataDir)),
+        RequestPath = "/files",
+        ServeUnknownFileTypes = true,
+        DefaultContentType = "application/octet-stream"
+    });
+}
 
 app.MapGet("/", () => "Hello, World!");
 
@@ -69,24 +81,6 @@ void ReplaceServletNames(WebAppPayload payload, string from, string to)
         }
     }
 }
-
-app.MapGet("/files/{filename}", async (string filename, HttpContext context) =>
-{
-    if (filename.Contains("..") || filename.Contains('/') || filename.Contains('\\'))
-    {
-        return Results.Forbid();
-    }
-
-    var filePath = Path.Combine(dataDir, filename);
-    if (!File.Exists(filePath))
-    {
-        return Results.NotFound();
-    }
-
-    context.Response.ContentType = "application/octet-stream";
-    await context.Response.SendFileAsync(filePath);
-    return Results.Empty;
-});
 
 app.Run($"http://0.0.0.0:{port}");
 

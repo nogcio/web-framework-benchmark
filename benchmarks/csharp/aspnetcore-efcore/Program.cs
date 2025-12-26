@@ -140,7 +140,7 @@ app.MapGet("/db/read/one", async (int id, BenchmarkContext db, CancellationToken
     var row = await db.HelloWorld
         .AsNoTracking()
         .Where(r => r.Id == id)
-        .Select(r => new { r.Id, r.Name, r.CreatedAt, r.UpdatedAt })
+        .Select(r => new { id = r.Id, name = r.Name, createdAt = r.CreatedAt, updatedAt = r.UpdatedAt })
         .FirstOrDefaultAsync(ct);
 
     return row is null ? Results.NotFound() : Results.Json(row);
@@ -154,7 +154,7 @@ app.MapGet("/db/read/many", async (int offset, int? limit, BenchmarkContext db, 
         .OrderBy(r => r.Id)
         .Skip(offset)
         .Take(actualLimit)
-        .Select(r => new { r.Id, r.Name, r.CreatedAt, r.UpdatedAt })
+        .Select(r => new { id = r.Id, name = r.Name, createdAt = r.CreatedAt, updatedAt = r.UpdatedAt })
         .ToListAsync(ct);
 
     return Results.Json(rows);
@@ -195,7 +195,7 @@ app.MapPost("/db/write/insert", async (HttpRequest request, BenchmarkContext db,
     db.HelloWorld.Add(entity);
     await db.SaveChangesAsync(ct);
 
-    var result = new { entity.Id, entity.Name, entity.CreatedAt, entity.UpdatedAt };
+    var result = new { id = entity.Id, name = entity.Name, createdAt = entity.CreatedAt, updatedAt = entity.UpdatedAt };
     return Results.Json(result);
 });
 

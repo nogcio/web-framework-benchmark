@@ -6,5 +6,6 @@ RUN cargo build --release
 FROM debian:bookworm-slim
 WORKDIR /app
 COPY --from=builder /app/target/release/wfb-rust-axum .
+COPY benchmarks_data /app/benchmarks_data
 ENV PORT=8000
 CMD ["./wfb-rust-axum"]

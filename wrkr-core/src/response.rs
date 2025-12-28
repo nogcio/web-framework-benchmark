@@ -7,15 +7,18 @@ pub struct Response {
     headers: HeaderMap,
     body: bytes::Bytes,
     body_len: usize,
+    headers_size: usize,
 }
 
 impl Response {
     pub async fn new(res: reqwest::Response) -> Result<Self, reqwest::Error> {
         let status = res.status().as_u16();
         let headers = res.headers().clone();
+        // Calculate headers size once during construction
+        let headers_size = headers.iter().map(|(k, v)| k.as_str().len() + v.len() + 4).sum::<usize>() + 12;
         let b = res.bytes().await.unwrap_or_default();
         let len = b.len();
-        Ok(Self { status, headers, body: b, body_len: len })
+        Ok(Self { status, headers, body: b, body_len: len, headers_size })
     }
 
     pub fn status(&self) -> u16 {
@@ -32,6 +35,11 @@ impl Response {
 
     pub fn body_len(&self) -> usize {
         self.body_len
+    }
+    
+    /// Returns total response size (body + headers + status line approximation)
+    pub fn total_size(&self) -> usize {
+        self.body_len + self.headers_size
     }
 }
 

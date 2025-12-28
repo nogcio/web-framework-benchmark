@@ -14,7 +14,6 @@ pub struct Stats {
     pub connections: AtomicU64,
     pub total_requests: AtomicU64,
     pub total_errors: AtomicU64,
-    pub total_bytes_sent: AtomicU64,
     pub total_bytes_received: AtomicU64,
     pub errors_map: DashMap<String, u64>,
     pub latency_histogram: Arc<Mutex<Histogram<u64>>>,
@@ -26,7 +25,6 @@ impl Stats {
             connections: AtomicU64::new(0),
             total_requests: AtomicU64::new(0),
             total_errors: AtomicU64::new(0),
-            total_bytes_sent: AtomicU64::new(0),
             total_bytes_received: AtomicU64::new(0),
             errors_map: DashMap::new(),
             latency_histogram: Arc::new(Mutex::new(Histogram::new(3).unwrap())),
@@ -42,9 +40,8 @@ impl Stats {
         *self.errors_map.entry(error).or_insert(0) += 1;
     }
 
-    pub fn merge(&self, requests: u64, bytes_sent: u64, bytes_received: u64, errors: &HashMap<String, u64>, histogram: &Histogram<u64>) {
+    pub fn merge(&self, requests: u64, bytes_received: u64, errors: &HashMap<String, u64>, histogram: &Histogram<u64>) {
         self.total_requests.fetch_add(requests, Ordering::Relaxed);
-        self.total_bytes_sent.fetch_add(bytes_sent, Ordering::Relaxed);
         self.total_bytes_received.fetch_add(bytes_received, Ordering::Relaxed);
         
         let error_count: u64 = errors.values().sum();
@@ -66,7 +63,6 @@ impl Stats {
             connections: self.connections.load(Ordering::Relaxed),
             total_requests: self.total_requests.load(Ordering::Relaxed),
             total_errors: self.total_errors.load(Ordering::Relaxed),
-            total_bytes_sent: self.total_bytes_sent.load(Ordering::Relaxed),
             total_bytes_received: self.total_bytes_received.load(Ordering::Relaxed),
             errors: self
                 .errors_map
@@ -89,7 +85,6 @@ pub struct StatsSnapshot {
     pub connections: u64,
     pub total_requests: u64,
     pub total_errors: u64,
-    pub total_bytes_sent: u64,
     pub total_bytes_received: u64,
     pub errors: HashMap<String, u64>,
     pub latency_histogram: Histogram<u64>,

@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(pb) = &pb_clone {
                     pb.set_position(p.elapsed.as_secs());
                     let rps = p.total_requests as f64 / p.elapsed.as_secs_f64();
-                    let tps = (p.total_bytes_sent + p.total_bytes_received) / p.elapsed.as_secs().max(1);
+                    let tps = p.total_bytes_received / p.elapsed.as_secs().max(1);
                     
                     let msg = format!("Conns: {} | RPS: {:.0} | TPS: {}",
                         p.connections, 
@@ -96,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     0.0
                 };
                 let tps = if p.elapsed.as_secs() > 0 {
-                    (p.total_bytes_sent + p.total_bytes_received) / p.elapsed.as_secs()
+                    p.total_bytes_received / p.elapsed.as_secs()
                 } else {
                     0
                 };
@@ -107,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     requests_per_sec: rps,
                     bytes_per_sec: tps,
                     total_requests: p.total_requests,
-                    total_bytes: p.total_bytes_sent + p.total_bytes_received,
+                    total_bytes: p.total_bytes_received,
                     total_errors: p.total_errors,
                     latency_mean: p.latency_histogram.mean(),
                     latency_stdev: p.latency_histogram.stdev(),

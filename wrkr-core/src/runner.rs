@@ -12,19 +12,22 @@ enum ExecutionMode {
     Once,
 }
 
+fn build_client() -> Result<Client> {
+    Client::builder()
+        // One connection per VU: single idle slot and no cross-VU pooling
+        .pool_max_idle_per_host(1)
+        .http1_only()
+        .tcp_nodelay(true)
+        .no_proxy()
+        .build()
+        .map_err(|e| Error::Other(e.to_string()))
+}
+
 pub async fn run_benchmark<F>(config: BenchmarkConfig, mut on_progress: Option<F>) -> Result<StatsSnapshot> 
 where F: FnMut(StatsSnapshot) + Send + 'static
 {
     let stats = Arc::new(Stats::new());
     let mut set = JoinSet::new();
-    
-    exec_global_setup(&config.wrk, stats.clone())?;
-
-    let client = Client::builder()
-        .pool_max_idle_per_host(config.connections as usize)
-        .no_proxy()
-        .build()
-        .map_err(|e| Error::Other(e.to_string()))?;
 
     let start_time = Instant::now();
     let end_time = start_time + config.duration;
@@ -59,7 +62,7 @@ where F: FnMut(StatsSnapshot) + Send + 'static
                 let stats = stats.clone();
                 let wrk_config = config.wrk.clone();
                 let vu_id = vu_counter.fetch_add(1, Ordering::Relaxed);
-                let client = client.clone();
+                let client = build_client()?;
                                                
                 set.spawn(async move {
                     stats.inc_connections();
@@ -86,8 +89,6 @@ where F: FnMut(StatsSnapshot) + Send + 'static
         }
     }
     
-    exec_global_teardown(&config.wrk, stats.clone())?;
-    
     let snapshot = stats.snapshot(config.duration, config.duration);
     
     Ok(snapshot)
@@ -97,39 +98,12 @@ pub async fn run_once(config: WrkConfig) -> Result<StatsSnapshot> {
     let stats = Arc::new(Stats::new());
     let start = Instant::now();
 
-    exec_global_setup(&config, stats.clone())?;
-
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| Error::Other(e.to_string()))?;
+    let client = build_client()?;
 
     run_vu(config.clone(), stats.clone(), ExecutionMode::Once, 1, client).await?;
-
-    exec_global_teardown(&config, stats.clone())?;
     
     let elapsed = start.elapsed();
     Ok(stats.snapshot(elapsed, elapsed))
-}
-
-fn exec_global_setup(config: &WrkConfig, stats: Arc<Stats>) -> Result<()> {
-    let client = Client::builder().no_proxy().build().map_err(|e| Error::Other(e.to_string()))?;
-    let (lua, _) = create_lua_env(client, config.host_url.clone(), stats.clone(), 0)?;
-    lua.load(&config.script_content).exec()?;
-    if let Ok(global_setup) = lua.globals().get::<Function>("global_setup") {
-        global_setup.call::<()>(())?;
-    }
-    Ok(())
-}
-
-fn exec_global_teardown(config: &WrkConfig, stats: Arc<Stats>) -> Result<()> {
-    let client = Client::builder().no_proxy().build().map_err(|e| Error::Other(e.to_string()))?;
-    let (lua, _) = create_lua_env(client, config.host_url.clone(), stats.clone(), 0)?;
-    lua.load(&config.script_content).exec()?;
-    if let Ok(global_teardown) = lua.globals().get::<Function>("global_teardown") {
-        global_teardown.call::<()>(())?;
-    }
-    Ok(())
 }
 
 async fn run_vu(config: WrkConfig, stats: Arc<Stats>, mode: ExecutionMode, vu_id: u64, client: Client) -> Result<()> {

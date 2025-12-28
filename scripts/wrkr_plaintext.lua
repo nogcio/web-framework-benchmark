@@ -1,7 +1,5 @@
 function scenario(ctx)
-  local res = ctx:http({
-    url = "/plaintext"
-  })
+  local res = ctx:get("/plaintext")
 
   ctx:assert(res.status == 200, "unexpected status: " .. res.status)
   

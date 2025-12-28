@@ -1,0 +1,24 @@
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct JsonStats {
+    pub elapsed_secs: u64,
+    pub connections: u64,
+    
+    pub requests_per_sec: f64,
+    pub bytes_per_sec: u64,
+    
+    pub total_requests: u64,
+    pub total_bytes: u64,
+    pub total_errors: u64,
+    
+    pub latency_mean: f64,
+    pub latency_stdev: f64,
+    pub latency_max: u64,
+    pub latency_p50: u64,
+    pub latency_p90: u64,
+    pub latency_p99: u64,
+    
+    pub errors: HashMap<String, u64>,
+}

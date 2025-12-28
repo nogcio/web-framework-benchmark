@@ -21,5 +21,6 @@ words:
   - serde
   - stdev
   - thiserror
+  - wrkr
 ignoreWords: []
 import: []

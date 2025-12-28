@@ -13,7 +13,6 @@ mod http_probe;
 mod parsers;
 mod verification;
 mod wrk;
-mod testcase_spec;
 
 pub mod prelude {
     pub use crate::error::*;

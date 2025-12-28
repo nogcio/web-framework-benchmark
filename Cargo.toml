@@ -1,13 +1,24 @@
-[package]
-name = "wfb"
-version = "0.3.0"
+[workspace]
+resolver = "3"
+members = ["wfb-runner", "wfb-storage","wrkr","wrkr-core", "wrkr-api"]
+
+[workspace.package]
 edition = "2024"
 authors = ["Andrew Sumskoy <getansum@nogc.io>"]
-description = "Web framework benchmark"
-readme = "README.md"
 license = "MIT"
 homepage = "https://webbenchmark.nogc.io"
 repository = "https://github.com/nogcio/web-framework-benchmark"
+
+[package]
+name = "wfb"
+version = "0.3.0"
+description = "Web framework benchmark"
+readme = "README.md"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
 
 [dependencies]
 tokio = { version = "1.8", features = ["process", "sync", "io-util", "rt-multi-thread", "time", "fs"] }

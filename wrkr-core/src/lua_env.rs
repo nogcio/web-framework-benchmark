@@ -163,6 +163,40 @@ impl UserData for BenchmarkContext {
             }
         });
 
+        // Optimized POST method - path + body (string or table->json), minimal parsing
+        methods.add_async_method("post", |lua: Lua, this, (path, body): (mlua::String, Value)| {
+            let this = this.clone();
+            let path_str = path.to_str().map(|s| s.to_string());
+            
+            async move {
+                let path = path_str.map_err(mlua::Error::external)?;
+                let url = if path.starts_with("http") {
+                    path
+                } else {
+                    format!("{}{}", this.base_url, path)
+                };
+
+                let mut req = this.client.post(&url);
+                match body {
+                    Value::Nil => {}
+                    Value::String(s) => {
+                        let body = s.to_str().map_err(mlua::Error::external)?;
+                        req = req.body(body.to_string());
+                    }
+                    Value::Table(t) => {
+                        let json_val: serde_json::Value = lua.from_value(Value::Table(t))?;
+                        req = req.json(&json_val);
+                    }
+                    _ => {}
+                }
+
+                let start = Instant::now();
+                let resp = req.send().await;
+
+                this.process_response(resp, start).await
+            }
+        });
+
         methods.add_async_method("http", |lua: Lua, this: UserDataRef<BenchmarkContext>, options: Table| {
             let this = this.clone();
             

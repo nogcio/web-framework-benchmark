@@ -21,3 +21,4 @@ rand = "0.8"
 console = "0.15"
 serde_json = "1.0.148"
 wrkr-api = { version = "0.1.0", path = "../wrkr-api" }
+async-trait = "0.1.89"

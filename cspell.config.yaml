@@ -17,6 +17,8 @@ words:
   - Deque
   - dotenv
   - dotenvy
+  - indicatif
+  - nogcio
   - rngs
   - serde
   - stdev

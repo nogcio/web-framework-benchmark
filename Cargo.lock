@@ -955,6 +955,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
 
 [[package]]
+name = "libmimalloc-sys"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "667f4fec20f29dfc6bc7357c582d91796c169ad7e2fce709468aefeb2c099870"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "libssh2-sys"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1024,6 +1034,15 @@ name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
+
+[[package]]
+name = "mimalloc"
+version = "0.1.48"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1ee66a4b64c74f4ef288bcbb9192ad9c3feaad75193129ac8509af543894fd8"
+dependencies = [
+ "libmimalloc-sys",
+]
 
 [[package]]
 name = "mime"
@@ -2303,6 +2322,7 @@ name = "wfb-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "clap",
  "console 0.15.11",
  "humanize-bytes",
@@ -2581,6 +2601,7 @@ dependencies = [
  "hdrhistogram",
  "humanize-bytes",
  "indicatif",
+ "mimalloc",
  "serde",
  "serde_json",
  "textplots",

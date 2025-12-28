@@ -1,17 +1,16 @@
 mod benchmark_data;
 mod cli;
 mod exec;
-mod verify;
-mod run;
-mod pipeline;
+mod db_config;
 mod consts;
-
-use std::time::Duration;
+mod runner;
+mod docker;
 
 use clap::Parser;
-use console::style;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use tokio::task::JoinSet;
 use wfb_storage::{DatabaseKind, Environment};
+use std::{sync::Arc, time::Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -21,80 +20,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     match args.command {
         cli::Commands::Run {
-            run_id,
+            run_id: _run_id,
             env,
+            skip_wrkr_build,
+            skip_db_build,
         } => {          
             let benchmarks = config.get_benchmarks();
 
             let env_config = config.get_environment(&env)
                 .ok_or_else(|| anyhow::anyhow!("Environment '{}' not found in config", env))?.clone();
-            
+
             let m = MultiProgress::new();
-
-            // 1. Build wrkr
-            let pb_wrkr = m.add(ProgressBar::new_spinner());
-            pb_wrkr.set_style(ProgressStyle::default_spinner().template("{spinner:.blue} {msg}").unwrap());
-            pb_wrkr.enable_steady_tick(Duration::from_millis(100));
-            pb_wrkr.set_message("Building wrkr...");
-            
-            let executor = match env_config {
-                Environment::Local(_) => exec::local::LocalExecutor::new(),
-                other => {
-                    anyhow::bail!("Unsupported executor type: {:?}", other);
-                }
-            };
-            
-            pipeline::build_wrkr_image(&executor, &pb_wrkr).await?;
-            pb_wrkr.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
-            pb_wrkr.finish_with_message(format!("{} wrkr built", style("✔").green()));
-
-            // 2. Build databases
-            let mut unique_dbs = benchmarks.iter()
-                .filter_map(|b| b.database)
-                .collect::<Vec<_>>();
-            unique_dbs.sort();
-            unique_dbs.dedup();
-            
-            pipeline::build_database_images(&env_config, unique_dbs.clone(), &m).await?;
-
-            // 3. Run benchmarks
-            let total_duration: u64 = benchmarks.iter()
-                .map(|b| b.tests.len() as u64 * consts::BENCHMARK_DURATION_PER_TEST_SECS)
-                .sum();
-            
-            let pb = m.add(ProgressBar::new(total_duration));
-            pb.set_style(ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
-                .unwrap()
-                .progress_chars("#>-"));
-            pb.set_message("Running benchmarks...");
-
-            let mut pb_index = unique_dbs.len() + 1; // +1 for wrkr build
-            for b in benchmarks {
-                pb.set_message(format!("{} running", b.name));
-                let executor = match env_config {
-                    Environment::Local(_) => exec::local::LocalExecutor::new(),
-                    other => {
-                        anyhow::bail!("Unsupported executor type: {:?}", other);
-                    }
-                };
-                let _ = run::run_benchmark(executor, b, pb_index, &m, &pb).await;
-                pb_index += 1;
-            }
-            pb.finish_with_message("Done");
-        }
-        cli::Commands::Verify { env } => {
-            if env != "local" {
-                anyhow::bail!("Only local environment is supported for verification");
-            }
-
-            let benchmarks = config.get_benchmarks();
-
-            let env_config = config.get_environment(&env)
-                .ok_or_else(|| anyhow::anyhow!("Environment '{}' not found in config", env))?.clone();
-            
-            let m = MultiProgress::new();
-
             let unique_dbs = vec![
                 DatabaseKind::Postgres,
                 DatabaseKind::Mysql,
@@ -102,28 +38,130 @@ async fn main() -> Result<(), anyhow::Error> {
                 DatabaseKind::Mongodb,
                 DatabaseKind::Mssql,
             ];
-            let unique_dbs_count = unique_dbs.len();
-            pipeline::build_database_images(&env_config, unique_dbs, &m).await?;
 
+            let runner: Arc<dyn runner::BenchmarkRunner> = match env_config {
+                Environment::Local(_local_config) => {
+                    let executor = exec::local::LocalExecutor::new();
+                    let config = runner::RunnerConfig {
+                        db_host: "host.docker.internal".to_string(),
+                        db_port: consts::DB_PORT_EXTERNAL.to_string(),
+                        app_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
+                        app_public_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
+                        is_remote: false,
+                    };
+                    Arc::new(runner::Runner::new(executor.clone(), executor.clone(), executor, false, config))
+                }
+                Environment::Ssh(ssh_config) => {
+                    let app_executor = exec::ssh::SshExecutor::from_config(&ssh_config.app);
+                    let db_executor = exec::ssh::SshExecutor::from_config(&ssh_config.db);
+                    let wrkr_executor = exec::ssh::SshExecutor::from_config(&ssh_config.wrkr);
+                    let config = runner::RunnerConfig {
+                        db_host: ssh_config.db.internal_ip.clone(),
+                        db_port: consts::DB_PORT_EXTERNAL.to_string(),
+                        app_host_url: format!("http://{}:{}", ssh_config.app.internal_ip, consts::APP_PORT_EXTERNAL),
+                        app_public_host_url: format!("http://{}:{}", ssh_config.app.ip, consts::APP_PORT_EXTERNAL),
+                        is_remote: true,
+                    };
+                    Arc::new(runner::Runner::new(app_executor, db_executor, wrkr_executor, true, config))
+                }
+            };
+
+            runner.prepare(&m).await?;
+
+            let mut start_actions = JoinSet::new();
+            if !skip_wrkr_build {
+                let runner_clone = runner.clone();
+                let m_clone = m.clone();
+                start_actions.spawn(async move {
+                    runner_clone.deploy_wrkr(&m_clone).await
+                });
+            }
+
+            if !skip_db_build {
+                let runner_clone = runner.clone();
+                let m_clone = m.clone();
+                start_actions.spawn(async move {
+                    runner_clone.build_database_images(unique_dbs, &m_clone).await
+                });
+            }
+
+            while let Some(res) = start_actions.join_next().await {
+                res??;
+            }
+            
             let pb = m.add(ProgressBar::new(benchmarks.len() as u64));
             pb.set_style(ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
                 .unwrap()
                 .progress_chars("#>-"));
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb.set_message("Running benchmarks...");
+
+            for b in benchmarks {
+                pb.set_message(format!("{} running", b.name));
+                let _ = runner.run_benchmark(b, &m).await;
+                pb.inc(1);
+            }
+            pb.finish_with_message("Done");
+        }
+        cli::Commands::Verify { env } => {
+            let benchmarks = config.get_benchmarks();
+
+            let env_config = config.get_environment(&env)
+                .ok_or_else(|| anyhow::anyhow!("Environment '{}' not found in config", env))?.clone();
+
+            let m = MultiProgress::new();
+            let unique_dbs = vec![
+                DatabaseKind::Postgres,
+                DatabaseKind::Mysql,
+                DatabaseKind::Mariadb,
+                DatabaseKind::Mongodb,
+                DatabaseKind::Mssql,
+            ];
+
+            let runner: Box<dyn runner::BenchmarkRunner> = match env_config {
+                Environment::Local(_local_config) => {
+                    let executor = exec::local::LocalExecutor::new();
+                    let config = runner::RunnerConfig {
+                        db_host: "host.docker.internal".to_string(),
+                        db_port: consts::DB_PORT_EXTERNAL.to_string(),
+                        app_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
+                        app_public_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
+                        is_remote: false,
+                    };
+                    Box::new(runner::Runner::new(executor.clone(), executor.clone(), executor, false, config))
+                }
+                Environment::Ssh(ssh_config) => {
+                    let app_executor = exec::ssh::SshExecutor::from_config(&ssh_config.app);
+                    let db_executor = exec::ssh::SshExecutor::from_config(&ssh_config.db);
+                    let wrkr_executor = exec::ssh::SshExecutor::from_config(&ssh_config.wrkr);
+                    let config = runner::RunnerConfig {
+                        db_host: ssh_config.db.internal_ip.clone(),
+                        db_port: consts::DB_PORT_EXTERNAL.to_string(),
+                        app_host_url: format!("http://{}:{}", ssh_config.app.ip, consts::APP_PORT_EXTERNAL),
+                        app_public_host_url: format!("http://{}:{}", ssh_config.app.ip, consts::APP_PORT_EXTERNAL),
+                        is_remote: true,
+                    };
+                    Box::new(runner::Runner::new(app_executor, db_executor, wrkr_executor, true, config))
+                }
+            };
+
+            runner.prepare(&m).await?;
+            
+            runner.build_database_images(unique_dbs, &m).await?;
+            
+            let pb = m.add(ProgressBar::new(benchmarks.len() as u64));
+            pb.set_style(ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
+                .unwrap()
+                .progress_chars("#>-"));
+            pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message("Verifying benchmarks...");
 
-            let mut pb_index = unique_dbs_count;
             for b in benchmarks {
                 pb.set_message(format!("{} verifying", b.name));
-                let executor = match env_config {
-                    Environment::Local(_) => exec::local::LocalExecutor::new(),
-                    other => {
-                        anyhow::bail!("Unsupported executor type: {:?}", other);
-                    }
-                };
-                let _ = verify::verify_benchmark(executor,b, pb_index, &m).await;
+                let _ = runner.verify_benchmark(b, &m).await;
                 pb.inc(1);
-                pb_index += 1;
             }
             pb.finish_with_message("Done");
         }

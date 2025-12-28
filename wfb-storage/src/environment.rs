@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "executor", rename_all = "snake_case")]
@@ -13,11 +15,10 @@ pub struct LocalEnvironment {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SshConnection {
-    pub public_ip: String,
-    pub port: u16,
-    pub private_ip: String,
-    pub username: String,
-    pub private_key_path: String,
+    pub ip: String,
+    pub internal_ip: String,
+    pub user: String,
+    pub ssh_key_path: PathBuf,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

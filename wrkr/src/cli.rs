@@ -27,6 +27,10 @@ pub struct Args {
     #[arg(short, long, default_value_t = 10)]
     pub connections: u64,
 
+    /// Time to reach target connections in seconds
+    #[arg(long)]
+    pub ramp_up: Option<u64>,
+
     /// Duration of the test in seconds
     #[arg(short, long, default_value_t = 10)]
     pub duration: u64,

@@ -1,4 +1,4 @@
-use super::Executor;
+use super::{Executor, OutputLogger};
 use anyhow::{Context, Result};
 use std::path::Path;
 use std::process::Stdio;
@@ -7,6 +7,8 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
+use async_trait::async_trait;
+use indicatif::ProgressBar;
 
 #[derive(Default, Clone)]
 pub struct LocalExecutor;
@@ -87,19 +89,29 @@ where
     Ok(())
 }
 
+#[async_trait]
 impl Executor for LocalExecutor {
-    async fn execute<F1, F2>(&self, script: &str, on_stdout: F1, on_stderr: F2) -> Result<String>
+    async fn execute<S>(&self, script: S, pb: &ProgressBar) -> Result<String, anyhow::Error>
     where
-        F1: Fn(&str) + Send + 'static,
-        F2: Fn(&str) + Send + 'static,
+        S: std::fmt::Display + Send + Sync {
+        self.execute_with_std_out(script, |_| {}, pb).await
+    }
+    
+    async fn execute_with_std_out<S, F>(&self, script: S, on_stdout: F, pb: &ProgressBar) -> Result<String, anyhow::Error>
+    where
+        F: Fn(&str) + Send + Sync + 'static,
+        S: std::fmt::Display + Send + Sync
     {
+        let script = script.to_string();
+        let logger = Arc::new(OutputLogger::new(pb.clone(), script.clone()));
+        
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("powershell");
-            c.arg("-Command").arg(script);
+            c.arg("-Command").arg(&script);
             c
         } else {
             let mut c = Command::new("sh");
-            c.arg("-c").arg(script);
+            c.arg("-c").arg(&script);
             c
         };
 
@@ -111,10 +123,12 @@ impl Executor for LocalExecutor {
         let stdout = child.stdout.take().context("Failed to open stdout")?;
         let stderr = child.stderr.take().context("Failed to open stderr")?;
 
+        let logger_clone = logger.clone();
         let stdout_task = tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
             let mut output = String::new();
             while let Ok(Some(line)) = reader.next_line().await {
+                logger_clone.on_stdout(&line);
                 on_stdout(&line);
                 output.push_str(&line);
                 output.push('\n');
@@ -122,10 +136,11 @@ impl Executor for LocalExecutor {
             output
         });
 
+        let logger_clone = logger.clone();
         let stderr_task = tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                on_stderr(&line);
+                logger_clone.on_stderr(&line);
             }
         });
 
@@ -136,7 +151,11 @@ impl Executor for LocalExecutor {
         let status = child.wait().await.context("Failed to wait for child")?;
 
         if !status.success() {
-            return Err(anyhow::anyhow!("Command failed with status: {}", status));
+            let stderr = logger.get_stderr();
+            if !stderr.is_empty() {
+                return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}\nStderr:\n{}", status, script, stderr));
+            }
+            return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}", status, script));
         }
 
         Ok(stdout_str)
@@ -147,28 +166,30 @@ impl Executor for LocalExecutor {
     }
 
     async fn rm(&self, path: &str) -> Result<(), anyhow::Error> {
-        match fs::metadata(path).await {
-            Ok(meta) => {
-                if meta.is_dir() {
-                    fs::remove_dir_all(path).await.context("Failed to remove directory")
-                } else {
-                    fs::remove_file(path).await.context("Failed to remove file")
-                }
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e).context("Failed to get metadata"),
+        if fs::metadata(path).await.is_ok() {
+            fs::remove_dir_all(path).await.context("Failed to remove directory")
+        } else {
+            Ok(())
         }
     }
 
-    async fn cp<F>(&self, src: &str, dst: &str, on_progress: F) -> Result<(), anyhow::Error>
-    where
-        F: Fn(&str, u64, u64) + Send + 'static,
-    {
+    async fn cp(&self, src: &str, dst: &str, pb: &ProgressBar) -> Result<(), anyhow::Error> {
         let src_path = Path::new(src);
         let dst_path = Path::new(dst);
 
         let total_size = get_dir_size(src_path).await.context("Failed to get size")?;
         let copied = Arc::new(AtomicU64::new(0));
+        let pb_clone = pb.clone();
+
+        let on_progress = move |filename: &str, current: u64, total: u64| {
+            let percentage = if total > 0 {
+                (current as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            };
+            pb_clone.set_message(format!("copying {}", filename));
+            pb_clone.set_position(percentage.round() as u64);
+        };
 
         copy_recursive(src_path, dst_path, total_size, copied, &on_progress).await
     }

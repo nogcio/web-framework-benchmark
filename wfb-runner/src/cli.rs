@@ -22,6 +22,14 @@ pub enum Commands {
         /// Environment to use
         #[arg(short, long, default_value = "local")]
         env: String,
+
+        /// Skip building and deploying wrkr
+        #[arg(long, default_value_t = false)]
+        skip_wrkr_build: bool,
+
+        /// Skip building and deploying dbs
+        #[arg(long, default_value_t = false)]
+        skip_db_build: bool,
     },
     Verify {
         /// Environment to use

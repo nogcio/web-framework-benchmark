@@ -6,14 +6,16 @@ pub struct Response {
     status: u16,
     headers: HeaderMap,
     body: bytes::Bytes,
+    body_len: usize,
 }
 
 impl Response {
     pub async fn new(res: reqwest::Response) -> Result<Self, reqwest::Error> {
         let status = res.status().as_u16();
         let headers = res.headers().clone();
-        let body = res.bytes().await.unwrap_or_default();
-        Ok(Self { status, headers, body })
+        let b = res.bytes().await.unwrap_or_default();
+        let len = b.len();
+        Ok(Self { status, headers, body: b, body_len: len })
     }
 
     pub fn status(&self) -> u16 {
@@ -26,6 +28,10 @@ impl Response {
 
     pub fn body(&self) -> &bytes::Bytes {
         &self.body
+    }
+
+    pub fn body_len(&self) -> usize {
+        self.body_len
     }
 }
 

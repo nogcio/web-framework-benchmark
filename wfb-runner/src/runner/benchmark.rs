@@ -1,0 +1,317 @@
+use humanize_bytes::humanize_bytes_binary;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use std::time::Duration;
+use std::vec;
+use anyhow::{Context, bail};
+use wfb_storage::{Benchmark, BenchmarkTests};
+use crate::exec::Executor;
+use crate::consts;
+use crate::db_config::get_db_config;
+use crate::runner::Runner;
+use wrkr_api::JsonStats;
+
+impl<E: Executor + Clone + Send + 'static> Runner<E> {
+    pub async fn run_app(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
+        let mut cmd = self.app_docker.run_command(&benchmark.name, &benchmark.name)
+            .port(consts::APP_PORT_EXTERNAL, consts::APP_PORT_INTERNAL)
+            .ulimit("nofile=1000000:1000000")
+            .sysctl("net.core.somaxconn", "65535");
+
+        if let Some(db_kind) = &benchmark.database {
+            cmd = cmd
+                .env("DB_HOST", &self.config.db_host)
+                .env("DB_PORT", &self.config.db_port)
+                .env("DB_USER", consts::DB_USER)
+                .env("DB_PASSWORD", consts::DB_PASS)
+                .env("DB_NAME", consts::DB_NAME)
+                .env("DB_KIND", format!("{:?}", db_kind));
+        }
+
+        // Add benchmark specific env vars
+        for (k, v) in &benchmark.env {
+            cmd = cmd.env(k, v);
+        }
+
+        self.app_docker.execute_run(cmd, pb).await?;
+
+        Ok(())
+    }
+
+    pub async fn wait_for_app_ready(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
+        pb.set_message(format!("Waiting for App - {}", benchmark.name));
+        self.wait_for_container_ready(&self.app_docker, &benchmark.name, pb).await
+    }
+
+    pub async fn run_tests(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
+        for test in &benchmark.tests {
+            let script_path = match test {
+                BenchmarkTests::PlainText => consts::SCRIPT_PLAINTEXT,
+                BenchmarkTests::JsonAggregate => consts::SCRIPT_JSON,
+                BenchmarkTests::StaticFiles => consts::SCRIPT_STATIC,
+            };
+
+            pb.set_message(format!("Running test {:?} - {}", test, benchmark.name));
+
+            let script_content = std::fs::read_to_string(script_path)
+                .with_context(|| format!("Failed to read script file: {}", script_path))?;
+
+            let config = wrkr_core::WrkConfig {
+                script_content,
+                host_url: self.config.app_public_host_url.clone(),
+            };
+
+            pb.set_message(format!("Running test {:?} - {}", test, benchmark.name));
+            let stats = wrkr_core::run_once(config.clone()).await?;
+
+            if stats.total_errors > 0 {
+                let errors = stats
+                    .errors
+                    .iter()
+                    .map(|(code, count)| format!("{}: {}", code, count))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                bail!(
+                    "Test {:?} failed with {} errors\n{}",
+                    test,
+                    stats.total_errors,
+                    errors
+                );
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn cleanup(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
+        self.app_docker.stop_and_remove(&benchmark.name, pb).await;
+
+        // Stop and remove db if exists
+        if let Some(db_kind) = &benchmark.database {
+            let config = get_db_config(db_kind);
+            self.db_docker.stop_and_remove(config.image_name, pb).await;
+        }
+        Ok(())
+    }
+
+    pub async fn verify_benchmark_impl(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()> {
+        let pb = mb.add(ProgressBar::new_spinner());
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.blue} {prefix} {msg}")
+                .unwrap(),
+        );
+        pb.set_prefix(format!("[{}]", benchmark.name));
+        pb.enable_steady_tick(Duration::from_millis(100));
+        pb.set_message(format!("Verifying {}", benchmark.name));
+    
+        let result = async {
+            self.build_benchmark_image(benchmark, &pb).await?;
+            if let Some(db_kind) = &benchmark.database {
+                self.setup_database(db_kind, &pb).await?;
+                self.wait_for_db_ready(db_kind, &pb).await?;
+            }
+            self.run_app(benchmark, &pb).await?;
+            self.wait_for_app_ready(benchmark, &pb).await?;
+            self.run_tests(benchmark, &pb).await?;
+    
+            Ok::<(), anyhow::Error>(())
+        }
+        .await;
+    
+        self.cleanup(benchmark, &pb)
+            .await
+            .ok();
+    
+        pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+    
+        match result {
+            Ok(_) => {
+                pb.finish_with_message(format!(
+                    "{} {} Verified",
+                    console::style("✔").green(),
+                    benchmark.name
+                ));
+                Ok(())
+            }
+            Err(e) => {
+                pb.finish_with_message(format!(
+                    "{} {} Failed: {}",
+                    console::style("✘").red(),
+                    benchmark.name,
+                    e
+                ));
+                Err(e)
+            }
+        }
+    }
+
+    pub async fn run_benchmark_impl(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()> {
+        let pb = mb.add(ProgressBar::new_spinner());
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.blue} {prefix} {msg}")
+                .unwrap(),
+        );
+        pb.set_prefix(format!("[{}]", benchmark.name));
+        pb.enable_steady_tick(Duration::from_millis(100));
+        pb.set_message(format!("Running {}", benchmark.name));
+    
+        let result = async {
+            // Build and deploy
+            self.build_benchmark_image(benchmark, &pb).await?;
+
+            if let Some(db_kind) = &benchmark.database {
+                self.setup_database(db_kind, &pb).await?;
+                self.wait_for_db_ready(db_kind, &pb).await?;
+            }
+            self.run_app(benchmark, &pb).await?;
+            self.wait_for_app_ready(benchmark, &pb).await?;
+            
+            // Verify via public IP
+            self.run_tests(benchmark, &pb).await?;
+
+            // Run tests via wrkr in docker
+            self.run_tests_docker(benchmark, mb).await?;
+    
+            Ok::<(), anyhow::Error>(())
+        }
+        .await;
+        
+        self.cleanup(benchmark, &pb)
+            .await
+            .ok();
+    
+        pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+    
+        match result {
+            Ok(_) => {
+                pb.finish_with_message(format!(
+                    "{} {} Finished",
+                    console::style("✔").green(),
+                    benchmark.name
+                ));
+                Ok(())
+            }
+            Err(e) => {
+                pb.finish_with_message(format!(
+                    "{} {} Failed: {}",
+                    console::style("✘").red(),
+                    benchmark.name,
+                    e
+                ));
+                Err(e)
+            }
+        }
+    }
+
+    async fn run_tests_docker(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()> {
+        for test in &benchmark.tests {
+            let pb = mb.add(ProgressBar::new_spinner());
+            pb.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner:.blue} {prefix} [{bar:40.cyan/blue}] {msg}")
+                    .unwrap()
+                    .progress_chars("#>-"),
+            );
+            pb.set_prefix(format!("[{}/{:?}]", benchmark.name, test));
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb.set_length(consts::BENCHMARK_DURATION_PER_TEST_SECS);
+            pb.set_position(0);
+
+            let run_pb = mb.add(ProgressBar::new(100));
+            run_pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("{msg}")
+                    .unwrap(),
+            );
+            
+            let script_path = match test {
+                BenchmarkTests::PlainText => consts::SCRIPT_PLAINTEXT,
+                BenchmarkTests::JsonAggregate => consts::SCRIPT_JSON,
+                BenchmarkTests::StaticFiles => consts::SCRIPT_STATIC,
+            };
+            
+            let duration = format!("{}", consts::BENCHMARK_DURATION_PER_TEST_SECS);
+            let ramp_up = format!("{}", consts::BENCHMARK_RAMP_UP_SECS);
+            let connections = consts::BENCHMARK_CONNECTIONS.to_string();
+
+            let cmd = self.wrkr_docker.run_command(consts::WRKR_IMAGE, "wrkr-runner")
+                .detach(false)
+                .network("host")
+                .ulimit("nofile=1000000:1000000")
+                .arg("-s")
+                .arg(script_path)
+                .arg("--url")
+                .arg(&self.config.app_host_url)
+                .arg("--duration")
+                .arg(&duration)
+                .arg("--ramp-up")
+                .arg(&ramp_up)
+                .arg("--connections")
+                .arg(&connections)
+                .arg("--output")
+                .arg("json");
+            
+            let pb_clone = pb.clone();
+            let output = self.wrkr_docker.execute_run_with_std_out(cmd, move |line| {
+                if let Ok(stats) = serde_json::from_str::<JsonStats>(line) {
+                    pb_clone.set_position(stats.elapsed_secs.min(consts::BENCHMARK_DURATION_PER_TEST_SECS));
+                    pb_clone.set_message(format!(
+                        "[{}] RPS: {:.0} | TPS: {} | Latency: {} | Errors: {}",
+                        stats.connections,
+                        stats.requests_per_sec,
+                        humanize_bytes_binary!(stats.bytes_per_sec),
+                        format_latency(stats.latency_p99),
+                        stats.total_errors
+                    ));
+                }
+            }, &run_pb).await?;
+            
+            self.wrkr_docker.stop_and_remove("wrkr-runner", &run_pb).await;
+
+            run_pb.finish_and_clear();
+            mb.remove(&run_pb);
+
+            // Parse output to find max RPS
+            let mut stats_vec = vec![];
+
+            for line in output.lines() {
+                if let Ok(stats) = serde_json::from_str::<JsonStats>(line) {
+                    stats_vec.push(stats);
+                }
+            }
+            stats_vec.sort_by(|a, b| a.requests_per_sec.partial_cmp(&b.requests_per_sec).unwrap());
+
+            pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+
+            if let Some(max_stats) = stats_vec.last() {
+                pb.finish_with_message(format!(
+                "   {} {:?} - Connections: [{}] | RPS: {:.0} | TPS: {} | Latency: {} | Errors: {}",
+                console::style("✔").green(),
+                test,
+                max_stats.connections,
+                max_stats.requests_per_sec,
+                humanize_bytes_binary!(max_stats.bytes_per_sec),
+                format_latency(max_stats.latency_p99),
+                max_stats.total_errors
+            ));
+            } else {
+                pb.finish_with_message(format!(
+                    "   {} {:?} - No stats collected",
+                    console::style("✘").red(),
+                    test
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn format_latency(micros: u64) -> String {
+    if micros >= 1_000_000 {
+        format!("{:.2}s", micros as f64 / 1_000_000.0)
+    } else if micros >= 1_000 {
+        format!("{:.2}ms", micros as f64 / 1_000.0)
+    } else {
+        format!("{:.2}us", micros)
+    }
+}

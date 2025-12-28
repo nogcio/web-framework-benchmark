@@ -1,3 +1,4 @@
 type: environment
 executor: local
 name: local
+title: Local

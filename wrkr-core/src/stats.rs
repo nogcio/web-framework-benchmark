@@ -37,32 +37,26 @@ impl Stats {
         self.connections.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn inc_requests(&self) {
-        self.total_requests.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn inc_errors(&self) {
-        self.total_errors.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn record_latency(&self, latency: Duration) {
-        if let Ok(mut hist) = self.latency_histogram.lock() {
-            let _ = hist.record(latency.as_micros() as u64);
-        }
-    }
-
     pub fn record_error(&self, error: String) {
-        self.inc_errors();
+        self.total_errors.fetch_add(1, Ordering::Relaxed);
         *self.errors_map.entry(error).or_insert(0) += 1;
     }
 
-    pub fn add_bytes_sent(&self, bytes: u64) {
-        self.total_bytes_sent.fetch_add(bytes, Ordering::Relaxed);
-    }
+    pub fn merge(&self, requests: u64, bytes_sent: u64, bytes_received: u64, errors: &HashMap<String, u64>, histogram: &Histogram<u64>) {
+        self.total_requests.fetch_add(requests, Ordering::Relaxed);
+        self.total_bytes_sent.fetch_add(bytes_sent, Ordering::Relaxed);
+        self.total_bytes_received.fetch_add(bytes_received, Ordering::Relaxed);
+        
+        let error_count: u64 = errors.values().sum();
+        self.total_errors.fetch_add(error_count, Ordering::Relaxed);
 
-    pub fn add_bytes_received(&self, bytes: u64) {
-        self.total_bytes_received
-            .fetch_add(bytes, Ordering::Relaxed);
+        for (k, v) in errors {
+            *self.errors_map.entry(k.clone()).or_insert(0) += v;
+        }
+        
+        if let Ok(mut h) = self.latency_histogram.lock() {
+            let _ = h.add(histogram);
+        }
     }
 
     pub fn snapshot(&self, duration: Duration, elapsed: Duration) -> StatsSnapshot {

@@ -7,6 +7,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use humanize_bytes::humanize_bytes_binary;
 use wrkr_api::JsonStats;
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 mod cli;
 
@@ -25,6 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         duration: Duration::from_secs(args.duration),
         connections: args.connections,
         start_connections: args.start_connections,
+        ramp_up: args.ramp_up.map(Duration::from_secs),
         wrk: WrkConfig {
             script_content,
             host_url: args.url.clone(),
@@ -113,10 +118,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     errors: p.errors,
                 };
                 println!("{}", serde_json::to_string(&json_stats).unwrap());
-                std::io::stdout().flush().unwrap();
             }
         }
     })).await?;
+    std::io::stdout().flush().ok();
 
     if let Some(pb) = pb {
         pb.finish_with_message("Done!");
@@ -228,6 +233,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("Socket errors: connect {}, read {}, write {}, timeout {}", connect_errs, read_errs, write_errs, timeouts);
     }
+
+    std::io::stdout().flush().ok();
 
     Ok(())
 }

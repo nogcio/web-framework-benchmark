@@ -1,6 +1,6 @@
-FROM rust:alpine AS chef
+FROM rust:bookworm AS chef
 WORKDIR /app
-RUN apk add --no-cache musl-dev pkgconfig luajit-dev
+RUN apt-get update && apt-get install -y libluajit-5.1-dev
 RUN cargo install cargo-chef
 
 FROM chef AS planner
@@ -17,9 +17,9 @@ COPY . .
 RUN cargo build --release -p wrkr
 
 # Runtime stage
-FROM alpine:3.19
+FROM debian:bookworm-slim
 WORKDIR /app
-RUN apk add --no-cache ca-certificates
+RUN apt-get update && apt-get install -y ca-certificates libluajit-5.1-2 && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/wrkr .
 COPY scripts ./scripts
 ENTRYPOINT ["./wrkr"]

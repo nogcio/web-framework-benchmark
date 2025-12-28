@@ -1,11 +1,14 @@
-use super::Executor;
+use super::{Executor, OutputLogger};
 use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use ssh2::Session;
+use async_trait::async_trait;
+use indicatif::ProgressBar;
 
 #[derive(Clone)]
 pub struct SshExecutor {
@@ -23,6 +26,15 @@ impl SshExecutor {
             username,
             private_key_path,
         }
+    }
+
+    pub fn from_config(config: &wfb_storage::SshConnection) -> Self {
+        SshExecutor::new(
+            config.ip.clone(),
+            22,
+            config.user.clone(),
+            config.ssh_key_path.clone(),
+        )
     }
 }
 
@@ -87,23 +99,10 @@ where
     F: Fn(&str, u64, u64) + Send + 'static,
 {
     if src.is_dir() {
-        // Create remote directory
-        // Use sftp for mkdir
         let sftp = sess.sftp().context("Failed to init SFTP")?;
-        // Ignore error if directory exists (or check first, but mkdir -p behavior is hard with sftp)
-        // SFTP mkdir fails if exists.
-        // We can try to stat it first.
         match sftp.stat(dst) {
             Ok(_) => {} // Exists
             Err(_) => {
-                // Try to create. Note: sftp.mkdir doesn't do -p.
-                // For simplicity, we assume parent exists or we don't care about -p here strictly,
-                // but user might expect it.
-                // To do -p properly via SFTP is tedious.
-                // Alternatively, we can execute "mkdir -p" via channel exec before uploading?
-                // But we are inside a loop.
-                // Let's just try mkdir and ignore failure?
-                // Or better: use sftp.mkdir with 0o755.
                 let _ = sftp.mkdir(dst, 0o755);
             }
         }
@@ -148,17 +147,26 @@ where
     Ok(())
 }
 
+#[async_trait]
 impl Executor for SshExecutor {
-    async fn execute<F1, F2>(&self, script: &str, on_stdout: F1, on_stderr: F2) -> Result<String>
+    async fn execute<S>(&self, script: S, pb: &ProgressBar) -> Result<String, anyhow::Error>
     where
-        F1: Fn(&str) + Send + 'static,
-        F2: Fn(&str) + Send + 'static,
+        S: std::fmt::Display + Send + Sync {
+        self.execute_with_std_out(script, |_| {}, pb).await
+    }
+    
+    async fn execute_with_std_out<S, F>(&self, script: S, on_stdout: F, pb: &ProgressBar) -> Result<String, anyhow::Error>
+    where
+        F: Fn(&str) + Send + Sync + 'static,
+        S: std::fmt::Display + Send + Sync
     {
+        let script = script.to_string();
+        let logger = Arc::new(OutputLogger::new(pb.clone(), format!("ssh {}@{} {}", self.username, self.host, script)));
+        
         let host = self.host.clone();
         let port = self.port;
         let username = self.username.clone();
         let private_key_path = self.private_key_path.clone();
-        let script = script.to_string();
 
         tokio::task::spawn_blocking(move || {
             let tcp = TcpStream::connect((host.as_str(), port)).context("Failed to connect to SSH host")?;
@@ -193,6 +201,7 @@ impl Executor for SshExecutor {
                             did_work = true;
                             let lines = stdout_buffer.push(&stdout_buf[..n]);
                             for line in lines {
+                                logger.on_stdout(&line);
                                 on_stdout(&line);
                                 output.push_str(&line);
                                 output.push('\n');
@@ -210,7 +219,7 @@ impl Executor for SshExecutor {
                             did_work = true;
                             let lines = stderr_buffer.push(&stderr_buf[..n]);
                             for line in lines {
-                                on_stderr(&line);
+                                logger.on_stderr(&line);
                             }
                         }
                         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
@@ -225,17 +234,21 @@ impl Executor for SshExecutor {
             
             // Flush remaining buffers
             if let Some(s) = stdout_buffer.flush() {
-                on_stdout(&s);
+                logger.on_stdout(&s);
                 output.push_str(&s);
             }
             if let Some(s) = stderr_buffer.flush() {
-                on_stderr(&s);
+                logger.on_stderr(&s);
             }
 
             channel.wait_close()?;
             let exit_status = channel.exit_status()?;
             if exit_status != 0 {
-                return Err(anyhow::anyhow!("Command failed with status: {}", exit_status));
+                let stderr = logger.get_stderr();
+                if !stderr.is_empty() {
+                    return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}\nStderr:\n{}", exit_status, script, stderr));
+                }
+                return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}", exit_status, script));
             }
 
             Ok(output)
@@ -244,29 +257,39 @@ impl Executor for SshExecutor {
     }
 
     async fn mkdir(&self, path: &str) -> Result<(), anyhow::Error> {
-        let noop = |_: &str| {};
-        self.execute(&format!("mkdir -p {}", path), noop, noop)
+        let pb = ProgressBar::hidden();
+        self.execute(format!("mkdir -p {}", path), &pb)
             .await
             .map(|_| ())
     }
 
     async fn rm(&self, path: &str) -> Result<(), anyhow::Error> {
-        let noop = |_: &str| {};
-        self.execute(&format!("rm -rf {}", path), noop, noop)
+        let pb = ProgressBar::hidden();
+        self.execute(format!("rm -rf {}", path), &pb)
             .await
             .map(|_| ())
     }
 
-    async fn cp<F>(&self, src: &str, dst: &str, on_progress: F) -> Result<(), anyhow::Error>
-    where
-        F: Fn(&str, u64, u64) + Send + 'static,
-    {
+    async fn cp(&self, src: &str, dst: &str, pb: &ProgressBar) -> Result<(), anyhow::Error> {
         let host = self.host.clone();
         let port = self.port;
         let username = self.username.clone();
         let private_key_path = self.private_key_path.clone();
         let src = src.to_string();
         let dst = dst.to_string();
+        let pb_clone = pb.clone();
+        pb_clone.set_length(100);
+        pb_clone.set_position(0);
+
+        let on_progress = move |filename: &str, current: u64, total: u64| {
+            let percentage = if total > 0 {
+                (current as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            };
+            pb_clone.set_message(format!("copying {}", filename));
+            pb_clone.set_position(percentage.round() as u64);
+        };
 
         tokio::task::spawn_blocking(move || {
             let tcp = TcpStream::connect((host.as_str(), port)).context("Failed to connect to SSH host")?;
@@ -281,11 +304,6 @@ impl Executor for SshExecutor {
             
             let total_size = get_dir_size_sync(src_path).context("Failed to get size")?;
             let copied = AtomicU64::new(0);
-
-            // Ensure parent directory exists on remote?
-            // We can't easily do `mkdir -p` via SFTP or SCP without executing a command.
-            // But we can assume the user has prepared the environment or we can try to create it.
-            // For now, let's just start uploading.
             
             upload_recursive_sync(&sess, src_path, dst_path, total_size, &copied, &on_progress)
         })

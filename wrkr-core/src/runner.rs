@@ -1,6 +1,7 @@
 use crate::stats::StatsSnapshot;
 use crate::{BenchmarkConfig, WrkConfig, error::*, stats::Stats, lua_env::create_lua_env};
 use std::sync::Arc;
+use reqwest::redirect::Policy;
 use tokio::time::{sleep, Instant, Duration};
 use tokio::task::JoinSet;
 use mlua::Function;
@@ -18,6 +19,13 @@ fn build_client() -> Result<Client> {
         .pool_max_idle_per_host(1)
         .http1_only()
         .tcp_nodelay(true)
+        .no_brotli()
+        .no_deflate()
+        .no_gzip()
+        .no_zstd()
+        .redirect(Policy::none())
+        .timeout(Duration::from_millis(2000))
+        .tcp_keepalive(Some(Duration::from_secs(120)))
         .no_proxy()
         .build()
         .map_err(|e| Error::Other(e.to_string()))

@@ -29,11 +29,11 @@ Notes:
 ### Processing Logic
 The service must compute analytics using only orders where `status == "completed"`.
 
-1. **processed_orders**: the number of orders with `status == "completed"`.
+1. **processedOrders**: the number of orders with `status == "completed"`.
 2. **results**: a per-country sum of `amount` across completed orders.
    - Key: `country` string
    - Value: integer cents sum
-3. **category_stats**: a per-category sum of `quantity` across items belonging to completed orders.
+3. **categoryStats**: a per-category sum of `quantity` across items belonging to completed orders.
    - Key: `category` string
    - Value: integer quantity sum
 
@@ -41,20 +41,20 @@ The service must compute analytics using only orders where `status == "completed
 - **Status Code**: `200 OK`
 - **Headers**: `Content-Type: application/json`
 - **Body**: JSON object with exactly the following fields:
-  - `processed_orders` (integer)
+  - `processedOrders` (integer)
   - `results` (object map: string -> integer)
-  - `category_stats` (object map: string -> integer)
+  - `categoryStats` (object map: string -> integer)
 
 Example shape:
 
 ```json
 {
-  "processed_orders": 167,
+  "processedOrders": 167,
   "results": {
     "US": 123456,
     "DE": 7890
   },
-  "category_stats": {
+  "categoryStats": {
     "Electronics": 250,
     "Books": 180
   }
@@ -67,10 +67,10 @@ The test runner performs the following checks:
 2. Asserts that the HTTP status code is `200`.
 3. Asserts that the `Content-Type` response header contains `application/json`.
 4. Parses the response JSON as:
-   - `processed_orders: usize`
+   - `processedOrders: usize`
    - `results: map<string, int64>`
-   - `category_stats: map<string, int32>`
+   - `categoryStats: map<string, int32>`
 5. Asserts:
-   - `processed_orders` equals the expected number of completed orders.
+   - `processedOrders` equals the expected number of completed orders.
    - For each country in `["US", "DE", "FR", "UK", "JP"]`, `results[country]` equals the expected sum.
-   - For each category in `["Electronics", "Books", "Clothing", "Home"]`, `category_stats[category]` equals the expected count.
+   - For each category in `["Electronics", "Books", "Clothing", "Home"]`, `categoryStats[category]` equals the expected count.

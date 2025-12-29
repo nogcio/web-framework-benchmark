@@ -72,8 +72,8 @@ scenario = function(ctx)
     
     ctx:assert(type(body) == "table", "Response body is not a JSON object")
     
-    ctx:assert(body.processed_orders == expected_processed, 
-        string.format("processed_orders mismatch: expected %d, got %s", expected_processed, tostring(body.processed_orders)))
+    ctx:assert(body.processedOrders == expected_processed, 
+        string.format("processedOrders mismatch: expected %d, got %s", expected_processed, tostring(body.processedOrders)))
     
     ctx:assert(type(body.results) == "table", "body.results is not a table")
     for k, v in pairs(expected_results) do
@@ -81,9 +81,9 @@ scenario = function(ctx)
         ctx:assert(actual == v, string.format("results mismatch for %s: expected %d, got %d", k, v, actual))
     end
     
-    ctx:assert(type(body.category_stats) == "table", "body.category_stats is not a table")
+    ctx:assert(type(body.categoryStats) == "table", "body.categoryStats is not a table")
     for k, v in pairs(expected_category_stats) do
-        local actual = body.category_stats[k] or 0
-        ctx:assert(actual == v, string.format("category_stats mismatch for %s: expected %d, got %d", k, v, actual))
+        local actual = body.categoryStats[k] or 0
+        ctx:assert(actual == v, string.format("categoryStats mismatch for %s: expected %d, got %d", k, v, actual))
     end
 end

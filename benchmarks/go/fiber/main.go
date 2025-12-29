@@ -28,7 +28,9 @@ func main() {
 		dataDir = "benchmarks_data"
 	}
 
-	app.Static("/files", dataDir)
+	app.Static("/files", dataDir, fiber.Static{
+		ByteRange: true,
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {

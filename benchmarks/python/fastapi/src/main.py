@@ -24,26 +24,41 @@ async def hello_world():
 async def plaintext():
     return PlainTextResponse("Hello, World!")
 
-class Servlet(BaseModel):
-    servlet_name: str = Field(..., alias="servlet-name")
-    servlet_class: str = Field(..., alias="servlet-class")
-    init_param: Optional[Dict[str, Any]] = Field(None, alias="init-param")
+class OrderItem(BaseModel):
+    quantity: int
+    category: str
 
-class Taglib(BaseModel):
-    taglib_uri: str = Field(..., alias="taglib-uri")
-    taglib_location: str = Field(..., alias="taglib-location")
+class Order(BaseModel):
+    status: str
+    amount: int
+    country: str
+    items: Optional[List[OrderItem]] = None
 
-class WebApp(BaseModel):
-    servlet: List[Servlet]
-    servlet_mapping: Dict[str, str] = Field(..., alias="servlet-mapping")
-    taglib: Taglib
+class AggregateResponse(BaseModel):
+    processedOrders: int
+    results: Dict[str, int]
+    categoryStats: Dict[str, int]
 
-class WebAppPayload(BaseModel):
-    web_app: WebApp = Field(..., alias="web-app")
+@app.post("/json/aggregate", response_model=AggregateResponse)
+async def json_aggregate(orders: List[Order]):
+    processed_orders = 0
+    results: Dict[str, int] = {}
+    category_stats: Dict[str, int] = {}
 
-@app.post("/json/{from_val}/{to_val}", response_model=WebAppPayload, response_model_by_alias=True, response_model_exclude_none=True)
-async def json_serialization(from_val: str, to_val: str, payload: WebAppPayload):
-    for servlet in payload.web_app.servlet:
-        if servlet.servlet_name == from_val:
-            servlet.servlet_name = to_val
-    return payload
+    for order in orders:
+        if order.status == "completed":
+            processed_orders += 1
+            
+            # results: country -> amount
+            results[order.country] = results.get(order.country, 0) + order.amount
+            
+            # category_stats: category -> quantity
+            if order.items:
+                for item in order.items:
+                    category_stats[item.category] = category_stats.get(item.category, 0) + item.quantity
+
+    return AggregateResponse(
+        processedOrders=processed_orders,
+        results=results,
+        categoryStats=category_stats
+    )

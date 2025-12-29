@@ -46,6 +46,14 @@ impl BenchmarkContext {
         })
     }
 
+    pub fn vu_id(&self) -> u64 {
+        self.vu_id
+    }
+
+    pub fn stats(&self) -> &Arc<Stats> {
+        &self.stats
+    }
+
     pub fn flush_stats(&self) {
         let requests = self.local_stats.requests.swap(0, Ordering::Relaxed);
         let bytes_received = self.local_stats.bytes_received.swap(0, Ordering::Relaxed);

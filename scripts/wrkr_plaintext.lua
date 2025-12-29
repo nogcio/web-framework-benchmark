@@ -1,7 +1,7 @@
 function scenario(ctx)
   local res = ctx:get("/plaintext")
 
-  ctx:assert(res.status == 200, "unexpected status: " .. res.status)
+  ctx:assert(res:status() == 200, "unexpected status: " .. res:status())
   
   -- Zero-copy body check
   ctx:assert(res:check_body("Hello, World!"), "unexpected body")

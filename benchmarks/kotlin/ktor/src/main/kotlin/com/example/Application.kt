@@ -6,6 +6,8 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.autohead.*
+import io.ktor.server.plugins.partialcontent.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -21,6 +23,8 @@ fun main() {
 }
 
 fun Application.module() {
+    install(AutoHeadResponse)
+    install(PartialContent)
     install(ContentNegotiation) {
         json(Json {
             explicitNulls = false
@@ -42,53 +46,55 @@ fun Application.module() {
             call.respondText("Hello, World!")
         }
         
-        static("/files") {
-            staticRootFolder = File(System.getenv("DATA_DIR") ?: "benchmarks_data")
-            files(".")
+        staticFiles("/files", File(System.getenv("DATA_DIR") ?: "benchmarks_data")) {
+            contentType { file ->
+                if (file.extension == "bin") {
+                    ContentType.Application.OctetStream
+                } else {
+                    null
+                }
+            }
         }
 
-        post("/json/{from}/{to}") {
-            val fromVal = call.parameters["from"]
-            val toVal = call.parameters["to"]
-            val root = call.receive<Root>()
-            val newRoot = if (fromVal != null && toVal != null) {
-                val newServlets = root.webApp.servlet.map { servlet ->
-                    if (servlet.servletName == fromVal) {
-                        servlet.copy(servletName = toVal)
-                    } else {
-                        servlet
+        post("/json/aggregate") {
+            val orders = call.receive<List<Order>>()
+            var processedOrders = 0
+            val results = mutableMapOf<String, Long>()
+            val categoryStats = mutableMapOf<String, Int>()
+
+            for (order in orders) {
+                if (order.status == "completed") {
+                    processedOrders++
+                    results[order.country] = (results[order.country] ?: 0L) + order.amount
+                    
+                    order.items?.forEach { item ->
+                        categoryStats[item.category] = (categoryStats[item.category] ?: 0) + item.quantity
                     }
                 }
-                root.copy(webApp = root.webApp.copy(servlet = newServlets))
-            } else {
-                root
             }
-            call.respond(newRoot)
+
+            call.respond(AggregateResponse(processedOrders, results, categoryStats))
         }
     }
 }
 
 @Serializable
-data class Root(
-    @SerialName("web-app") val webApp: WebApp
+data class Order(
+    val status: String,
+    val amount: Long,
+    val country: String,
+    val items: List<OrderItem>? = null
 )
 
 @Serializable
-data class WebApp(
-    val servlet: List<Servlet>,
-    @SerialName("servlet-mapping") val servletMapping: Map<String, String>,
-    val taglib: Taglib
+data class OrderItem(
+    val quantity: Int,
+    val category: String
 )
 
 @Serializable
-data class Servlet(
-    @SerialName("servlet-name") val servletName: String,
-    @SerialName("servlet-class") val servletClass: String,
-    @SerialName("init-param") val initParam: JsonObject? = null
-)
-
-@Serializable
-data class Taglib(
-    @SerialName("taglib-uri") val taglibUri: String,
-    @SerialName("taglib-location") val taglibLocation: String
+data class AggregateResponse(
+    @SerialName("processedOrders") val processedOrders: Int,
+    val results: Map<String, Long>,
+    @SerialName("categoryStats") val categoryStats: Map<String, Int>
 )

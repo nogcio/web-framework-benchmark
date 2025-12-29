@@ -28,23 +28,32 @@ func main() {
 		c.String(http.StatusOK, "Hello, World!")
 	})
 
-	r.POST("/json/:from/:to", func(c *gin.Context) {
-		from := c.Param("from")
-		to := c.Param("to")
-
-		var body Root
-		if err := c.ShouldBindJSON(&body); err != nil {
+	r.POST("/json/aggregate", func(c *gin.Context) {
+		var orders []Order
+		if err := c.ShouldBindJSON(&orders); err != nil {
 			c.Status(http.StatusBadRequest)
 			return
 		}
 
-		for i := range body.WebApp.Servlet {
-			if body.WebApp.Servlet[i].ServletName == from {
-				body.WebApp.Servlet[i].ServletName = to
+		processedOrders := 0
+		results := make(map[string]int64)
+		categoryStats := make(map[string]int32)
+
+		for _, order := range orders {
+			if order.Status == "completed" {
+				processedOrders++
+				results[order.Country] += order.Amount
+				for _, item := range order.Items {
+					categoryStats[item.Category] += item.Quantity
+				}
 			}
 		}
 
-		c.JSON(http.StatusOK, body)
+		c.JSON(http.StatusOK, gin.H{
+			"processedOrders": processedOrders,
+			"results":         results,
+			"categoryStats":   categoryStats,
+		})
 	})
 
 	dataDir := os.Getenv("DATA_DIR")
@@ -61,23 +70,14 @@ func main() {
 	r.Run(":" + port)
 }
 
-type Root struct {
-	WebApp WebApp `json:"web-app"`
+type Order struct {
+	Status  string      `json:"status"`
+	Amount  int64       `json:"amount"`
+	Country string      `json:"country"`
+	Items   []OrderItem `json:"items"`
 }
 
-type WebApp struct {
-	Servlet        []Servlet         `json:"servlet"`
-	ServletMapping map[string]string `json:"servlet-mapping"`
-	Taglib         Taglib            `json:"taglib"`
-}
-
-type Servlet struct {
-	ServletName  string                 `json:"servlet-name"`
-	ServletClass string                 `json:"servlet-class"`
-	InitParam    map[string]interface{} `json:"init-param,omitempty"`
-}
-
-type Taglib struct {
-	TaglibURI      string `json:"taglib-uri"`
-	TaglibLocation string `json:"taglib-location"`
+type OrderItem struct {
+	Quantity int32  `json:"quantity"`
+	Category string `json:"category"`
 }

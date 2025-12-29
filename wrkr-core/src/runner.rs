@@ -1,12 +1,17 @@
 use crate::stats::StatsSnapshot;
-use crate::{BenchmarkConfig, WrkConfig, error::*, stats::Stats, lua_env::create_lua_env};
+use crate::{BenchmarkConfig, WrkConfig, error::*, stats::Stats, lua_env::{create_lua_env, BenchmarkContext}};
 use std::sync::Arc;
 use reqwest::redirect::Policy;
 use tokio::time::{sleep, Instant, Duration};
 use tokio::task::JoinSet;
-use mlua::Function;
+use mlua::{Function, Lua};
 use std::sync::atomic::{AtomicU64, Ordering};
 use reqwest::Client;
+
+struct PreparedVu {
+    lua: Lua,
+    ctx: BenchmarkContext,
+}
 
 enum ExecutionMode {
     Duration(Instant),
@@ -31,16 +36,52 @@ fn build_client(timeout: Duration) -> Result<Client> {
         .map_err(|e| Error::Other(format!("Failed to build HTTP client: {}", e)))
 }
 
+async fn prepare_vu_env(config: &WrkConfig, stats: Arc<Stats>, vu_id: u64, client: Client) -> Result<PreparedVu> {
+    let (lua, ctx) = create_lua_env(client, config.host_url.clone(), stats, vu_id)?;
+    lua.load(&config.script_content).exec_async().await?;
+    
+    lua.set_named_registry_value("ctx_vars", lua.create_table()?)?;
+
+    if let Ok(setup) = lua.globals().get::<Function>("setup") {
+        setup.call_async::<()>(ctx.clone()).await?;
+    }
+    Ok(PreparedVu { lua, ctx })
+}
+
 pub async fn run_benchmark<F>(config: BenchmarkConfig, mut on_progress: Option<F>) -> Result<StatsSnapshot> 
 where F: FnMut(StatsSnapshot) + Send + 'static
 {
     let stats = Arc::new(Stats::new());
     let mut set = JoinSet::new();
 
+    // Pre-create VUs
+    let max_connections = if let Some(steps) = &config.step_connections {
+        if steps.is_empty() { 
+            config.connections.max(config.start_connections)
+        } else { 
+            *steps.iter().max().unwrap_or(&0) 
+        }
+    } else {
+        config.connections.max(config.start_connections)
+    };
+    
+    let mut prepared_vus = Vec::with_capacity(max_connections as usize);
+    let timeout = config.timeout.unwrap_or(Duration::from_secs(10));
+    
+    // println!("Pre-allocating {} Lua environments...", max_connections);
+    for i in 0..max_connections {
+        let client = build_client(timeout)?;
+        let vu = prepare_vu_env(&config.wrk, stats.clone(), i + 1, client).await?;
+        prepared_vus.push(vu);
+    }
+    // println!("Pre-allocation complete.");
+    // Reverse to pop from end (efficient)
+    prepared_vus.reverse();
+
     let start_time = Instant::now();
     let end_time = start_time + config.duration;
     let mut current_connections = 0;
-    let vu_counter = Arc::new(AtomicU64::new(1));
+    // let vu_counter = Arc::new(AtomicU64::new(1));
     let mut rps_samples = Vec::new();
     let mut last_requests = 0;
     let mut last_sample_time = start_time;
@@ -124,24 +165,19 @@ where F: FnMut(StatsSnapshot) + Send + 'static
         
         if current_connections < target_connections {
             let to_spawn = target_connections - current_connections;
-            let timeout = config.timeout.unwrap_or(Duration::from_secs(10));
             for _ in 0..to_spawn {
-                let stats = stats.clone();
-                let wrk_config = config.wrk.clone();
-                let vu_id = vu_counter.fetch_add(1, Ordering::Relaxed);                
-                set.spawn(async move {
-                    stats.inc_connections();
-                    let client = match build_client(timeout) {
-                        Ok(c) => c,
-                        Err(e) => {
-                            eprintln!("Failed to create client for VU {}: {}", vu_id, e);
-                            return;
+                if let Some(prepared) = prepared_vus.pop() {
+                    let stats = stats.clone();
+                    let vu_id = prepared.ctx.vu_id();
+                    set.spawn(async move {
+                        stats.inc_connections();
+                        if let Err(e) = run_vu(prepared, ExecutionMode::Duration(end_time)).await {
+                            eprintln!("VU {} failed: {}", vu_id, e);
                         }
-                    };
-                    if let Err(e) = run_vu(wrk_config, stats.clone(), ExecutionMode::Duration(end_time), vu_id, client).await {
-                        eprintln!("VU {} failed: {}", vu_id, e);
-                    }
-                });
+                    });
+                } else {
+                    eprintln!("Warning: Not enough prepared VUs for target connections {}", target_connections);
+                }
             }
             current_connections += to_spawn;
         }
@@ -179,21 +215,15 @@ pub async fn run_once(config: WrkConfig) -> Result<StatsSnapshot> {
 
     let client = build_client(Duration::from_secs(10))?;
 
-    run_vu(config.clone(), stats.clone(), ExecutionMode::Once, 1, client).await?;
+    let prepared = prepare_vu_env(&config, stats.clone(), 1, client).await?;
+    run_vu(prepared, ExecutionMode::Once).await?;
     
     let elapsed = start.elapsed();
     Ok(stats.snapshot(elapsed, elapsed, Vec::new()))
 }
 
-async fn run_vu(config: WrkConfig, stats: Arc<Stats>, mode: ExecutionMode, vu_id: u64, client: Client) -> Result<()> {
-    let (lua, ctx_ud) = create_lua_env(client, config.host_url.clone(), stats.clone(), vu_id)?;
-    lua.load(&config.script_content).exec_async().await?;
-    
-    lua.set_named_registry_value("ctx_vars", lua.create_table()?)?;
-
-    if let Ok(setup) = lua.globals().get::<Function>("setup") {
-        setup.call_async::<()>(ctx_ud.clone()).await?;
-    }
+async fn run_vu(prepared: PreparedVu, mode: ExecutionMode) -> Result<()> {
+    let PreparedVu { lua, ctx: ctx_ud } = prepared;
     
     let scenario_func: Function = match lua.globals().get("scenario") {
         Ok(f) => f,
@@ -232,7 +262,7 @@ async fn run_vu(config: WrkConfig, stats: Arc<Stats>, mode: ExecutionMode, vu_id
                 };
                 
                 let clean_msg = clean_msg.trim_start_matches("runtime error: ").to_string();
-                stats.record_error(clean_msg);
+                ctx_ud.stats().record_error(clean_msg);
             }
         }
 

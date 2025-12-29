@@ -39,6 +39,37 @@ if (cluster.isMaster) {
     res.type('text/plain').send('Hello, World!');
   });
 
+  app.post('/json/aggregate', express.json({ limit: '50mb' }), (req, res) => {
+    const orders = req.body;
+    let processed_orders = 0;
+    const results = {};
+    const category_stats = {};
+
+    if (Array.isArray(orders)) {
+      for (const order of orders) {
+        if (order.status === 'completed') {
+          processed_orders++;
+
+          // results: country -> amount
+          results[order.country] = (results[order.country] || 0) + order.amount;
+
+          // category_stats: category -> quantity
+          if (Array.isArray(order.items)) {
+            for (const item of order.items) {
+              category_stats[item.category] = (category_stats[item.category] || 0) + item.quantity;
+            }
+          }
+        }
+      }
+    }
+
+    res.json({
+      processedOrders: processed_orders,
+      results,
+      categoryStats: category_stats
+    });
+  });
+
   const port = parseInt(process.env.PORT || '8080');
   app.listen(port, '0.0.0.0', () => {
     console.log(`Worker ${process.pid} listening on port ${port}`);

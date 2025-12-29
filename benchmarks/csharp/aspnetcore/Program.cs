@@ -19,7 +19,7 @@ var app = builder.Build();
 
 var jsonOptions = new JsonSerializerOptions
 {
-    PropertyNameCaseInsensitive = false,
+    PropertyNameCaseInsensitive = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never
 };
 
@@ -42,15 +42,45 @@ app.MapGet("/health", async (HttpContext ctx) =>
     return Results.Text("OK");
 });
 
-app.MapPost("/json/{from}/{to}", async (string from, string to, HttpRequest request) =>
+app.MapPost("/json/aggregate", async (HttpRequest request) =>
 {
     try
     {
-        var payload = await JsonSerializer.DeserializeAsync<WebAppPayload>(request.Body, jsonOptions);
-        if (payload == null) return Results.BadRequest();
+        var orders = await JsonSerializer.DeserializeAsync<List<Order>>(request.Body, jsonOptions);
+        if (orders == null) return Results.BadRequest();
 
-        ReplaceServletNames(payload, from, to);
-        return Results.Json(payload, jsonOptions);
+        var processedOrders = 0;
+        var results = new Dictionary<string, long>();
+        var categoryStats = new Dictionary<string, int>();
+
+        foreach (var order in orders)
+        {
+            if (order.Status == "completed")
+            {
+                processedOrders++;
+
+                if (!results.ContainsKey(order.Country))
+                    results[order.Country] = 0;
+                results[order.Country] += order.Amount;
+
+                if (order.Items != null)
+                {
+                    foreach (var item in order.Items)
+                    {
+                        if (!categoryStats.ContainsKey(item.Category))
+                            categoryStats[item.Category] = 0;
+                        categoryStats[item.Category] += item.Quantity;
+                    }
+                }
+            }
+        }
+
+        return Results.Json(new AggregateResponse
+        {
+            ProcessedOrders = processedOrders,
+            Results = results,
+            CategoryStats = categoryStats
+        }, jsonOptions);
     }
     catch
     {
@@ -58,45 +88,30 @@ app.MapPost("/json/{from}/{to}", async (string from, string to, HttpRequest requ
     }
 });
 
-void ReplaceServletNames(WebAppPayload payload, string from, string to)
-{
-    var servlets = payload.WebApp?.Servlets;
-    if (servlets == null) return;
-
-    foreach (var servlet in servlets)
-    {
-        if (string.Equals(servlet.ServletName, from, StringComparison.Ordinal))
-        {
-            servlet.ServletName = to;
-        }
-    }
-}
-
 app.Run($"http://0.0.0.0:{port}");
 
-class WebAppPayload
+class Order
 {
-    [JsonPropertyName("web-app")]
-    public WebAppSection? WebApp { get; set; }
-
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; set; }
+    public string Status { get; set; } = "";
+    public long Amount { get; set; }
+    public string Country { get; set; } = "";
+    public List<OrderItem>? Items { get; set; }
 }
 
-class WebAppSection
+class OrderItem
 {
-    [JsonPropertyName("servlet")]
-    public List<ServletConfig>? Servlets { get; set; }
-
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; set; }
+    public int Quantity { get; set; }
+    public string Category { get; set; } = "";
 }
 
-class ServletConfig
+class AggregateResponse
 {
-    [JsonPropertyName("servlet-name")]
-    public string? ServletName { get; set; }
+    [JsonPropertyName("processedOrders")]
+    public int ProcessedOrders { get; set; }
 
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; set; }
+    [JsonPropertyName("results")]
+    public Dictionary<string, long> Results { get; set; } = new();
+
+    [JsonPropertyName("categoryStats")]
+    public Dictionary<string, int> CategoryStats { get; set; } = new();
 }

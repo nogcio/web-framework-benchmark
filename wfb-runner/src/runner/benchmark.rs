@@ -172,6 +172,8 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             // Cleanup before running actual benchmarks to ensure clean state for each test
             self.cleanup(benchmark, &pb).await?;
 
+            pb.set_message("benchmarks running...");
+
             // Run tests via wrkr in docker
             self.run_tests_docker(benchmark, mb).await?;
     
@@ -237,14 +239,13 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     .unwrap(),
             );
             
-            let script_path = match test {
-                BenchmarkTests::PlainText => consts::SCRIPT_PLAINTEXT,
-                BenchmarkTests::JsonAggregate => consts::SCRIPT_JSON,
-                BenchmarkTests::StaticFiles => consts::SCRIPT_STATIC,
+            let (script_path, step_connections) = match test {
+                BenchmarkTests::PlainText => (consts::SCRIPT_PLAINTEXT, consts::BENCHMARK_STEP_CONNECTIONS_PLAINTEXT),
+                BenchmarkTests::JsonAggregate => (consts::SCRIPT_JSON, consts::BENCHMARK_STEP_CONNECTIONS_JSON),
+                BenchmarkTests::StaticFiles => (consts::SCRIPT_STATIC, consts::BENCHMARK_STEP_CONNECTIONS_STATIC),
             };
             
             let duration = format!("{}", consts::BENCHMARK_DURATION_PER_TEST_SECS);
-            let step_connections = consts::BENCHMARK_STEP_CONNECTIONS;
             let step_duration = format!("{}", consts::BENCHMARK_STEP_DURATION_SECS);
 
             let memory_usage = std::sync::Arc::new(std::sync::Mutex::new(0u64));

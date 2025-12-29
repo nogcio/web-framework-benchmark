@@ -45,7 +45,6 @@ impl Response {
 
 impl UserData for Response {
     fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("status", |_, this| Ok(this.status));
         fields.add_field_method_get("bytes", |_, this| Ok(this.body.to_vec()));
         
         fields.add_field_method_get("headers", |lua, this| {
@@ -60,6 +59,8 @@ impl UserData for Response {
     }
 
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("status", |_, this, ()| Ok(this.status));
+
         methods.add_method("header", |_, this, name: String| {
             if let Some(Ok(s)) = this.headers.get(&name).map(|val| val.to_str()) {
                 return Ok(Some(s.to_string()));

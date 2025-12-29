@@ -7,6 +7,7 @@ framework: nginx
 framework_version: "1.29.4"
 tests:
   - plain_text
+  - static_files
 tags:
   platform: nginx
 path: benchmarks/c/nginx
@@ -33,6 +34,7 @@ framework: fiber
 framework_version: "2.52.10"
 tests:
   - plain_text
+  - static_files
 tags:
   platform: fiber
 path: benchmarks/go/fiber
@@ -46,6 +48,8 @@ framework: gin
 framework_version: "1.11.0"
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: gin
 path: benchmarks/go/gin
@@ -59,6 +63,8 @@ framework: fastapi
 framework_version: "0.127.0"
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: fastapi
 path: benchmarks/python/fastapi
@@ -72,6 +78,8 @@ framework: axum
 framework_version: "0.8.8"
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: axum
 path: benchmarks/rust/axum
@@ -85,6 +93,7 @@ framework: actix-web
 framework_version: "4.12.1"
 tests:
   - plain_text
+  - static_files  
 tags:
   platform: actix-web
 path: benchmarks/rust/actix-web
@@ -98,6 +107,8 @@ framework: express
 framework_version: "5.2.1"
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: express
 path: benchmarks/javascript/express
@@ -111,6 +122,8 @@ framework: fastify
 framework_version: "5.6.2"
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: fastify
 path: benchmarks/javascript/fastify
@@ -124,6 +137,8 @@ framework: aspnetcore
 framework_version: "10.0"
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: aspnetcore
 path: benchmarks/csharp/aspnetcore
@@ -138,6 +153,8 @@ framework_version: "4.0.1"
 database: postgres
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: spring-boot
 path: benchmarks/java/spring-boot-jpa-postgres
@@ -151,6 +168,8 @@ framework: ktor
 framework_version: "3.3.3"
 tests:
   - plain_text
+  - static_files
+  - json_aggregate
 tags:
   platform: ktor
 path: benchmarks/kotlin/ktor
@@ -164,6 +183,7 @@ framework: hono
 framework_version: "4.11.2"
 tests:
   - plain_text
+  - json_aggregate
 tags:
   platform: hono
 path: benchmarks/javascript/hono
@@ -203,6 +223,7 @@ framework: caddy
 framework_version: "2.10.2"
 tests:
   - plain_text
+  - static_files
 tags:
   platform: caddy
 path: benchmarks/go/caddy
@@ -216,6 +237,7 @@ framework: openresty
 framework_version: "1.27.1.2"
 tests:
   - plain_text
+  - json_aggregate
 tags:
   platform: openresty
 path: benchmarks/lua/nginx

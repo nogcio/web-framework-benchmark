@@ -38,26 +38,56 @@ if (process.env.BUN_WORKER_ID === undefined) {
 
   // Static files
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'benchmarks_data')
+
+  app.on('HEAD', '/files/*', async (c) => {
+    const filePath = c.req.path.replace(/^\/files\//, '')
+    const file = Bun.file(path.join(dataDir, filePath))
+    if (await file.exists()) {
+      return new Response(file, {
+        status: 200,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream'
+        }
+      })
+    }
+    return c.notFound()
+  })
+
   app.use('/files/*', serveStatic({
     root: dataDir,
     rewriteRequestPath: (path) => path.replace(/^\/files/, '')
   }))
 
-  // JSON
-  app.post('/json/:from/:to', async (c) => {
-    const from = c.req.param('from')
-    const to = c.req.param('to')
-    const body = await c.req.json()
+  // JSON Aggregation
+  app.post('/json/aggregate', async (c) => {
+    const orders = await c.req.json()
+    let processedOrders = 0
+    const results: Record<string, number> = {}
+    const categoryStats: Record<string, number> = {}
 
-    // @ts-ignore
-    const servlets = body['web-app']['servlet']
-    for (let i = 0; i < servlets.length; i++) {
-      if (servlets[i]['servlet-name'] === from) {
-        servlets[i]['servlet-name'] = to
+    if (Array.isArray(orders)) {
+      for (const order of orders) {
+        if (order.status === 'completed') {
+          processedOrders++
+
+          // results: country -> amount
+          results[order.country] = (results[order.country] || 0) + order.amount
+
+          // categoryStats: category -> quantity
+          if (Array.isArray(order.items)) {
+            for (const item of order.items) {
+              categoryStats[item.category] = (categoryStats[item.category] || 0) + item.quantity
+            }
+          }
+        }
       }
     }
 
-    return c.json(body)
+    return c.json({
+      processedOrders,
+      results,
+      categoryStats
+    })
   })
 
   const port = parseInt(process.env.PORT || '8080')

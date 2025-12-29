@@ -25,7 +25,7 @@ scenario = function(ctx)
         ctx:assert(cl == file.size, string.format("GET %s: Content-Length mismatch: expected %d, got %s", file.name, file.size, tostring(cl)))
         
         local ct = resp:header("content-type") or ""
-        ctx:assert(string.find(ct, "application/octet-stream"), string.format("GET %s: Content-Type mismatch: expected application/octet-stream, got %s", file.name, ct))
+        ctx:assert(string.find(ct, "application/octet-stream", 1, true), string.format("GET %s: Content-Type mismatch: expected application/octet-stream, got %s", file.name, ct))
         
         file_responses[file.name] = resp
 

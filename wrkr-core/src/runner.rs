@@ -28,7 +28,7 @@ fn build_client() -> Result<Client> {
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .no_proxy()
         .build()
-        .map_err(|e| Error::Other(e.to_string()))
+        .map_err(|e| Error::Other(format!("Failed to build HTTP client: {}", e)))
 }
 
 pub async fn run_benchmark<F>(config: BenchmarkConfig, mut on_progress: Option<F>) -> Result<StatsSnapshot> 
@@ -130,8 +130,16 @@ where F: FnMut(StatsSnapshot) + Send + 'static
                 let vu_id = vu_counter.fetch_add(1, Ordering::Relaxed);                
                 set.spawn(async move {
                     stats.inc_connections();
-                    let client = build_client().unwrap();
-                    run_vu(wrk_config, stats, ExecutionMode::Duration(end_time), vu_id, client).await.unwrap();
+                    let client = match build_client() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            eprintln!("Failed to create client for VU {}: {}", vu_id, e);
+                            return;
+                        }
+                    };
+                    if let Err(e) = run_vu(wrk_config, stats.clone(), ExecutionMode::Duration(end_time), vu_id, client).await {
+                        eprintln!("VU {} failed: {}", vu_id, e);
+                    }
                 });
             }
             current_connections += to_spawn;

@@ -158,30 +158,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                      latency_distribution.push((*percent, p.latency_histogram.value_at_quantile(*percent as f64 / 100.0)));
                 }
                 
-                let json_stats = JsonStats {
-                    elapsed_secs: p.elapsed.as_secs(),
-                    connections: p.connections,
-                    requests_per_sec: rps,
-                    bytes_per_sec: tps,
-                    total_requests: p.total_requests,
-                    total_bytes: p.total_bytes_received,
-                    total_errors: p.total_errors,
-                    latency_mean: lat_mean,
-                    latency_stdev: lat_stdev,
-                    latency_max: p.latency_histogram.max(),
-                    latency_p50: p.latency_histogram.value_at_quantile(0.50),
-                    latency_p75: p.latency_histogram.value_at_quantile(0.75),
-                    latency_p90: p.latency_histogram.value_at_quantile(0.90),
-                    latency_p99: p.latency_histogram.value_at_quantile(0.99),
-                    latency_stdev_pct: lat_stdev_pct,
-                    latency_distribution,
-                    errors: p.errors,
-                    req_per_sec_avg: rps_mean,
-                    req_per_sec_stdev: rps_stdev,
-                    req_per_sec_max: rps_max,
-                    req_per_sec_stdev_pct: rps_stdev_pct,
-                };
-                println!("{}", serde_json::to_string(&json_stats).unwrap());
+                // Skip output if no requests have been made yet (avoids empty first line)
+                if p.total_requests > 0 {
+                    let json_stats = JsonStats {
+                        elapsed_secs: p.elapsed.as_secs(),
+                        connections: p.connections,
+                        requests_per_sec: rps,
+                        bytes_per_sec: tps,
+                        total_requests: p.total_requests,
+                        total_bytes: p.total_bytes_received,
+                        total_errors: p.total_errors,
+                        latency_mean: lat_mean,
+                        latency_stdev: lat_stdev,
+                        latency_max: p.latency_histogram.max(),
+                        latency_p50: p.latency_histogram.value_at_quantile(0.50),
+                        latency_p75: p.latency_histogram.value_at_quantile(0.75),
+                        latency_p90: p.latency_histogram.value_at_quantile(0.90),
+                        latency_p99: p.latency_histogram.value_at_quantile(0.99),
+                        latency_stdev_pct: lat_stdev_pct,
+                        latency_distribution,
+                        errors: p.errors,
+                        req_per_sec_avg: rps_mean,
+                        req_per_sec_stdev: rps_stdev,
+                        req_per_sec_max: rps_max,
+                        req_per_sec_stdev_pct: rps_stdev_pct,
+                    };
+                    println!("{}", serde_json::to_string(&json_stats).unwrap());
+                }
             }
         }
     })).await?;

@@ -148,8 +148,33 @@ async fn main() -> Result<(), anyhow::Error> {
             }
             pb.finish_with_message("Done");
         }
-        cli::Commands::Verify { env } => {
-            let benchmarks = config.get_benchmarks();
+        cli::Commands::Verify { env, benchmark, testcase } => {
+            let mut benchmarks = config.get_benchmarks().into_iter().cloned().collect::<Vec<_>>();
+            
+            // Filter by benchmark name if specified
+            if let Some(ref benchmark_name) = benchmark {
+                benchmarks.retain(|b| b.name == *benchmark_name);
+                if benchmarks.is_empty() {
+                    eprintln!("No benchmark found with name: {}", benchmark_name);
+                    return Ok(());
+                }
+            }
+            
+            // Filter by test case if specified
+            if let Some(ref tc) = testcase {
+                let tc = match tc.to_lowercase().as_str() {
+                    "plaintext" => wfb_storage::BenchmarkTests::PlainText,
+                    "json_aggregate" => wfb_storage::BenchmarkTests::JsonAggregate,
+                    "static_files" => wfb_storage::BenchmarkTests::StaticFiles,
+                    _ => {
+                        eprintln!("Unknown testcase: {}", tc);
+                        return Ok(());
+                    }
+                };
+                for b in &mut benchmarks {
+                    b.tests.retain(|test| *test == tc);
+                }
+            }
 
             let env_config = config.get_environment(&env)
                 .ok_or_else(|| anyhow::anyhow!("Environment '{}' not found in config", env))?.clone();
@@ -227,7 +252,7 @@ async fn main() -> Result<(), anyhow::Error> {
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message("Verifying benchmarks...");
 
-            for b in benchmarks {
+            for b in &benchmarks {
                 pb.set_message(format!("{} verifying", b.name));
                 let _ = runner.verify_benchmark(b, &m).await;
                 pb.inc(1);

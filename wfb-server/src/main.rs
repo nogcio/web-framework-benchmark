@@ -6,7 +6,8 @@ use axum::{
     Router,
     body::Body,
 };
-use std::sync::Arc;
+use tracing::info;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
@@ -18,6 +19,9 @@ use wfb_storage::{Config, Storage, BenchmarkTests};
 
 mod api_models;
 use api_models::*;
+
+mod file_watcher;
+use file_watcher::{FileWatcherService, FileChangeEvent};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -32,19 +36,67 @@ struct Args {
 }
 
 struct AppState {
-    storage: Storage,
-    config: Config,
+    storage: Arc<Storage>,
+    config: Arc<RwLock<Config>>,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_level(true)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+        )
+        .init();
     let args = Args::parse();
 
-    let storage = Storage::new("./data")?;
-    let config = Config::load(&std::path::PathBuf::from("./config"))?;
+    let data_path = std::path::PathBuf::from("./data");
+    let config_path = std::path::PathBuf::from("./config");
 
-    let state = Arc::new(AppState { storage, config });
+    let storage = Arc::new(Storage::new(&data_path)?);
+    let config = Arc::new(RwLock::new(Config::load(&config_path)?));
+
+    let state = Arc::new(AppState { 
+        storage: storage.clone(), 
+        config: config.clone(),
+    });
+
+    let (mut watcher, mut rx) = FileWatcherService::new(&config_path, &data_path)?;
+    watcher.watch(&config_path)?;
+    watcher.watch(&data_path)?;
+
+    let storage_clone = storage.clone();
+    let config_clone = config.clone();
+    let config_path_clone = config_path.clone();
+    tokio::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            match event {
+                FileChangeEvent::ConfigChanged => {
+                    tracing::info!("Config changed, reloading...");
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                    
+                    let mut config_guard = config_clone.write().unwrap();
+                    if let Err(e) = config_guard.reload(&config_path_clone) {
+                        tracing::error!("Failed to reload config: {}", e);
+                    } else {
+                        tracing::info!("Config reloaded successfully");
+                    }
+                }
+                FileChangeEvent::DataChanged => {
+                    tracing::info!("Data changed, reloading...");
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                    
+                    if let Err(e) = storage_clone.reload() {
+                        tracing::error!("Failed to reload data: {}", e);
+                    } else {
+                        tracing::info!("Data reloaded successfully");
+                    }
+                }
+            }
+        }
+    });
 
     let app = Router::new()
         .route("/api/tags", get(get_tags))
@@ -75,7 +127,7 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = format!("{}:{}", args.host, args.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    println!("Listening on {}", listener.local_addr()?);
+    info!("Listening on {}", listener.local_addr()?);
     axum::serve(listener, app).await?;
 
     Ok(())
@@ -88,8 +140,9 @@ async fn get_version() -> Json<VersionInfo> {
 }
 
 async fn get_tags(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
+    let config = state.config.read().unwrap();
     let mut tags = std::collections::HashSet::new();
-    for b in state.config.benchmarks() {
+    for b in config.benchmarks() {
         for key in b.tags.keys() {
             tags.insert(key.clone());
         }
@@ -100,7 +153,8 @@ async fn get_tags(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
 }
 
 async fn get_environments(State(state): State<Arc<AppState>>) -> Json<Vec<EnvironmentInfo>> {
-    let envs = state.config.environments().iter().map(|e| {
+    let config = state.config.read().unwrap();
+    let envs = config.environments().iter().map(|e| {
         EnvironmentInfo {
             name: e.name().to_string(),
             display_name: e.title().to_string(),
@@ -136,7 +190,8 @@ async fn get_tests() -> Json<Vec<TestInfo>> {
 }
 
 async fn get_languages(State(state): State<Arc<AppState>>) -> Json<Vec<LanguageInfo>> {
-    let langs = state.config.languages().iter().map(|l| LanguageInfo {
+    let config = state.config.read().unwrap();
+    let langs = config.languages().iter().map(|l| LanguageInfo {
         name: l.name.clone(),
         url: l.url.clone(),
         color: l.color.clone(),
@@ -145,7 +200,8 @@ async fn get_languages(State(state): State<Arc<AppState>>) -> Json<Vec<LanguageI
 }
 
 async fn get_frameworks(State(state): State<Arc<AppState>>) -> Json<Vec<FrameworkInfo>> {
-    let frameworks = state.config.frameworks().iter().map(|f| FrameworkInfo {
+    let config = state.config.read().unwrap();
+    let frameworks = config.frameworks().iter().map(|f| FrameworkInfo {
         language: f.language.clone(),
         name: f.name.clone(),
         url: f.url.clone(),
@@ -154,7 +210,8 @@ async fn get_frameworks(State(state): State<Arc<AppState>>) -> Json<Vec<Framewor
 }
 
 async fn get_benchmarks(State(state): State<Arc<AppState>>) -> Json<Vec<BenchmarkInfo>> {
-    let benchmarks = state.config.benchmarks().iter().map(|b| BenchmarkInfo {
+    let config = state.config.read().unwrap();
+    let benchmarks = config.benchmarks().iter().map(|b| BenchmarkInfo {
         name: b.name.clone(),
         language: b.language.clone(),
         language_version: b.language_version.clone(),

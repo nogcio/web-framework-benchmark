@@ -154,4 +154,10 @@ impl Config {
     pub fn get_lang(&self, name: &str) -> Option<&Lang> {
         self.inner.langs.iter().find(|l| l.name == name)
     }
+
+    pub fn reload(&mut self, dir: &PathBuf) -> Result<()> {
+        let new_config = Self::load(dir)?;
+        self.inner = new_config.inner;
+        Ok(())
+    }
 }

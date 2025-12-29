@@ -249,4 +249,16 @@ impl Storage {
         }
         false
     }
+
+    pub fn reload(&self) -> Result<()> {
+        let (new_data, new_runs) = Self::load_all(&self.base_path)?;
+        
+        let mut data = self.data.write().unwrap();
+        *data = new_data;
+        
+        let mut runs = self.runs.write().unwrap();
+        *runs = new_runs;
+        
+        Ok(())
+    }
 }

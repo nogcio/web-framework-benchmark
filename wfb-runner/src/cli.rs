@@ -34,5 +34,13 @@ pub enum Commands {
     Verify {
         /// Environment to use
         env: String,
+
+        /// Filter by specific benchmark name
+        #[arg(short, long)]
+        benchmark: Option<String>,
+
+        /// Filter by specific test case (plaintext, json_aggregate, static_files)
+        #[arg(short, long)]
+        testcase: Option<String>,
     },
 }

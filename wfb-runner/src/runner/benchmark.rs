@@ -344,30 +344,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
             let final_memory_usage = *memory_usage.lock().unwrap();
 
-            if let Some(last_stat) = raw_data.last().cloned() {
-                 let summary = wfb_storage::TestCaseSummary {
-                    requests_per_sec: last_stat.requests_per_sec,
-                    bytes_per_sec: last_stat.bytes_per_sec,
-                    total_requests: last_stat.total_requests,
-                    total_bytes: last_stat.total_bytes,
-                    total_errors: last_stat.total_errors,
-                    latency_mean: last_stat.latency_mean,
-                    latency_stdev: last_stat.latency_stdev,
-                    latency_max: last_stat.latency_max,
-                    latency_p50: last_stat.latency_p50,
-                    latency_p75: last_stat.latency_p75,
-                    latency_p90: last_stat.latency_p90,
-                    latency_p99: last_stat.latency_p99,
-                    latency_stdev_pct: last_stat.latency_stdev_pct,
-                    latency_distribution: last_stat.latency_distribution,
-                    errors: last_stat.errors,
-                    memory_usage_bytes: final_memory_usage,
-                    req_per_sec_avg: last_stat.req_per_sec_avg,
-                    req_per_sec_stdev: last_stat.req_per_sec_stdev,
-                    req_per_sec_max: last_stat.req_per_sec_max,
-                    req_per_sec_stdev_pct: last_stat.req_per_sec_stdev_pct,
-                };
-                
+            if let Some(summary) = find_max_stable_performance(&raw_data, final_memory_usage) {
                 let manifest = wfb_storage::BenchmarkManifest {
                     language_version: benchmark.language_version.clone(),
                     framework_version: benchmark.framework_version.clone(),
@@ -458,5 +435,112 @@ fn parse_docker_memory(s: &str) -> u64 {
         (num * multiplier) as u64
     } else {
         0
+    }
+}
+
+fn find_max_stable_performance(data: &[wfb_storage::TestCaseRaw], final_memory_usage: u64) -> Option<wfb_storage::TestCaseSummary> {
+    if data.is_empty() {
+        return None;
+    }
+
+    // Window size in seconds (samples)
+    let window_size = 5;
+    
+    if data.len() < window_size {
+        // Not enough data for window, fallback to max RPS
+        let best = data.iter().max_by(|a, b| a.requests_per_sec.partial_cmp(&b.requests_per_sec).unwrap())?;
+        let mut summary = raw_to_summary(best, final_memory_usage);
+        
+        // Use final cumulative values from the last sample
+        if let Some(last) = data.last() {
+            summary.total_requests = last.total_requests;
+            summary.total_bytes = last.total_bytes;
+            summary.total_errors = last.total_errors;
+            
+            // Calculate average bytes_per_sec from total bytes and elapsed time
+            summary.bytes_per_sec = if last.elapsed_secs > 0 {
+                last.total_bytes / last.elapsed_secs
+            } else {
+                0
+            };
+            
+            // Use final RPS statistics (these are cumulative stats over entire test)
+            summary.req_per_sec_avg = last.req_per_sec_avg;
+            summary.req_per_sec_stdev = last.req_per_sec_stdev;
+            summary.req_per_sec_max = last.req_per_sec_max;
+            summary.req_per_sec_stdev_pct = last.req_per_sec_stdev_pct;
+        }
+        // Use max latency across all samples
+        summary.latency_max = data.iter().map(|x| x.latency_max).max().unwrap_or(0);
+        
+        return Some(summary);
+    }
+
+    let mut best_window_avg_rps = 0.0;
+    let mut best_window_end_index = 0;
+
+    for i in window_size..=data.len() {
+        let window = &data[i-window_size..i];
+        let avg_rps: f64 = window.iter().map(|x| x.requests_per_sec).sum::<f64>() / window_size as f64;
+        
+        if avg_rps > best_window_avg_rps {
+            best_window_avg_rps = avg_rps;
+            best_window_end_index = i - 1; // Index of the last element in the window
+        }
+    }
+
+    // We take the sample at the end of the best window as the representative for latency etc.
+    // But we use the window's average RPS as the reported RPS.
+    let mut summary = raw_to_summary(&data[best_window_end_index], final_memory_usage);
+    summary.requests_per_sec = best_window_avg_rps;
+    
+    // FIX: Use final cumulative values from the last sample, not from the best window
+    if let Some(last) = data.last() {
+        summary.total_requests = last.total_requests;
+        summary.total_bytes = last.total_bytes;
+        summary.total_errors = last.total_errors;
+        
+        // Calculate average bytes_per_sec from total bytes and elapsed time
+        summary.bytes_per_sec = if last.elapsed_secs > 0 {
+            last.total_bytes / last.elapsed_secs
+        } else {
+            0
+        };
+        
+        // Use final RPS statistics (these are cumulative stats over entire test)
+        summary.req_per_sec_avg = last.req_per_sec_avg;
+        summary.req_per_sec_stdev = last.req_per_sec_stdev;
+        summary.req_per_sec_max = last.req_per_sec_max;
+        summary.req_per_sec_stdev_pct = last.req_per_sec_stdev_pct;
+    }
+    
+    // Use the maximum latency observed across the entire test
+    summary.latency_max = data.iter().map(|x| x.latency_max).max().unwrap_or(summary.latency_max);
+    
+    Some(summary)
+}
+
+fn raw_to_summary(raw: &wfb_storage::TestCaseRaw, memory_usage: u64) -> wfb_storage::TestCaseSummary {
+    wfb_storage::TestCaseSummary {
+        requests_per_sec: raw.requests_per_sec,
+        bytes_per_sec: raw.bytes_per_sec,
+        total_requests: raw.total_requests,
+        total_bytes: raw.total_bytes,
+        total_errors: raw.total_errors,
+        latency_mean: raw.latency_mean,
+        latency_stdev: raw.latency_stdev,
+        latency_max: raw.latency_max,
+        latency_p50: raw.latency_p50,
+        latency_p75: raw.latency_p75,
+        latency_p90: raw.latency_p90,
+        latency_p99: raw.latency_p99,
+        latency_stdev_pct: raw.latency_stdev_pct,
+        latency_distribution: raw.latency_distribution.clone(),
+        errors: raw.errors.clone(),
+        memory_usage_bytes: memory_usage,
+        req_per_sec_avg: raw.req_per_sec_avg,
+        req_per_sec_stdev: raw.req_per_sec_stdev,
+        req_per_sec_max: raw.req_per_sec_max,
+        req_per_sec_stdev_pct: raw.req_per_sec_stdev_pct,
     }
 }

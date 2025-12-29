@@ -1,6 +1,6 @@
-pub const BENCHMARK_DURATION_PER_TEST_SECS: u64 = 60 * 3;
+pub const BENCHMARK_DURATION_PER_TEST_SECS: u64 = 60 * 4;
 pub const BENCHMARK_STEP_CONNECTIONS: &str = "32,64,128,256,512,1024,2048";
-pub const BENCHMARK_STEP_DURATION_SECS: u64 = 10;
+pub const BENCHMARK_STEP_DURATION_SECS: u64 = 20;
 pub const WRKR_IMAGE: &str = "nogcio/wrkr";
 pub const BENCHMARK_DATA: &str = "benchmarks_data";
 

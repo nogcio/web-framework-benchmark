@@ -44,9 +44,14 @@ where F: FnMut(StatsSnapshot) + Send + 'static
     let mut rps_samples = Vec::new();
     let mut last_requests = 0;
     let mut last_sample_time = start_time;
+    let mut first_progress_sent = false;
     
     // Main loop
-    while Instant::now() < end_time {
+    loop {
+        let now = Instant::now();
+        if now >= end_time {
+            break;
+        }
         let now = Instant::now();
         let elapsed = now.duration_since(start_time);
         
@@ -130,6 +135,12 @@ where F: FnMut(StatsSnapshot) + Send + 'static
                 });
             }
             current_connections += to_spawn;
+        }
+
+        // Wait before sending first progress report to avoid zero stats
+        if !first_progress_sent {
+            sleep(Duration::from_secs(1)).await;
+            first_progress_sent = true;
         }
 
         if let Some(ref mut cb) = on_progress {

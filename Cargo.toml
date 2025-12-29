@@ -9,45 +9,6 @@ license = "MIT"
 homepage = "https://webbenchmark.nogc.io"
 repository = "https://github.com/nogcio/web-framework-benchmark"
 
-[package]
-name = "wfb"
-version = "0.3.0"
-description = "Web framework benchmark"
-readme = "README.md"
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-homepage.workspace = true
-repository.workspace = true
-
-[dependencies]
-tokio = { version = "1.8", features = ["process", "sync", "io-util", "rt-multi-thread", "time", "fs"] }
-tokio-util = { version = "0.7.17", features = ["io"] }
-
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-
-serde_yaml = "0.9"
-
-tracing = "0.1"
-tracing-subscriber = "0.3"
-dotenvy = "0.15.7"
-thiserror = "2.0.17"
-clap = {version = "4.5.53", features = ["derive", "env"]}
-uuid = {version = "1.19.0", features = ["v4"] }
-
-reqwest = { version = "0.12.26", default-features = false, features = ["json", "rustls-tls", "http2", "charset"] }
-regex = "1.12.2"
-humanize-bytes = "1.0.6"
-chrono = { version = "0.4.42", features = ["serde"] }
-axum = "0.8.7"
-rand = "0.8"
-async-trait = "0.1.89"
-tower-http = { version = "0.6.8", features = ["fs"] }
-
-[dev-dependencies]
-tempfile = "3.0"
-
 [profile.release]
 opt-level = 3
 lto = true

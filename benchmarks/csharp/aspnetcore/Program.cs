@@ -12,8 +12,6 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxConcurrentUpgradedConnections = null;
 });
 builder.Logging.ClearProviders();
-builder.Logging.AddSimpleConsole();
-builder.Logging.SetMinimumLevel(LogLevel.Error);
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 var dataDir = Environment.GetEnvironmentVariable("DATA_DIR") ?? "benchmarks_data";
 

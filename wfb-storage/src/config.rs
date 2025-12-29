@@ -135,6 +135,22 @@ impl Config {
             .find(|env| env.name() == name)
     }
 
+    pub fn languages(&self) -> &[Lang] {
+        &self.inner.langs
+    }
+
+    pub fn frameworks(&self) -> &[Framework] {
+        &self.inner.frameworks
+    }
+
+    pub fn benchmarks(&self) -> &[Benchmark] {
+        &self.inner.benchmarks
+    }
+
+    pub fn environments(&self) -> &[Environment] {
+        &self.inner.environments
+    }
+
     pub fn get_lang(&self, name: &str) -> Option<&Lang> {
         self.inner.langs.iter().find(|l| l.name == name)
     }

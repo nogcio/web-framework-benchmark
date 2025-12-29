@@ -17,12 +17,20 @@ pub struct TestCaseRaw {
     pub latency_stdev: f64,
     pub latency_max: u64,
     pub latency_p50: u64,
+    pub latency_p75: u64,
     pub latency_p90: u64,
     pub latency_p99: u64,
+    pub latency_stdev_pct: f64,
+    pub latency_distribution: Vec<(u8, u64)>,
     
     pub errors: HashMap<String, u64>,
 
     pub memory_usage_bytes: u64,
+
+    pub req_per_sec_avg: f64,
+    pub req_per_sec_stdev: f64,
+    pub req_per_sec_max: f64,
+    pub req_per_sec_stdev_pct: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -38,9 +46,17 @@ pub struct TestCaseSummary {
     pub latency_stdev: f64,
     pub latency_max: u64,
     pub latency_p50: u64,
+    pub latency_p75: u64,
     pub latency_p90: u64,
     pub latency_p99: u64,
+    pub latency_stdev_pct: f64,
+    pub latency_distribution: Vec<(u8, u64)>,
     
     pub errors: HashMap<String, u64>,
     pub memory_usage_bytes: u64,
+
+    pub req_per_sec_avg: f64,
+    pub req_per_sec_stdev: f64,
+    pub req_per_sec_max: f64,
+    pub req_per_sec_stdev_pct: f64,
 }

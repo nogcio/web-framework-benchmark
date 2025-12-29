@@ -41,12 +41,28 @@ where F: FnMut(StatsSnapshot) + Send + 'static
     let end_time = start_time + config.duration;
     let mut current_connections = 0;
     let vu_counter = Arc::new(AtomicU64::new(1));
+    let mut rps_samples = Vec::new();
+    let mut last_requests = 0;
+    let mut last_sample_time = start_time;
     
     // Main loop
     while Instant::now() < end_time {
         let now = Instant::now();
         let elapsed = now.duration_since(start_time);
         
+        // Calculate RPS sample
+        {   
+            let current_requests = stats.total_requests.load(Ordering::Relaxed);
+            let sample_elapsed = now.duration_since(last_sample_time).as_secs_f64();
+            if sample_elapsed >= 1.0 {
+                let requests_diff = current_requests - last_requests;
+                let rps = requests_diff as f64 / sample_elapsed;
+                rps_samples.push(rps);
+                last_requests = current_requests;
+                last_sample_time = now;
+            }
+        }
+
         let ramp_up_secs = if let Some(ramp_up) = config.ramp_up {
             ramp_up.as_secs_f64()
         } else {
@@ -56,7 +72,44 @@ where F: FnMut(StatsSnapshot) + Send + 'static
         let progress = elapsed.as_secs_f64() / ramp_up_secs;
         let progress = progress.min(1.0);
         
-        let target_connections = if config.connections >= config.start_connections {
+        let target_connections = if let (Some(steps), Some(step_duration)) = (&config.step_connections, config.step_duration) {
+            if steps.is_empty() {
+                config.connections as f64
+            } else if steps.len() == 1 {
+                steps[0] as f64
+            } else {
+                let step_secs = step_duration.as_secs_f64();
+                let total_secs = config.duration.as_secs_f64();
+                let total_hold_time = steps.len() as f64 * step_secs;
+                
+                // Calculate available time for ramping
+                let total_ramp_time = (total_secs - total_hold_time).max(0.0);
+                let num_ramps = (steps.len() - 1) as f64;
+                let ramp_secs = if num_ramps > 0.0 { total_ramp_time / num_ramps } else { 0.0 };
+                
+                let elapsed_secs = elapsed.as_secs_f64();
+                let mut current_target = *steps.last().unwrap() as f64;
+                
+                // Find which cycle we are in
+                for i in 0..steps.len() - 1 {
+                    let cycle_start = i as f64 * (step_secs + ramp_secs);
+                    let hold_end = cycle_start + step_secs;
+                    let ramp_end = hold_end + ramp_secs;
+                    
+                    if elapsed_secs < hold_end {
+                        current_target = steps[i] as f64;
+                        break;
+                    } else if elapsed_secs < ramp_end {
+                        let progress = (elapsed_secs - hold_end) / ramp_secs;
+                        let start_val = steps[i] as f64;
+                        let end_val = steps[i+1] as f64;
+                        current_target = start_val + (end_val - start_val) * progress;
+                        break;
+                    }
+                }
+                current_target
+            }
+        } else if config.connections >= config.start_connections {
              config.start_connections as f64 + (config.connections - config.start_connections) as f64 * progress
         } else {
              config.start_connections as f64
@@ -69,11 +122,10 @@ where F: FnMut(StatsSnapshot) + Send + 'static
             for _ in 0..to_spawn {
                 let stats = stats.clone();
                 let wrk_config = config.wrk.clone();
-                let vu_id = vu_counter.fetch_add(1, Ordering::Relaxed);
-                let client = build_client()?;
-                                               
+                let vu_id = vu_counter.fetch_add(1, Ordering::Relaxed);                
                 set.spawn(async move {
                     stats.inc_connections();
+                    let client = build_client().unwrap();
                     run_vu(wrk_config, stats, ExecutionMode::Duration(end_time), vu_id, client).await.unwrap();
                 });
             }
@@ -81,7 +133,7 @@ where F: FnMut(StatsSnapshot) + Send + 'static
         }
 
         if let Some(ref mut cb) = on_progress {
-            let snapshot = stats.snapshot(config.duration, Instant::now().duration_since(start_time));
+            let snapshot = stats.snapshot(config.duration, Instant::now().duration_since(start_time), rps_samples.clone());
             cb(snapshot);
         }
 
@@ -97,8 +149,7 @@ where F: FnMut(StatsSnapshot) + Send + 'static
         }
     }
     
-    let snapshot = stats.snapshot(config.duration, config.duration);
-    
+    let snapshot = stats.snapshot(config.duration, config.duration, rps_samples);
     Ok(snapshot)
 }
 
@@ -111,7 +162,7 @@ pub async fn run_once(config: WrkConfig) -> Result<StatsSnapshot> {
     run_vu(config.clone(), stats.clone(), ExecutionMode::Once, 1, client).await?;
     
     let elapsed = start.elapsed();
-    Ok(stats.snapshot(elapsed, elapsed))
+    Ok(stats.snapshot(elapsed, elapsed, Vec::new()))
 }
 
 async fn run_vu(config: WrkConfig, stats: Arc<Stats>, mode: ExecutionMode, vu_id: u64, client: Client) -> Result<()> {

@@ -59,4 +59,6 @@ pub struct BenchmarkManifest {
     pub language_version: String,
     pub framework_version: String,
     pub tags: HashMap<String, String>,
+    pub database: Option<DatabaseKind>,
+    pub path: String,
 }

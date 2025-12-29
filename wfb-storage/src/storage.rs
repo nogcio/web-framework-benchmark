@@ -11,12 +11,18 @@ use crate::lang::Lang;
 use crate::testcase::TestCaseSummary;
 
 // RunId -> Environment -> Language -> BenchmarkName -> BenchmarkResult
-type StorageData = HashMap<String, HashMap<String, HashMap<String, HashMap<String, BenchmarkResult>>>>;
+pub type StorageData = HashMap<String, HashMap<String, HashMap<String, HashMap<String, BenchmarkResult>>>>;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RunManifest {
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
 
 #[derive(Clone)]
 pub struct Storage {
-    base_path: PathBuf,
-    data: Arc<RwLock<StorageData>>,
+    pub base_path: PathBuf,
+    pub data: Arc<RwLock<StorageData>>,
+    pub runs: Arc<RwLock<HashMap<String, RunManifest>>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -28,17 +34,19 @@ pub struct BenchmarkResult {
 impl Storage {
     pub fn new(base_path: impl Into<PathBuf>) -> Result<Self> {
         let base_path = base_path.into();
-        let data = Self::load_all(&base_path)?;
+        let (data, runs) = Self::load_all(&base_path)?;
         Ok(Self {
             base_path,
             data: Arc::new(RwLock::new(data)),
+            runs: Arc::new(RwLock::new(runs)),
         })
     }
 
-    fn load_all(base_path: &Path) -> Result<StorageData> {
+    fn load_all(base_path: &Path) -> Result<(StorageData, HashMap<String, RunManifest>)> {
         let mut data = HashMap::new();
+        let mut runs = HashMap::new();
         if !base_path.exists() {
-            return Ok(data);
+            return Ok((data, runs));
         }
 
         for run_entry in fs::read_dir(base_path)? {
@@ -47,6 +55,17 @@ impl Storage {
                 continue;
             }
             let run_id = run_entry.file_name().to_string_lossy().to_string();
+            
+            // Load run manifest
+            let manifest_path = run_entry.path().join("manifest.yaml");
+            if manifest_path.exists() {
+                if let Ok(file) = fs::File::open(&manifest_path) {
+                    if let Ok(manifest) = serde_yaml::from_reader(file) {
+                        runs.insert(run_id.clone(), manifest);
+                    }
+                }
+            }
+
             let run_data = data.entry(run_id.clone()).or_insert_with(HashMap::new);
 
             for env_entry in fs::read_dir(run_entry.path())? {
@@ -110,7 +129,7 @@ impl Storage {
                 }
             }
         }
-        Ok(data)
+        Ok((data, runs))
     }
 
     fn get_benchmark_path(
@@ -158,6 +177,20 @@ impl Storage {
         // Save to disk
         let benchmark_path = self.get_benchmark_path(run_id, environment, language, benchmark);
         fs::create_dir_all(&benchmark_path)?;
+
+        // Save run manifest if it doesn't exist
+        let run_path = self.base_path.join(run_id);
+        let run_manifest_path = run_path.join("manifest.yaml");
+        if !run_manifest_path.exists() {
+            let manifest = RunManifest {
+                created_at: chrono::Utc::now(),
+            };
+            let file = fs::File::create(&run_manifest_path)?;
+            serde_yaml::to_writer(file, &manifest)?;
+            
+            // Update memory
+            self.runs.write().unwrap().insert(run_id.to_string(), manifest);
+        }
 
         // Save manifest if it doesn't exist
         let manifest_path = benchmark_path.join("manifest.yaml");

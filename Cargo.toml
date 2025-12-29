@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["wfb-runner", "wfb-storage","wrkr","wrkr-core", "wrkr-api"]
+members = ["wfb-runner", "wfb-storage","wrkr","wrkr-core", "wrkr-api", "wfb-server"]
 
 [workspace.package]
 edition = "2024"

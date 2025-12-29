@@ -11,6 +11,9 @@ pub enum Environment {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LocalEnvironment {
     pub name: String,
+    pub title: String,
+    pub spec: Option<String>,
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -24,6 +27,9 @@ pub struct SshConnection {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SshEnvironment {
     pub name: String,
+    pub title: String,  
+    pub spec: Option<String>,
+    pub icon: Option<String>,
     pub wrkr: SshConnection,
     pub db: SshConnection,
     pub app: SshConnection,
@@ -34,6 +40,27 @@ impl Environment {
         match self {
             Environment::Local(env) => &env.name,
             Environment::Ssh(env) => &env.name,
+        }
+    }
+
+    pub fn title(&self) -> &str {
+        match self {
+            Environment::Local(env) => &env.title,
+            Environment::Ssh(env) => &env.title,
+        }
+    }
+
+    pub fn spec(&self) -> Option<&str> {
+        match self {
+            Environment::Local(env) => env.spec.as_deref(),
+            Environment::Ssh(env) => env.spec.as_deref(),
+        }
+    }
+
+    pub fn icon(&self) -> Option<&str> {
+        match self {
+            Environment::Local(env) => env.icon.as_deref(),
+            Environment::Ssh(env) => env.icon.as_deref(),
         }
     }
 }

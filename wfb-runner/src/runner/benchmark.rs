@@ -244,8 +244,8 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             };
             
             let duration = format!("{}", consts::BENCHMARK_DURATION_PER_TEST_SECS);
-            let ramp_up = format!("{}", consts::BENCHMARK_RAMP_UP_SECS);
-            let connections = consts::BENCHMARK_CONNECTIONS.to_string();
+            let step_connections = consts::BENCHMARK_STEP_CONNECTIONS;
+            let step_duration = format!("{}", consts::BENCHMARK_STEP_DURATION_SECS);
 
             let memory_usage = std::sync::Arc::new(std::sync::Mutex::new(0u64));
             let memory_usage_clone = memory_usage.clone();
@@ -276,10 +276,10 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 .arg(&self.config.app_host_url)
                 .arg("--duration")
                 .arg(&duration)
-                .arg("--ramp-up")
-                .arg(&ramp_up)
-                .arg("--connections")
-                .arg(&connections)
+                .arg("--step-connections")
+                .arg(step_connections)
+                .arg("--step-duration")
+                .arg(&step_duration)
                 .arg("--output")
                 .arg("json");
             
@@ -308,10 +308,17 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                         latency_stdev: stats.latency_stdev,
                         latency_max: stats.latency_max,
                         latency_p50: stats.latency_p50,
+                        latency_p75: stats.latency_p75,
                         latency_p90: stats.latency_p90,
                         latency_p99: stats.latency_p99,
+                        latency_stdev_pct: stats.latency_stdev_pct,
+                        latency_distribution: stats.latency_distribution.clone(),
                         errors: stats.errors.clone(),
                         memory_usage_bytes: mem_bytes,
+                        req_per_sec_avg: stats.req_per_sec_avg,
+                        req_per_sec_stdev: stats.req_per_sec_stdev,
+                        req_per_sec_max: stats.req_per_sec_max,
+                        req_per_sec_stdev_pct: stats.req_per_sec_stdev_pct,
                     };
 
                     if let Ok(mut guard) = raw_data_collection_clone.lock() {
@@ -348,16 +355,25 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     latency_stdev: last_stat.latency_stdev,
                     latency_max: last_stat.latency_max,
                     latency_p50: last_stat.latency_p50,
+                    latency_p75: last_stat.latency_p75,
                     latency_p90: last_stat.latency_p90,
                     latency_p99: last_stat.latency_p99,
+                    latency_stdev_pct: last_stat.latency_stdev_pct,
+                    latency_distribution: last_stat.latency_distribution,
                     errors: last_stat.errors,
                     memory_usage_bytes: final_memory_usage,
+                    req_per_sec_avg: last_stat.req_per_sec_avg,
+                    req_per_sec_stdev: last_stat.req_per_sec_stdev,
+                    req_per_sec_max: last_stat.req_per_sec_max,
+                    req_per_sec_stdev_pct: last_stat.req_per_sec_stdev_pct,
                 };
                 
                 let manifest = wfb_storage::BenchmarkManifest {
                     language_version: benchmark.language_version.clone(),
                     framework_version: benchmark.framework_version.clone(),
                     tags: benchmark.tags.clone(),
+                    database: benchmark.database,
+                    path: benchmark.path.clone(),
                 };
 
                 self.storage.save_benchmark_result(

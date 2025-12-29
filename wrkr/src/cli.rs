@@ -31,6 +31,14 @@ pub struct Args {
     #[arg(long)]
     pub ramp_up: Option<u64>,
 
+    /// Comma-separated list of connections (VUs) for step load (e.g. "32,64,128,256")
+    #[arg(long)]
+    pub step_connections: Option<String>,
+
+    /// Duration to hold each step in seconds
+    #[arg(long)]
+    pub step_duration: Option<u64>,
+
     /// Duration of the test in seconds
     #[arg(short, long, default_value_t = 10)]
     pub duration: u64,

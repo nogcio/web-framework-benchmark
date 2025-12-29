@@ -1,0 +1,6 @@
+language_version: '1.25'
+framework_version: 2.52.10
+tags:
+  platform: fiber
+database: null
+path: benchmarks/go/fiber

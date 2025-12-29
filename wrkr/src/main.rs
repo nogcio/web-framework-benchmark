@@ -25,11 +25,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     
     let script_content = tokio::fs::read_to_string(&args.script).await?;
+    
+    let step_connections = args.step_connections.map(|s| {
+        s.split(',')
+            .filter_map(|v| v.trim().parse::<u64>().ok())
+            .collect()
+    });
+
     let config = BenchmarkConfig {
         duration: Duration::from_secs(args.duration),
         connections: args.connections,
         start_connections: args.start_connections,
         ramp_up: args.ramp_up.map(Duration::from_secs),
+        step_connections,
+        step_duration: args.step_duration.map(Duration::from_secs),
         wrk: WrkConfig {
             script_content,
             host_url: args.url.clone(),
@@ -59,18 +68,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let error_bars_clone = error_bars.clone();
     let output_format = args.output.clone();
 
+    let mut last_requests = 0;
+    let mut last_bytes = 0;
+    let mut last_elapsed = Duration::from_secs(0);
+
     let stats = run_benchmark(config, Some(move |p: wrkr_core::StatsSnapshot| {
+        let interval_secs = (p.elapsed - last_elapsed).as_secs_f64();
+        let current_rps = if interval_secs > 0.0 {
+            (p.total_requests - last_requests) as f64 / interval_secs
+        } else {
+            0.0
+        };
+        
+        let current_tps = if interval_secs > 0.0 {
+             ((p.total_bytes_received - last_bytes) as f64 / interval_secs) as u64
+        } else {
+            0
+        };
+
+        last_requests = p.total_requests;
+        last_bytes = p.total_bytes_received;
+        last_elapsed = p.elapsed;
+
         match output_format {
             cli::OutputFormat::Text => {
                 if let Some(pb) = &pb_clone {
                     pb.set_position(p.elapsed.as_secs());
-                    let rps = p.total_requests as f64 / p.elapsed.as_secs_f64();
-                    let tps = p.total_bytes_received / p.elapsed.as_secs().max(1);
                     
                     let msg = format!("Conns: {} | RPS: {:.0} | TPS: {}",
                         p.connections, 
-                        rps, 
-                        humanize_bytes_binary!(tps),
+                        current_rps, 
+                        humanize_bytes_binary!(current_tps),
                     );
                     pb.set_message(msg);
 
@@ -90,16 +118,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             cli::OutputFormat::Json => {
-                let rps = if p.elapsed.as_secs_f64() > 0.0 {
-                    p.total_requests as f64 / p.elapsed.as_secs_f64()
+                let rps = current_rps;
+                let tps = current_tps;
+
+                let rps_mean = if !p.rps_samples.is_empty() {
+                    p.rps_samples.iter().sum::<f64>() / p.rps_samples.len() as f64
                 } else {
                     0.0
                 };
-                let tps = if p.elapsed.as_secs() > 0 {
-                    p.total_bytes_received / p.elapsed.as_secs()
+                
+                let rps_max = p.rps_samples.iter().fold(0.0f64, |a, &b| a.max(b));
+                
+                let rps_stdev = if p.rps_samples.len() > 1 {
+                    let variance = p.rps_samples.iter().map(|value| {
+                        let diff = rps_mean - *value;
+                        diff * diff
+                    }).sum::<f64>() / (p.rps_samples.len() - 1) as f64;
+                    variance.sqrt()
                 } else {
-                    0
+                    0.0
                 };
+
+                let rps_stdev_pct = if rps_mean > 0.0 {
+                    rps_stdev / rps_mean * 100.0
+                } else {
+                    0.0
+                };
+
+                let lat_mean = p.latency_histogram.mean();
+                let lat_stdev = p.latency_histogram.stdev();
+                let lat_stdev_pct = if lat_mean > 0.0 {
+                    lat_stdev / lat_mean * 100.0
+                } else {
+                    0.0
+                };
+
+                let mut latency_distribution = Vec::new();
+                for percent in &[10, 25, 50, 75, 90, 99] {
+                     latency_distribution.push((*percent, p.latency_histogram.value_at_quantile(*percent as f64 / 100.0)));
+                }
                 
                 let json_stats = JsonStats {
                     elapsed_secs: p.elapsed.as_secs(),
@@ -109,13 +166,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     total_requests: p.total_requests,
                     total_bytes: p.total_bytes_received,
                     total_errors: p.total_errors,
-                    latency_mean: p.latency_histogram.mean(),
-                    latency_stdev: p.latency_histogram.stdev(),
+                    latency_mean: lat_mean,
+                    latency_stdev: lat_stdev,
                     latency_max: p.latency_histogram.max(),
                     latency_p50: p.latency_histogram.value_at_quantile(0.50),
+                    latency_p75: p.latency_histogram.value_at_quantile(0.75),
                     latency_p90: p.latency_histogram.value_at_quantile(0.90),
                     latency_p99: p.latency_histogram.value_at_quantile(0.99),
+                    latency_stdev_pct: lat_stdev_pct,
+                    latency_distribution,
                     errors: p.errors,
+                    req_per_sec_avg: rps_mean,
+                    req_per_sec_stdev: rps_stdev,
+                    req_per_sec_max: rps_max,
+                    req_per_sec_stdev_pct: rps_stdev_pct,
                 };
                 println!("{}", serde_json::to_string(&json_stats).unwrap());
             }

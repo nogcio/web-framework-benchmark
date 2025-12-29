@@ -21,6 +21,8 @@ pub struct BenchmarkConfig {
     pub connections: u64, // Target connections
     pub start_connections: u64, // Start connections
     pub ramp_up: Option<Duration>,
+    pub step_connections: Option<Vec<u64>>,
+    pub step_duration: Option<Duration>,
     pub wrk: WrkConfig,
 }
 

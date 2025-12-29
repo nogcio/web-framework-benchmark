@@ -56,7 +56,7 @@ impl Stats {
         }
     }
 
-    pub fn snapshot(&self, duration: Duration, elapsed: Duration) -> StatsSnapshot {
+    pub fn snapshot(&self, duration: Duration, elapsed: Duration, rps_samples: Vec<f64>) -> StatsSnapshot {
         StatsSnapshot {
             duration,
             elapsed,
@@ -74,6 +74,7 @@ impl Stats {
             } else {
                 Histogram::new(3).unwrap()
             },
+            rps_samples,
         }
     }
 }
@@ -88,4 +89,5 @@ pub struct StatsSnapshot {
     pub total_bytes_received: u64,
     pub errors: HashMap<String, u64>,
     pub latency_histogram: Histogram<u64>,
+    pub rps_samples: Vec<f64>,
 }

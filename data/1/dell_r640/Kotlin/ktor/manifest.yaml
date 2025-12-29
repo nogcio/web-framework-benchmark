@@ -1,0 +1,6 @@
+language_version: 2.3.0
+framework_version: 3.3.3
+tags:
+  platform: ktor
+database: null
+path: benchmarks/kotlin/ktor

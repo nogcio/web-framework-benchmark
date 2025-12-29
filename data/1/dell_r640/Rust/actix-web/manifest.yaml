@@ -1,0 +1,6 @@
+language_version: '1.85'
+framework_version: 4.12.1
+tags:
+  platform: actix-web
+database: null
+path: benchmarks/rust/actix-web

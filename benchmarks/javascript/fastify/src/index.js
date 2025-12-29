@@ -27,15 +27,6 @@ if (cluster.isMaster) {
     prefix: '/files/', // optional: default '/'
   });
 
-  // X-Request-ID handling
-  fastify.addHook('onSend', (request, reply, payload, done) => {
-    const requestId = request.headers['x-request-id'];
-    if (requestId) {
-      reply.header('x-request-id', requestId);
-    }
-    done();
-  });
-
   // Health Check
   fastify.get('/health', async (request, reply) => {
     return 'OK';

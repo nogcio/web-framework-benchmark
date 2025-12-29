@@ -74,7 +74,6 @@ async fn main() {
         .route("/api/tweets", post(create_tweet))
         .route("/api/tweets/{id}", get(get_tweet))
         .route("/api/tweets/{id}/like", post(like_tweet))
-        .layer(middleware::from_fn(x_request_id_middleware))
         .with_state(state);
 
     println!("Listening on {}", addr);
@@ -163,16 +162,7 @@ async fn db_write_insert(
     }
 }
 
-async fn x_request_id_middleware(req: Request, next: Next) -> Response {
-    let request_id = req.headers().get("x-request-id").cloned();
-    let mut response = next.run(req).await;
 
-    if let Some(request_id) = request_id {
-        response.headers_mut().insert("x-request-id", request_id);
-    }
-
-    response
-}
 
 // --- Tweet Service ---
 

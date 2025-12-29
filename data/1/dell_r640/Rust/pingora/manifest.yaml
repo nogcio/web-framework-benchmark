@@ -1,0 +1,6 @@
+language_version: '1.85'
+framework_version: '0.6'
+tags:
+  platform: pingora
+database: null
+path: benchmarks/rust/pingora

@@ -1,0 +1,6 @@
+language_version: '5.1'
+framework_version: 1.27.1.2
+tags:
+  platform: openresty
+database: null
+path: benchmarks/lua/nginx

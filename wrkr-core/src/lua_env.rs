@@ -16,13 +16,13 @@ struct LocalStats {
 }
 
 impl LocalStats {
-    fn new() -> Self {
-        Self {
+    fn new() -> Option<Self> {
+        Some(Self {
             requests: AtomicU64::new(0),
             bytes_received: AtomicU64::new(0),
             errors: Mutex::new(HashMap::new()),
-            histogram: Mutex::new(Histogram::new(3).unwrap()),
-        }
+            histogram: Mutex::new(Histogram::new(3).ok()?),
+        })
     }
 }
 
@@ -36,22 +36,28 @@ pub struct BenchmarkContext {
 }
 
 impl BenchmarkContext {
-    pub fn new(client: Client, base_url: String, stats: Arc<Stats>, vu_id: u64) -> Self {
-        Self {
+    pub fn new(client: Client, base_url: String, stats: Arc<Stats>, vu_id: u64) -> Option<Self> {
+        Some(Self {
             client,
             base_url,
             stats,
             vu_id,
-            local_stats: Arc::new(LocalStats::new()),
-        }
+            local_stats: Arc::new(LocalStats::new()?),
+        })
     }
 
     pub fn flush_stats(&self) {
         let requests = self.local_stats.requests.swap(0, Ordering::Relaxed);
         let bytes_received = self.local_stats.bytes_received.swap(0, Ordering::Relaxed);
         
-        let mut errors_guard = self.local_stats.errors.lock().unwrap();
-        let mut histogram_guard = self.local_stats.histogram.lock().unwrap();
+        let mut errors_guard = match self.local_stats.errors.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        let mut histogram_guard = match self.local_stats.histogram.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
         
         if requests > 0 || bytes_received > 0 || !errors_guard.is_empty() || !histogram_guard.is_empty() {
              self.stats.merge(
@@ -77,20 +83,20 @@ impl BenchmarkContext {
                         self.local_stats.bytes_received.fetch_add(resp_size as u64, Ordering::Relaxed);
                         let duration = start.elapsed();
                         {
-                            let mut hist = self.local_stats.histogram.lock().unwrap();
+                            let mut hist = self.local_stats.histogram.lock().unwrap_or_else(|e| e.into_inner());
                             let _ = hist.record(duration.as_micros() as u64);
                         }
                         
                         let status = response.status();
                         if !(200..400).contains(&status) {
-                            let mut errors = self.local_stats.errors.lock().unwrap();
+                            let mut errors = self.local_stats.errors.lock().unwrap_or_else(|e| e.into_inner());
                             *errors.entry("Non 2xx and non 3xx status code".to_owned()).or_insert(0) += 1;
                         }
                         Ok(response)
                     },
                     Err(e) => {
                         self.local_stats.requests.fetch_add(1, Ordering::Relaxed);
-                        let mut errors = self.local_stats.errors.lock().unwrap();
+                        let mut errors = self.local_stats.errors.lock().unwrap_or_else(|e| e.into_inner());
                         *errors.entry(format!("Response processing error: {}", e)).or_insert(0) += 1;
                         Err(mlua::Error::external(e))
                     }
@@ -98,7 +104,7 @@ impl BenchmarkContext {
             },
             Err(e) => {
                 self.local_stats.requests.fetch_add(1, Ordering::Relaxed);
-                let mut errors = self.local_stats.errors.lock().unwrap();
+                let mut errors = self.local_stats.errors.lock().unwrap_or_else(|e| e.into_inner());
                 if e.is_timeout() {
                     *errors.entry("Request timeout".to_owned()).or_insert(0) += 1;
                 } else {
@@ -264,7 +270,8 @@ impl UserData for BenchmarkContext {
 
 pub fn create_lua_env(client: Client, base_url: String, stats: Arc<Stats>, vu_id: u64) -> Result<(Lua, BenchmarkContext)> {
     let lua = Lua::new();
-    let ctx = BenchmarkContext::new(client, base_url, stats, vu_id);
+    let ctx = BenchmarkContext::new(client, base_url, stats, vu_id)
+        .ok_or_else(|| mlua::Error::RuntimeError("Failed to create benchmark context (out of memory?)".to_string()))?;
     
     Ok((lua, ctx))
 }

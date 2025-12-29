@@ -32,20 +32,6 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .wrap_fn(|req, srv| {
-                let request_id = req.headers().get("x-request-id").cloned();
-                let fut = srv.call(req);
-                async move {
-                    let mut res = fut.await?;
-                    if let Some(request_id) = request_id {
-                        res.headers_mut().insert(
-                            actix_web::http::header::HeaderName::from_static("x-request-id"),
-                            actix_web::http::header::HeaderValue::from_bytes(request_id.as_bytes()).unwrap(),
-                        );
-                    }
-                    Ok(res)
-                }
-            })
             .service(hello_world)
             .service(plaintext)
             .service(health_check)

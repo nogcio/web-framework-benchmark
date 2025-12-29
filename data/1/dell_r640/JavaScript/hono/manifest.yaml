@@ -1,0 +1,6 @@
+language_version: '23'
+framework_version: 4.11.2
+tags:
+  platform: hono
+database: null
+path: benchmarks/javascript/hono

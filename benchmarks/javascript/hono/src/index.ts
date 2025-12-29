@@ -32,15 +32,6 @@ if (process.env.BUN_WORKER_ID === undefined) {
   // Worker process
   const app = new Hono()
 
-  // X-Request-ID middleware
-  app.use(async (c, next) => {
-    const requestId = c.req.header('x-request-id')
-    await next()
-    if (requestId) {
-      c.header('x-request-id', requestId)
-    }
-  })
-
   app.get('/health', (c) => c.text('OK'))
   app.get('/', (c) => c.text('Hello, World!'))
   app.get('/plaintext', (c) => c.text('Hello, World!'))

@@ -33,14 +33,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, openapi_url=None, docs_url=None, redoc_url=None)
 
-@app.middleware("http")
-async def x_request_id_middleware(request: Request, call_next):
-    response = await call_next(request)
-    request_id = request.headers.get("x-request-id")
-    if request_id:
-        response.headers["x-request-id"] = request_id
-    return response
-
 @app.get("/health")
 async def health():
     try:

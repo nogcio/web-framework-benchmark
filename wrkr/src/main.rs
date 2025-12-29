@@ -16,6 +16,21 @@ mod cli;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Install panic hook to log panics before abort
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("PANIC OCCURRED:");
+        if let Some(location) = panic_info.location() {
+            eprintln!("  Location: {}:{}:{}", location.file(), location.line(), location.column());
+        }
+        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            eprintln!("  Message: {}", s);
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            eprintln!("  Message: {}", s);
+        }
+        eprintln!("  Backtrace:");
+        eprintln!("{:?}", std::backtrace::Backtrace::force_capture());
+    }));
+    
     let args = cli::Args::parse();
     
     if args.output == cli::OutputFormat::Text {
@@ -39,6 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ramp_up: args.ramp_up.map(Duration::from_secs),
         step_connections,
         step_duration: args.step_duration.map(Duration::from_secs),
+        timeout: Some(Duration::from_secs(args.timeout)),
         wrk: WrkConfig {
             script_content,
             host_url: args.url.clone(),

@@ -1,0 +1,6 @@
+language_version: '23'
+framework_version: 5.2.1
+tags:
+  platform: express
+database: null
+path: benchmarks/javascript/express

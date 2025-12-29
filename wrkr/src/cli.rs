@@ -43,6 +43,10 @@ pub struct Args {
     #[arg(short, long, default_value_t = 10)]
     pub duration: u64,
 
+    /// Request timeout in seconds
+    #[arg(long, default_value_t = 10)]
+    pub timeout: u64,
+
     /// Output format
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Text)]
     pub output: OutputFormat,

@@ -1,0 +1,6 @@
+language_version: '1.25'
+framework_version: 1.11.0
+tags:
+  platform: gin
+database: null
+path: benchmarks/go/gin

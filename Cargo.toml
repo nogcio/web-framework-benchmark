@@ -13,5 +13,5 @@ repository = "https://github.com/nogcio/web-framework-benchmark"
 opt-level = 3
 lto = true
 codegen-units = 1
-panic = "abort"
+# panic = "abort"
 strip = true

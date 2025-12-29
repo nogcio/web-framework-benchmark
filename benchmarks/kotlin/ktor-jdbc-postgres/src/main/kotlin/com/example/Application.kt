@@ -72,13 +72,6 @@ fun Application.module() {
         }
     }
 
-    intercept(ApplicationCallPipeline.Plugins) {
-        val requestId = call.request.header("x-request-id")
-        if (requestId != null) {
-            call.response.header("x-request-id", requestId)
-        }
-    }
-
     routing {
         get("/health") {
             try {

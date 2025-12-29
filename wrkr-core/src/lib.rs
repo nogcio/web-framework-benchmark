@@ -23,6 +23,7 @@ pub struct BenchmarkConfig {
     pub ramp_up: Option<Duration>,
     pub step_connections: Option<Vec<u64>>,
     pub step_duration: Option<Duration>,
+    pub timeout: Option<Duration>,
     pub wrk: WrkConfig,
 }
 

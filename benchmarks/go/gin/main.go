@@ -16,14 +16,6 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	// Middleware for X-Request-ID
-	r.Use(func(c *gin.Context) {
-		if requestID := c.GetHeader("X-Request-ID"); requestID != "" {
-			c.Header("X-Request-ID", requestID)
-		}
-		c.Next()
-	})
-
 	r.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
 	})

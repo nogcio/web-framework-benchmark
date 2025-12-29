@@ -1,0 +1,6 @@
+language_version: '3.13'
+framework_version: 0.127.0
+tags:
+  platform: fastapi
+database: null
+path: benchmarks/python/fastapi

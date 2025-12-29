@@ -11,14 +11,6 @@ func main() {
 		DisableStartupMessage: true,
 	})
 
-	// Middleware for X-Request-ID
-	app.Use(func(c *fiber.Ctx) error {
-		if requestID := c.Get("X-Request-ID"); requestID != "" {
-			c.Set("X-Request-ID", requestID)
-		}
-		return c.Next()
-	})
-
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
 	})

@@ -27,7 +27,10 @@ impl Stats {
             total_errors: AtomicU64::new(0),
             total_bytes_received: AtomicU64::new(0),
             errors_map: DashMap::new(),
-            latency_histogram: Arc::new(Mutex::new(Histogram::new(3).unwrap())),
+            latency_histogram: Arc::new(Mutex::new(Histogram::new(3).unwrap_or_else(|_| {
+                eprintln!("Failed to create histogram, using default");
+                Histogram::new(2).expect("Failed to create fallback histogram")
+            }))),
         }
     }
 
@@ -72,7 +75,7 @@ impl Stats {
             latency_histogram: if let Ok(hist) = self.latency_histogram.lock() {
                 hist.clone()
             } else {
-                Histogram::new(3).unwrap()
+                Histogram::new(3).unwrap_or_else(|_| Histogram::new(2).expect("Failed to create fallback histogram"))
             },
             rps_samples,
         }

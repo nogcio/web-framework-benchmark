@@ -21,15 +21,6 @@ if (cluster.isMaster) {
   app.disable('x-powered-by');
   app.disable('etag');
 
-  // X-Request-ID handling
-  app.use((req, res, next) => {
-    const requestId = req.headers['x-request-id'];
-    if (requestId) {
-      res.setHeader('x-request-id', requestId);
-    }
-    next();
-  });
-
   // Static files
   const staticDir = process.env.DATA_DIR || path.join(process.cwd(), 'benchmarks_data');
   app.use('/files', express.static(staticDir));

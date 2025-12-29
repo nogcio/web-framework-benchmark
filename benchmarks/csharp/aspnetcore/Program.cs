@@ -23,15 +23,6 @@ var jsonOptions = new JsonSerializerOptions
     DefaultIgnoreCondition = JsonIgnoreCondition.Never
 };
 
-app.Use(async (context, next) =>
-{
-    if (context.Request.Headers.TryGetValue("x-request-id", out var requestId))
-    {
-        context.Response.Headers.Append("x-request-id", requestId);
-    }
-    await next();
-});
-
 if (Directory.Exists(dataDir))
 {
     app.UseStaticFiles(new StaticFileOptions

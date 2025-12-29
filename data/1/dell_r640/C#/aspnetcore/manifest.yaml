@@ -1,0 +1,6 @@
+language_version: '10.0'
+framework_version: '10.0'
+tags:
+  platform: aspnetcore
+database: null
+path: benchmarks/csharp/aspnetcore

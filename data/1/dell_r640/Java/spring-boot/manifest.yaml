@@ -1,0 +1,6 @@
+language_version: '23'
+framework_version: 4.0.1
+tags:
+  platform: spring-boot
+database: postgres
+path: benchmarks/java/spring-boot-jpa-postgres

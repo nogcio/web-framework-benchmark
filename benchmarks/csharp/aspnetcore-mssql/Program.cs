@@ -42,15 +42,6 @@ builder.Services.AddSingleton(connectionString);
 
 var app = builder.Build();
 
-app.Use(async (context, next) =>
-{
-    if (context.Request.Headers.TryGetValue("x-request-id", out var requestId))
-    {
-        context.Response.Headers.Append("x-request-id", requestId);
-    }
-    await next();
-});
-
 app.MapGet("/health", async (HttpContext ctx, [FromServices] string connectionString) =>
 {
     try

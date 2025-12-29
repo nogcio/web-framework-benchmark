@@ -13,7 +13,7 @@ enum ExecutionMode {
     Once,
 }
 
-fn build_client() -> Result<Client> {
+fn build_client(timeout: Duration) -> Result<Client> {
     Client::builder()
         // One connection per VU: single idle slot and no cross-VU pooling
         .pool_max_idle_per_host(1)
@@ -24,7 +24,7 @@ fn build_client() -> Result<Client> {
         .no_gzip()
         .no_zstd()
         .redirect(Policy::none())
-        .timeout(Duration::from_millis(2000))
+        .timeout(timeout)
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .no_proxy()
         .build()
@@ -93,7 +93,7 @@ where F: FnMut(StatsSnapshot) + Send + 'static
                 let ramp_secs = if num_ramps > 0.0 { total_ramp_time / num_ramps } else { 0.0 };
                 
                 let elapsed_secs = elapsed.as_secs_f64();
-                let mut current_target = *steps.last().unwrap() as f64;
+                let mut current_target = steps.last().copied().unwrap_or(0) as f64;
                 
                 // Find which cycle we are in
                 for i in 0..steps.len() - 1 {
@@ -124,13 +124,14 @@ where F: FnMut(StatsSnapshot) + Send + 'static
         
         if current_connections < target_connections {
             let to_spawn = target_connections - current_connections;
+            let timeout = config.timeout.unwrap_or(Duration::from_secs(10));
             for _ in 0..to_spawn {
                 let stats = stats.clone();
                 let wrk_config = config.wrk.clone();
                 let vu_id = vu_counter.fetch_add(1, Ordering::Relaxed);                
                 set.spawn(async move {
                     stats.inc_connections();
-                    let client = match build_client() {
+                    let client = match build_client(timeout) {
                         Ok(c) => c,
                         Err(e) => {
                             eprintln!("Failed to create client for VU {}: {}", vu_id, e);
@@ -176,7 +177,7 @@ pub async fn run_once(config: WrkConfig) -> Result<StatsSnapshot> {
     let stats = Arc::new(Stats::new());
     let start = Instant::now();
 
-    let client = build_client()?;
+    let client = build_client(Duration::from_secs(10))?;
 
     run_vu(config.clone(), stats.clone(), ExecutionMode::Once, 1, client).await?;
     

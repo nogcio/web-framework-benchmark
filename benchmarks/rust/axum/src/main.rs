@@ -27,8 +27,7 @@ async fn main() {
         .route("/plaintext", get(hello_world))
         .route("/health", get(health_check))
         .route("/json/{from}/{to}", post(json_handler))
-        .nest_service("/files", ServeDir::new(DATA_DIR.get().unwrap()))
-        .layer(middleware::from_fn(x_request_id_middleware));
+        .nest_service("/files", ServeDir::new(DATA_DIR.get().unwrap()));
 
     println!("Listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -36,17 +35,6 @@ async fn main() {
 }
 
 
-
-async fn x_request_id_middleware(req: Request, next: Next) -> Response {
-    let request_id = req.headers().get("x-request-id").cloned();
-    let mut response = next.run(req).await;
-
-    if let Some(request_id) = request_id {
-        response.headers_mut().insert("x-request-id", request_id);
-    }
-
-    response
-}
 
 async fn hello_world() -> &'static str {
     "Hello, World!"

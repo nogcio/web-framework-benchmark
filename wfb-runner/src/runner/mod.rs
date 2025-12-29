@@ -8,7 +8,7 @@ use crate::consts;
 use indicatif::{ProgressBar, MultiProgress};
 use tokio::time::sleep;
 use std::time::Duration;
-use wfb_storage::{Benchmark, DatabaseKind};
+use wfb_storage::{Benchmark, DatabaseKind, Storage, Config, Environment};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -38,6 +38,10 @@ pub struct Runner<E: Executor> {
     db_docker: DockerManager<E>,
     wrkr_docker: DockerManager<E>,
     config: RunnerConfig,
+    storage: Storage,
+    run_id: String,
+    environment: Environment,
+    wfb_config: Config,
 }
 
 #[async_trait]
@@ -96,7 +100,17 @@ impl<E: Executor + Clone + Send + Sync + 'static> BenchmarkRunner for Runner<E> 
 }
 
 impl<E: Executor + Clone> Runner<E> {
-    pub fn new(app_executor: E, db_executor: E, wrkr_executor: E, sudo: bool, config: RunnerConfig) -> Self {
+    pub fn new(
+        app_executor: E,
+        db_executor: E,
+        wrkr_executor: E,
+        sudo: bool,
+        config: RunnerConfig,
+        storage: Storage,
+        run_id: String,
+        environment: Environment,
+        wfb_config: Config,
+    ) -> Self {
         Self {
             executor: app_executor.clone(),
             db_executor: db_executor.clone(),
@@ -105,6 +119,10 @@ impl<E: Executor + Clone> Runner<E> {
             db_docker: DockerManager::new(db_executor, sudo),
             wrkr_docker: DockerManager::new(wrkr_executor, sudo),
             config,
+            storage,
+            run_id,
+            environment,
+            wfb_config,
         }
     }
 

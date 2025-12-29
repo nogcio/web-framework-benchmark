@@ -43,6 +43,7 @@ if (process.env.BUN_WORKER_ID === undefined) {
 
   app.get('/health', (c) => c.text('OK'))
   app.get('/', (c) => c.text('Hello, World!'))
+  app.get('/plaintext', (c) => c.text('Hello, World!'))
 
   // Static files
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'benchmarks_data')
@@ -68,7 +69,7 @@ if (process.env.BUN_WORKER_ID === undefined) {
     return c.json(body)
   })
 
-  const port = parseInt(process.env.PORT || '8000')
+  const port = parseInt(process.env.PORT || '8080')
   
   console.log(`Worker ${process.pid} (ID: ${process.env.BUN_WORKER_ID}) listening on port ${port}`)
   

@@ -41,10 +41,14 @@ if (cluster.isMaster) {
 
   // Hello World
   app.get('/', (req, res) => {
-    res.send('Hello, World!');
+    res.type('text/plain').send('Hello, World!');
   });
 
-  const port = parseInt(process.env.PORT || '8000');
+  app.get('/plaintext', (req, res) => {
+    res.type('text/plain').send('Hello, World!');
+  });
+
+  const port = parseInt(process.env.PORT || '8080');
   app.listen(port, '0.0.0.0', () => {
     console.log(`Worker ${process.pid} listening on port ${port}`);
   });

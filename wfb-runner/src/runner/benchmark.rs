@@ -169,6 +169,9 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             // Verify via public IP
             self.run_tests(benchmark, &pb).await?;
 
+            // Cleanup before running actual benchmarks to ensure clean state for each test
+            self.cleanup(benchmark, &pb).await?;
+
             // Run tests via wrkr in docker
             self.run_tests_docker(benchmark, mb).await?;
     
@@ -204,6 +207,9 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
     }
 
     async fn run_tests_docker(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()> {
+        let lang = self.wfb_config.get_lang(&benchmark.language)
+            .ok_or_else(|| anyhow::anyhow!("Language '{}' not found", benchmark.language))?;
+
         for test in &benchmark.tests {
             let pb = mb.add(ProgressBar::new_spinner());
             pb.set_style(
@@ -212,10 +218,17 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     .unwrap()
                     .progress_chars("#>-"),
             );
-            pb.set_prefix(format!("[{}/{:?}]", benchmark.name, test));
+            pb.set_prefix(format!("[{}/{}]", benchmark.name, test));
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_length(consts::BENCHMARK_DURATION_PER_TEST_SECS);
             pb.set_position(0);
+
+            if let Some(db_kind) = &benchmark.database {
+                self.setup_database(db_kind, &pb).await?;
+                self.wait_for_db_ready(db_kind, &pb).await?;
+            }
+            self.run_app(benchmark, &pb).await?;
+            self.wait_for_app_ready(benchmark, &pb).await?;
 
             let run_pb = mb.add(ProgressBar::new(100));
             run_pb.set_style(
@@ -234,6 +247,25 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             let ramp_up = format!("{}", consts::BENCHMARK_RAMP_UP_SECS);
             let connections = consts::BENCHMARK_CONNECTIONS.to_string();
 
+            let memory_usage = std::sync::Arc::new(std::sync::Mutex::new(0u64));
+            let memory_usage_clone = memory_usage.clone();
+            let app_docker = self.app_docker.clone();
+            let container_name = benchmark.name.clone();
+            
+            let monitor_handle = tokio::spawn(async move {
+                loop {
+                    if let Ok(stats) = app_docker.stats(&container_name, "{{.MemUsage}}").await {
+                        // stats output might be "10MiB / 1GiB"
+                        let usage_str = stats.trim().split('/').next().unwrap_or("0B").trim();
+                        let bytes = parse_docker_memory(usage_str);
+                        if let Ok(mut guard) = memory_usage_clone.lock() {
+                            *guard = (*guard).max(bytes);
+                        }
+                    }
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+            });
+
             let cmd = self.wrkr_docker.run_command(consts::WRKR_IMAGE, "wrkr-runner")
                 .detach(false)
                 .network("host")
@@ -251,22 +283,98 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 .arg("--output")
                 .arg("json");
             
+            let raw_data_collection = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            let raw_data_collection_clone = raw_data_collection.clone();
+
             let pb_clone = pb.clone();
+            let memory_usage_read = memory_usage.clone();
             let output = self.wrkr_docker.execute_run_with_std_out(cmd, move |line| {
                 if let Ok(stats) = serde_json::from_str::<JsonStats>(line) {
+                    let mem_bytes = if let Ok(guard) = memory_usage_read.lock() {
+                        *guard
+                    } else {
+                        0
+                    };
+
+                    let raw_item = wfb_storage::TestCaseRaw {
+                        elapsed_secs: stats.elapsed_secs,
+                        connections: stats.connections,
+                        requests_per_sec: stats.requests_per_sec,
+                        bytes_per_sec: stats.bytes_per_sec,
+                        total_requests: stats.total_requests,
+                        total_bytes: stats.total_bytes,
+                        total_errors: stats.total_errors,
+                        latency_mean: stats.latency_mean,
+                        latency_stdev: stats.latency_stdev,
+                        latency_max: stats.latency_max,
+                        latency_p50: stats.latency_p50,
+                        latency_p90: stats.latency_p90,
+                        latency_p99: stats.latency_p99,
+                        errors: stats.errors.clone(),
+                        memory_usage_bytes: mem_bytes,
+                    };
+
+                    if let Ok(mut guard) = raw_data_collection_clone.lock() {
+                        guard.push(raw_item);
+                    }
+
                     pb_clone.set_position(stats.elapsed_secs.min(consts::BENCHMARK_DURATION_PER_TEST_SECS));
                     pb_clone.set_message(format!(
-                        "[{}] RPS: {:.0} | TPS: {} | Latency: {} | Errors: {}",
+                        "[{}] RPS: {:.0} | TPS: {} | Latency: {} | Errors: {} | Mem: {}",
                         stats.connections,
                         stats.requests_per_sec,
                         humanize_bytes_binary!(stats.bytes_per_sec),
                         format_latency(stats.latency_p99),
-                        stats.total_errors
+                        stats.total_errors,
+                        humanize_bytes_binary!(mem_bytes)
                     ));
                 }
             }, &run_pb).await?;
             
+            monitor_handle.abort();
+
+            let raw_data = raw_data_collection.lock().unwrap().clone();
+
+            let final_memory_usage = *memory_usage.lock().unwrap();
+
+            if let Some(last_stat) = raw_data.last().cloned() {
+                 let summary = wfb_storage::TestCaseSummary {
+                    requests_per_sec: last_stat.requests_per_sec,
+                    bytes_per_sec: last_stat.bytes_per_sec,
+                    total_requests: last_stat.total_requests,
+                    total_bytes: last_stat.total_bytes,
+                    total_errors: last_stat.total_errors,
+                    latency_mean: last_stat.latency_mean,
+                    latency_stdev: last_stat.latency_stdev,
+                    latency_max: last_stat.latency_max,
+                    latency_p50: last_stat.latency_p50,
+                    latency_p90: last_stat.latency_p90,
+                    latency_p99: last_stat.latency_p99,
+                    errors: last_stat.errors,
+                    memory_usage_bytes: final_memory_usage,
+                };
+                
+                let manifest = wfb_storage::BenchmarkManifest {
+                    language_version: benchmark.language_version.clone(),
+                    framework_version: benchmark.framework_version.clone(),
+                    tags: benchmark.tags.clone(),
+                };
+
+                self.storage.save_benchmark_result(
+                    &self.run_id,
+                    &self.environment,
+                    lang,
+                    benchmark,
+                    *test,
+                    &manifest,
+                    &summary,
+                    &raw_data,
+                )?;
+            }
+            
             self.wrkr_docker.stop_and_remove("wrkr-runner", &run_pb).await;
+
+            self.cleanup(benchmark, &pb).await?;
 
             run_pb.finish_and_clear();
             mb.remove(&run_pb);
@@ -313,5 +421,26 @@ fn format_latency(micros: u64) -> String {
         format!("{:.2}ms", micros as f64 / 1_000.0)
     } else {
         format!("{:.2}us", micros)
+    }
+}
+
+fn parse_docker_memory(s: &str) -> u64 {
+    let s = s.trim();
+    let (num_str, multiplier) = if s.ends_with("GiB") {
+        (s.trim_end_matches("GiB"), 1024.0 * 1024.0 * 1024.0)
+    } else if s.ends_with("MiB") {
+        (s.trim_end_matches("MiB"), 1024.0 * 1024.0)
+    } else if s.ends_with("KiB") {
+        (s.trim_end_matches("KiB"), 1024.0)
+    } else if s.ends_with("B") {
+        (s.trim_end_matches("B"), 1.0)
+    } else {
+        return 0;
+    };
+    
+    if let Ok(num) = num_str.trim().parse::<f64>() {
+        (num * multiplier) as u64
+    } else {
+        0
     }
 }

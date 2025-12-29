@@ -2,7 +2,7 @@ pub mod command;
 
 use crate::exec::Executor;
 use indicatif::ProgressBar;
-use self::command::{DockerRunCommand, DockerBuildCommand, DockerStopCommand, DockerRmCommand, DockerInspectCommand, DockerSaveCommand, DockerLoadCommand};
+use self::command::{DockerRunCommand, DockerBuildCommand, DockerStopCommand, DockerRmCommand, DockerInspectCommand, DockerSaveCommand, DockerLoadCommand, DockerStatsCommand};
 
 #[derive(Clone)]
 pub struct DockerManager<E: Executor> {
@@ -67,6 +67,12 @@ impl<E: Executor> DockerManager<E> {
 
     pub async fn inspect(&self, container_name: &str, format: &str) -> anyhow::Result<String> {
         let cmd = DockerInspectCommand::new(self.sudo, container_name, format);
+        let pb = ProgressBar::hidden();
+        self.executor.execute(cmd, &pb).await
+    }
+
+    pub async fn stats(&self, container_name: &str, format: &str) -> anyhow::Result<String> {
+        let cmd = DockerStatsCommand::new(self.sudo, container_name, format);
         let pb = ProgressBar::hidden();
         self.executor.execute(cmd, &pb).await
     }

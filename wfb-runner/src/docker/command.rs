@@ -137,6 +137,24 @@ impl<'a> fmt::Display for DockerInspectCommand<'a> {
     }
 }
 
+pub struct DockerStatsCommand<'a> {
+    sudo: bool,
+    container_name: &'a str,
+    format: &'a str,
+}
+
+impl<'a> DockerStatsCommand<'a> {
+    pub fn new(sudo: bool, container_name: &'a str, format: &'a str) -> Self {
+        Self { sudo, container_name, format }
+    }
+}
+
+impl<'a> fmt::Display for DockerStatsCommand<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} stats --no-stream --format \"{}\" {}", docker_cmd(self.sudo), self.format, self.container_name)
+    }
+}
+
 pub struct DockerRunCommand<'a> {
     sudo: bool,
     image: &'a str,

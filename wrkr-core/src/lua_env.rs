@@ -135,8 +135,6 @@ impl UserData for BenchmarkContext {
 
         methods.add_method("assert", |_, this, (condition, msg): (bool, String)| {
             if !condition {
-                let mut errors = this.local_stats.errors.lock().unwrap();
-                *errors.entry(msg.clone()).or_insert(0) += 1;
                 // We could throw a Lua error to stop execution of the current iteration
                 return Err(mlua::Error::RuntimeError(format!("Assertion failed: {}", msg)));
             }

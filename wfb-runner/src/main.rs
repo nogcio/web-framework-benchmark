@@ -20,7 +20,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     match args.command {
         cli::Commands::Run {
-            run_id: _run_id,
+            run_id,
             env,
             skip_wrkr_build,
             skip_db_build,
@@ -39,8 +39,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 DatabaseKind::Mssql,
             ];
 
+            let storage = wfb_storage::Storage::new("data")?;
+            let run_id_clone = run_id.clone();
+            let env_config_clone = env_config.clone();
+            let config_clone = config.clone();
+
             let runner: Arc<dyn runner::BenchmarkRunner> = match env_config {
-                Environment::Local(_local_config) => {
+                Environment::Local(ref _local_config) => {
                     let executor = exec::local::LocalExecutor::new();
                     let config = runner::RunnerConfig {
                         db_host: "host.docker.internal".to_string(),
@@ -49,9 +54,19 @@ async fn main() -> Result<(), anyhow::Error> {
                         app_public_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
                         is_remote: false,
                     };
-                    Arc::new(runner::Runner::new(executor.clone(), executor.clone(), executor, false, config))
+                    Arc::new(runner::Runner::new(
+                        executor.clone(), 
+                        executor.clone(), 
+                        executor, 
+                        false, 
+                        config,
+                        storage.clone(),
+                        run_id_clone,
+                        env_config_clone,
+                        config_clone,
+                    ))
                 }
-                Environment::Ssh(ssh_config) => {
+                Environment::Ssh(ref ssh_config) => {
                     let app_executor = exec::ssh::SshExecutor::from_config(&ssh_config.app);
                     let db_executor = exec::ssh::SshExecutor::from_config(&ssh_config.db);
                     let wrkr_executor = exec::ssh::SshExecutor::from_config(&ssh_config.wrkr);
@@ -62,7 +77,17 @@ async fn main() -> Result<(), anyhow::Error> {
                         app_public_host_url: format!("http://{}:{}", ssh_config.app.ip, consts::APP_PORT_EXTERNAL),
                         is_remote: true,
                     };
-                    Arc::new(runner::Runner::new(app_executor, db_executor, wrkr_executor, true, config))
+                    Arc::new(runner::Runner::new(
+                        app_executor, 
+                        db_executor, 
+                        wrkr_executor, 
+                        true, 
+                        config,
+                        storage.clone(),
+                        run_id_clone,
+                        env_config_clone,
+                        config_clone,
+                    ))
                 }
             };
 
@@ -88,8 +113,27 @@ async fn main() -> Result<(), anyhow::Error> {
             while let Some(res) = start_actions.join_next().await {
                 res??;
             }
+
+            let mut benchmarks_to_run = Vec::new();
+            for b in benchmarks {
+                let lang = config.get_lang(&b.language)
+                    .ok_or_else(|| anyhow::anyhow!("Language '{}' not found", b.language))?;
+                
+                let mut missing_tests = Vec::new();
+                for test in &b.tests {
+                    if !storage.has_test_result(&run_id, &env_config, lang, b, *test) {
+                        missing_tests.push(*test);
+                    }
+                }
+
+                if !missing_tests.is_empty() {
+                    let mut b_clone = b.clone();
+                    b_clone.tests = missing_tests;
+                    benchmarks_to_run.push(b_clone);
+                }
+            }
             
-            let pb = m.add(ProgressBar::new(benchmarks.len() as u64));
+            let pb = m.add(ProgressBar::new(benchmarks_to_run.len() as u64));
             pb.set_style(ProgressStyle::default_bar()
                 .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
                 .unwrap()
@@ -97,9 +141,9 @@ async fn main() -> Result<(), anyhow::Error> {
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message("Running benchmarks...");
 
-            for b in benchmarks {
+            for b in benchmarks_to_run {
                 pb.set_message(format!("{} running", b.name));
-                let _ = runner.run_benchmark(b, &m).await;
+                let _ = runner.run_benchmark(&b, &m).await;
                 pb.inc(1);
             }
             pb.finish_with_message("Done");
@@ -119,8 +163,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 DatabaseKind::Mssql,
             ];
 
-            let runner: Box<dyn runner::BenchmarkRunner> = match env_config {
-                Environment::Local(_local_config) => {
+            let storage = wfb_storage::Storage::new("data")?;
+            let run_id_clone = "verify".to_string();
+            let env_config_clone = env_config.clone();
+            let config_clone = config.clone();
+
+            let runner: Arc<dyn runner::BenchmarkRunner> = match env_config {
+                Environment::Local(ref _local_config) => {
                     let executor = exec::local::LocalExecutor::new();
                     let config = runner::RunnerConfig {
                         db_host: "host.docker.internal".to_string(),
@@ -129,9 +178,19 @@ async fn main() -> Result<(), anyhow::Error> {
                         app_public_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
                         is_remote: false,
                     };
-                    Box::new(runner::Runner::new(executor.clone(), executor.clone(), executor, false, config))
+                    Arc::new(runner::Runner::new(
+                        executor.clone(), 
+                        executor.clone(), 
+                        executor, 
+                        false, 
+                        config,
+                        storage.clone(),
+                        run_id_clone,
+                        env_config_clone,
+                        config_clone,
+                    ))
                 }
-                Environment::Ssh(ssh_config) => {
+                Environment::Ssh(ref ssh_config) => {
                     let app_executor = exec::ssh::SshExecutor::from_config(&ssh_config.app);
                     let db_executor = exec::ssh::SshExecutor::from_config(&ssh_config.db);
                     let wrkr_executor = exec::ssh::SshExecutor::from_config(&ssh_config.wrkr);
@@ -142,7 +201,17 @@ async fn main() -> Result<(), anyhow::Error> {
                         app_public_host_url: format!("http://{}:{}", ssh_config.app.ip, consts::APP_PORT_EXTERNAL),
                         is_remote: true,
                     };
-                    Box::new(runner::Runner::new(app_executor, db_executor, wrkr_executor, true, config))
+                    Arc::new(runner::Runner::new(
+                        app_executor, 
+                        db_executor, 
+                        wrkr_executor, 
+                        true, 
+                        config,
+                        storage,
+                        run_id_clone,
+                        env_config_clone,
+                        config_clone,
+                    ))
                 }
             };
 

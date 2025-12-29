@@ -32,6 +32,10 @@ func main() {
 		c.String(http.StatusOK, "Hello, World!")
 	})
 
+	r.GET("/plaintext", func(c *gin.Context) {
+		c.String(http.StatusOK, "Hello, World!")
+	})
+
 	r.POST("/json/:from/:to", func(c *gin.Context) {
 		from := c.Param("from")
 		to := c.Param("to")
@@ -60,7 +64,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8000"
+		port = "8080"
 	}
 	r.Run(":" + port)
 }

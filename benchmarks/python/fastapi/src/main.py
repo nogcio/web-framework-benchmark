@@ -28,6 +28,10 @@ async def health():
 async def hello_world():
     return PlainTextResponse("Hello, World!")
 
+@app.get("/plaintext")
+async def plaintext():
+    return PlainTextResponse("Hello, World!")
+
 class Servlet(BaseModel):
     servlet_name: str = Field(..., alias="servlet-name")
     servlet_class: str = Field(..., alias="servlet-class")

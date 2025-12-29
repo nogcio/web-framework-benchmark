@@ -8,7 +8,12 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 #[get("/")]
 async fn hello_world() -> impl Responder {
-    HttpResponse::Ok().body("Hello, World!")
+    HttpResponse::Ok().content_type("text/plain").body("Hello, World!")
+}
+
+#[get("/plaintext")]
+async fn plaintext() -> impl Responder {
+    HttpResponse::Ok().content_type("text/plain").body("Hello, World!")
 }
 
 #[get("/health")]
@@ -18,7 +23,7 @@ async fn health_check() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let port: u16 = port.parse().unwrap();
     
     let data_dir = env::var("DATA_DIR").unwrap_or_else(|_| "benchmarks_data".to_string());
@@ -42,6 +47,7 @@ async fn main() -> std::io::Result<()> {
                 }
             })
             .service(hello_world)
+            .service(plaintext)
             .service(health_check)
             .service(Files::new("/files", &data_dir))
     })

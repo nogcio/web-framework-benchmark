@@ -17,13 +17,14 @@ static DATA_DIR: OnceLock<String> = OnceLock::new();
 
 #[tokio::main]
 async fn main() {
-    let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let addr = format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap();
 
     DATA_DIR.get_or_init(|| env::var("DATA_DIR").unwrap_or_else(|_| "benchmarks_data".to_string()));
 
     let app = Router::new()
         .route("/", get(hello_world))
+        .route("/plaintext", get(hello_world))
         .route("/health", get(health_check))
         .route("/json/{from}/{to}", post(json_handler))
         .nest_service("/files", ServeDir::new(DATA_DIR.get().unwrap()))

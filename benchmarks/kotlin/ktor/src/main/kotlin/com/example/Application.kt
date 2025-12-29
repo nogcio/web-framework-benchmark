@@ -15,7 +15,7 @@ import kotlinx.serialization.json.*
 import java.io.File
 
 fun main() {
-    val port = System.getenv("PORT")?.toIntOrNull() ?: 8000
+    val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
     embeddedServer(Netty, port = port, host = "0.0.0.0", module = Application::module)
         .start(wait = true)
 }
@@ -43,6 +43,10 @@ fun Application.module() {
         }
 
         get("/") {
+            call.respondText("Hello, World!")
+        }
+
+        get("/plaintext") {
             call.respondText("Hello, World!")
         }
         

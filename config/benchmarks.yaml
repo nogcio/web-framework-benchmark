@@ -23,3 +23,199 @@ tests:
 tags:
   platform: haproxy
 path: benchmarks/c/haproxy
+
+---
+type: benchmark
+name: fiber
+language: Go
+language_version: "1.25"
+framework: fiber
+framework_version: "2.52.10"
+tests:
+  - plain_text
+tags:
+  platform: fiber
+path: benchmarks/go/fiber
+
+---
+type: benchmark
+name: gin
+language: Go
+language_version: "1.25"
+framework: gin
+framework_version: "1.11.0"
+tests:
+  - plain_text
+tags:
+  platform: gin
+path: benchmarks/go/gin
+
+---
+type: benchmark
+name: fastapi
+language: Python
+language_version: "3.13"
+framework: fastapi
+framework_version: "0.127.0"
+tests:
+  - plain_text
+tags:
+  platform: fastapi
+path: benchmarks/python/fastapi
+
+---
+type: benchmark
+name: axum
+language: Rust
+language_version: "1.85"
+framework: axum
+framework_version: "0.8.8"
+tests:
+  - plain_text
+tags:
+  platform: axum
+path: benchmarks/rust/axum
+
+---
+type: benchmark
+name: actix-web
+language: Rust
+language_version: "1.85"
+framework: actix-web
+framework_version: "4.12.1"
+tests:
+  - plain_text
+tags:
+  platform: actix-web
+path: benchmarks/rust/actix-web
+
+---
+type: benchmark
+name: express
+language: JavaScript
+language_version: "23"
+framework: express
+framework_version: "5.2.1"
+tests:
+  - plain_text
+tags:
+  platform: express
+path: benchmarks/javascript/express
+
+---
+type: benchmark
+name: fastify
+language: JavaScript
+language_version: "23"
+framework: fastify
+framework_version: "5.6.2"
+tests:
+  - plain_text
+tags:
+  platform: fastify
+path: benchmarks/javascript/fastify
+
+---
+type: benchmark
+name: aspnetcore
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "10.0"
+tests:
+  - plain_text
+tags:
+  platform: aspnetcore
+path: benchmarks/csharp/aspnetcore
+
+---
+type: benchmark
+name: spring-boot
+language: Java
+language_version: "23"
+framework: spring-boot
+framework_version: "4.0.1"
+database: postgres
+tests:
+  - plain_text
+tags:
+  platform: spring-boot
+path: benchmarks/java/spring-boot-jpa-postgres
+
+---
+type: benchmark
+name: ktor
+language: Kotlin
+language_version: "2.3.0"
+framework: ktor
+framework_version: "3.3.3"
+tests:
+  - plain_text
+tags:
+  platform: ktor
+path: benchmarks/kotlin/ktor
+
+---
+type: benchmark
+name: hono
+language: JavaScript
+language_version: "23"
+framework: hono
+framework_version: "4.11.2"
+tests:
+  - plain_text
+tags:
+  platform: hono
+path: benchmarks/javascript/hono
+
+---
+type: benchmark
+name: pingora
+language: Rust
+language_version: "1.85"
+framework: pingora
+framework_version: "0.6"
+tests:
+  - plain_text
+tags:
+  platform: pingora
+path: benchmarks/rust/pingora
+
+---
+type: benchmark
+name: envoy
+language: C++
+language_version: "17"
+framework: envoy
+framework_version: "1.36.4"
+tests:
+  - plain_text
+tags:
+  platform: envoy
+path: benchmarks/cpp/envoy
+
+---
+type: benchmark
+name: caddy
+language: Go
+language_version: "1.25"
+framework: caddy
+framework_version: "2.10.2"
+tests:
+  - plain_text
+tags:
+  platform: caddy
+path: benchmarks/go/caddy
+
+---
+type: benchmark
+name: openresty
+language: Lua
+language_version: "5.1"
+framework: openresty
+framework_version: "1.27.1.2"
+tests:
+  - plain_text
+tags:
+  platform: openresty
+path: benchmarks/lua/nginx

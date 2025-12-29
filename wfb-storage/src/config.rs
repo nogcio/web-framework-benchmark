@@ -134,4 +134,8 @@ impl Config {
             .iter()
             .find(|env| env.name() == name)
     }
+
+    pub fn get_lang(&self, name: &str) -> Option<&Lang> {
+        self.inner.langs.iter().find(|l| l.name == name)
+    }
 }

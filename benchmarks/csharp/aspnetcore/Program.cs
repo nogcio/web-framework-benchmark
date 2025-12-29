@@ -14,7 +14,7 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Error);
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8000";
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 var dataDir = Environment.GetEnvironmentVariable("DATA_DIR") ?? "benchmarks_data";
 
 var app = builder.Build();
@@ -46,6 +46,7 @@ if (Directory.Exists(dataDir))
 }
 
 app.MapGet("/", () => "Hello, World!");
+app.MapGet("/plaintext", () => "Hello, World!");
 
 app.MapGet("/health", async (HttpContext ctx) =>
 {

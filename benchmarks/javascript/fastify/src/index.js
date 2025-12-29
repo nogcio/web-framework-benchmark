@@ -46,6 +46,10 @@ if (cluster.isMaster) {
     return 'Hello, World!';
   });
 
+  fastify.get('/plaintext', async (request, reply) => {
+    return 'Hello, World!';
+  });
+
   // JSON Serialization
   fastify.post('/json/:from/:to', async (request, reply) => {
     const { from, to } = request.params;
@@ -63,7 +67,7 @@ if (cluster.isMaster) {
 
   const start = async () => {
     try {
-      const port = parseInt(process.env.PORT || '8000');
+      const port = parseInt(process.env.PORT || '8080');
       await fastify.listen({ port, host: '0.0.0.0' });
       console.log(`Worker ${process.pid} listening on port ${port}`);
     } catch (err) {

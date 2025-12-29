@@ -10,4 +10,9 @@ public class HelloController {
     public String hello() {
         return "Hello, World!";
     }
+
+    @GetMapping(value = "/plaintext", produces = MediaType.TEXT_PLAIN_VALUE)
+    public String plaintext() {
+        return "Hello, World!";
+    }
 }

@@ -27,6 +27,10 @@ func main() {
 		return c.SendString("Hello, World!")
 	})
 
+	app.Get("/plaintext", func(c *fiber.Ctx) error {
+		return c.SendString("Hello, World!")
+	})
+
 	dataDir := os.Getenv("DATA_DIR")
 	if dataDir == "" {
 		dataDir = "benchmarks_data"
@@ -36,8 +40,8 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8000"
+		port = "8080"
 	}
 
-	app.Listen(":" + port)
+	app.Listen("0.0.0.0:" + port)
 }

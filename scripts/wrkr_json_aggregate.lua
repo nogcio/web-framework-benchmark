@@ -2,13 +2,12 @@ local countries = {"US", "DE", "FR", "UK", "JP"}
 local statuses = {"completed", "pending", "failed"}
 local categories = {"Electronics", "Books", "Clothing", "Home"}
 
-setup = function(ctx)
-    -- Seed random number generator with time and VU ID to ensure uniqueness per VU
-    math.randomseed(os.time() + ctx:vu())
-end
+local data_pool = {}
+local pool_size = 20000
+local current_index = 1
 
-scenario = function(ctx)
-    local num_orders = 500
+local function generate_entry()
+    local num_orders = 100
     
     local orders = {}
     local expected_processed = 0
@@ -58,13 +57,29 @@ scenario = function(ctx)
             expected_results[country] = expected_results[country] + total_amount
         end
     end
-    
-    local resp = ctx:http({
-        method = "POST",
-        url = "/json/aggregate",
-        headers = { ["Content-Type"] = "application/json" },
-        body = orders
-    })
+
+    return {
+        orders = orders,
+        expected_processed = expected_processed,
+        expected_results = expected_results,
+        expected_category_stats = expected_category_stats
+    }
+end
+
+setup = function(ctx)
+    -- Seed random number generator with time and VU ID to ensure uniqueness per VU
+    math.randomseed(os.time() + ctx:vu())
+
+    for i = 1, pool_size do
+        data_pool[i] = generate_entry()
+    end
+end
+
+scenario = function(ctx)
+    local data = data_pool[current_index]
+    current_index = (current_index % pool_size) + 1
+
+    local resp = ctx:post("/json/aggregate", data.orders)
     
     ctx:assert(resp:status() == 200, "Status is not 200: " .. resp:status())
     
@@ -72,17 +87,17 @@ scenario = function(ctx)
     
     ctx:assert(type(body) == "table", "Response body is not a JSON object")
     
-    ctx:assert(body.processedOrders == expected_processed, 
-        string.format("processedOrders mismatch: expected %d, got %s", expected_processed, tostring(body.processedOrders)))
+    ctx:assert(body.processedOrders == data.expected_processed, 
+        string.format("processedOrders mismatch: expected %d, got %s", data.expected_processed, tostring(body.processedOrders)))
     
     ctx:assert(type(body.results) == "table", "body.results is not a table")
-    for k, v in pairs(expected_results) do
+    for k, v in pairs(data.expected_results) do
         local actual = body.results[k] or 0
         ctx:assert(actual == v, string.format("results mismatch for %s: expected %d, got %d", k, v, actual))
     end
     
     ctx:assert(type(body.categoryStats) == "table", "body.categoryStats is not a table")
-    for k, v in pairs(expected_category_stats) do
+    for k, v in pairs(data.expected_category_stats) do
         local actual = body.categoryStats[k] or 0
         ctx:assert(actual == v, string.format("categoryStats mismatch for %s: expected %d, got %d", k, v, actual))
     end

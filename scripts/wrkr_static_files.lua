@@ -1,7 +1,6 @@
 local files = {
     { name = "15kb.bin", size = 15 * 1024 },
-    { name = "1mb.bin", size = 1024 * 1024 },
-    { name = "10mb.bin", size = 10 * 1024 * 1024 }
+    { name = "1mb.bin", size = 1024 * 1024 }
 }
 
 setup = function(ctx)

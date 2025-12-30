@@ -33,11 +33,11 @@ pub async fn ensure_data() -> std::result::Result<(), io::Error> {
     // sizes in bytes
     let f15 = base.join("15kb.bin");
     let f1m = base.join("1mb.bin");
-    let f10m = base.join("10mb.bin");
+    //let f10m = base.join("10mb.bin");
 
     create_if_missing_random(f15, 15 * 1024)?;
     create_if_missing_random(f1m, 1024 * 1024)?;
-    create_if_missing_random(f10m, 10 * 1024 * 1024)?;
+    //create_if_missing_random(f10m, 10 * 1024 * 1024)?;
 
     Ok(())
 }

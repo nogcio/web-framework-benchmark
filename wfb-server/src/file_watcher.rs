@@ -24,10 +24,12 @@ impl FileWatcherService {
     {
         let (tx, rx) = mpsc::channel(100);
 
-        let config_path = config_path.as_ref().to_path_buf();
-        let data_path = data_path.as_ref().to_path_buf();
+        let config_path = std::fs::canonicalize(config_path)?;
+        let data_path = std::fs::canonicalize(data_path)?;
 
         let tx_clone = tx.clone();
+        let runtime_handle = tokio::runtime::Handle::current();
+
         let watcher = RecommendedWatcher::new(
             move |res: notify::Result<Event>| {
                 match res {
@@ -44,7 +46,7 @@ impl FileWatcherService {
                             };
 
                             if let Some(evt) = change_event {
-                                tokio::spawn(async move {
+                                runtime_handle.spawn(async move {
                                     if let Err(e) = tx.send(evt).await {
                                         warn!("Failed to send file change event: {}", e);
                                     }

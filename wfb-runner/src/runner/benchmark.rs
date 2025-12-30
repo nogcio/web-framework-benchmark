@@ -14,8 +14,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
     pub async fn run_app(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
         let mut cmd = self.app_docker.run_command(&benchmark.name, &benchmark.name)
             .port(consts::APP_PORT_EXTERNAL, consts::APP_PORT_INTERNAL)
-            .ulimit("nofile=1000000:1000000")
-            .sysctl("net.core.somaxconn", "65535");
+            .ulimit("nofile=1000000:1000000");
 
         if let Some(db_kind) = &benchmark.database {
             cmd = cmd
@@ -232,18 +231,62 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             self.run_app(benchmark, &pb).await?;
             self.wait_for_app_ready(benchmark, &pb).await?;
 
+            let (script_path, step_connections) = match test {
+                BenchmarkTests::PlainText => (consts::SCRIPT_PLAINTEXT, consts::BENCHMARK_STEP_CONNECTIONS_PLAINTEXT),
+                BenchmarkTests::JsonAggregate => (consts::SCRIPT_JSON, consts::BENCHMARK_STEP_CONNECTIONS_JSON),
+                BenchmarkTests::StaticFiles => (consts::SCRIPT_STATIC, consts::BENCHMARK_STEP_CONNECTIONS_STATIC),
+            };
+
+            // --- WARMUP PHASE ---
+            {
+                let warmup_pb = mb.add(ProgressBar::new(consts::BENCHMARK_WARMUP_DURATION_SECS));
+                warmup_pb.set_style(
+                    ProgressStyle::default_bar()
+                        .template("{spinner:.yellow} {prefix} [WARMUP] [{bar:40.yellow/white}] {msg}")
+                        .unwrap()
+                        .progress_chars("=>-"),
+                );
+                warmup_pb.set_prefix(format!("[{}/{}]", benchmark.name, test));
+                warmup_pb.enable_steady_tick(Duration::from_millis(100));
+
+                let warmup_duration = format!("{}", consts::BENCHMARK_WARMUP_DURATION_SECS);
+
+                let cmd = self.wrkr_docker.run_command(consts::WRKR_IMAGE, "wrkr-warmup")
+                    .detach(false)
+                    .ulimit("nofile=1000000:1000000")
+                    .arg("-s")
+                    .arg(script_path)
+                    .arg("--url")
+                    .arg(&self.config.app_host_url)
+                    .arg("--duration")
+                    .arg(&warmup_duration)
+                    .arg("--connections")
+                    .arg("8")
+                    .arg("--output")
+                    .arg("json");
+
+                let warmup_pb_clone = warmup_pb.clone();
+                let _ = self.wrkr_docker.execute_run_with_std_out(cmd, move |line| {
+                    if let Ok(stats) = serde_json::from_str::<JsonStats>(line) {
+                        warmup_pb_clone.set_position(stats.elapsed_secs.min(consts::BENCHMARK_WARMUP_DURATION_SECS));
+                        warmup_pb_clone.set_message(format!(
+                            "RPS: {:.0} | Latency: {}",
+                            stats.requests_per_sec,
+                            format_latency(stats.latency_p99)
+                        ));
+                    }
+                }, &warmup_pb).await;
+                self.wrkr_docker.stop_and_remove("wrkr-warmup", &warmup_pb).await;
+                warmup_pb.finish_and_clear();
+            }
+            // --- END WARMUP PHASE ---
+
             let run_pb = mb.add(ProgressBar::new(100));
             run_pb.set_style(
                 ProgressStyle::default_bar()
                     .template("{msg}")
                     .unwrap(),
             );
-            
-            let (script_path, step_connections) = match test {
-                BenchmarkTests::PlainText => (consts::SCRIPT_PLAINTEXT, consts::BENCHMARK_STEP_CONNECTIONS_PLAINTEXT),
-                BenchmarkTests::JsonAggregate => (consts::SCRIPT_JSON, consts::BENCHMARK_STEP_CONNECTIONS_JSON),
-                BenchmarkTests::StaticFiles => (consts::SCRIPT_STATIC, consts::BENCHMARK_STEP_CONNECTIONS_STATIC),
-            };
             
             let duration = format!("{}", consts::BENCHMARK_DURATION_PER_TEST_SECS);
             let step_duration = format!("{}", consts::BENCHMARK_STEP_DURATION_SECS);
@@ -269,7 +312,6 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
             let cmd = self.wrkr_docker.run_command(consts::WRKR_IMAGE, "wrkr-runner")
                 .detach(false)
-                .network("host")
                 .ulimit("nofile=1000000:1000000")
                 .arg("-s")
                 .arg(script_path)

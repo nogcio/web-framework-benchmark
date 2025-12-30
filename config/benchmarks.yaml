@@ -9,7 +9,9 @@ tests:
   - plain_text
   - static_files
 tags:
-  platform: nginx
+  type: proxy
+  runtime: native
+  arch: event-loop
 path: benchmarks/c/nginx
 
 ---
@@ -22,7 +24,9 @@ framework_version: "2.8.4"
 tests:
   - plain_text
 tags:
-  platform: haproxy
+  type: proxy
+  runtime: native
+  arch: event-loop
 path: benchmarks/c/haproxy
 
 ---
@@ -35,8 +39,11 @@ framework_version: "2.52.10"
 tests:
   - plain_text
   - static_files
+  - json_aggregate
 tags:
-  platform: fiber
+  type: micro-framework
+  runtime: native
+  arch: async
 path: benchmarks/go/fiber
 
 ---
@@ -51,14 +58,16 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: gin
+  type: micro-framework
+  runtime: native
+  arch: async
 path: benchmarks/go/gin
 
 ---
 type: benchmark
 name: fastapi
 language: Python
-language_version: "3.13"
+language_version: "3.14"
 framework: fastapi
 framework_version: "0.127.0"
 tests:
@@ -66,14 +75,16 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: fastapi
+  type: micro-framework
+  runtime: python-asyncio
+  arch: async
 path: benchmarks/python/fastapi
 
 ---
 type: benchmark
 name: axum
 language: Rust
-language_version: "1.85"
+language_version: "1.92"
 framework: axum
 framework_version: "0.8.8"
 tests:
@@ -81,28 +92,32 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: axum
+  type: micro-framework
+  runtime: native
+  arch: async
 path: benchmarks/rust/axum
 
 ---
 type: benchmark
 name: actix-web
 language: Rust
-language_version: "1.85"
+language_version: "1.92"
 framework: actix-web
 framework_version: "4.12.1"
 tests:
   - plain_text
-  - static_files  
+  - static_files
 tags:
-  platform: actix-web
+  type: micro-framework
+  runtime: native
+  arch: async
 path: benchmarks/rust/actix-web
 
 ---
 type: benchmark
 name: express
 language: JavaScript
-language_version: "23"
+language_version: "25"
 framework: express
 framework_version: "5.2.1"
 tests:
@@ -110,14 +125,16 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: express
+  type: micro-framework
+  runtime: nodejs
+  arch: event-loop
 path: benchmarks/javascript/express
 
 ---
 type: benchmark
 name: fastify
 language: JavaScript
-language_version: "23"
+language_version: "25"
 framework: fastify
 framework_version: "5.6.2"
 tests:
@@ -125,7 +142,9 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: fastify
+  type: micro-framework
+  runtime: nodejs
+  arch: event-loop
 path: benchmarks/javascript/fastify
 
 ---
@@ -140,7 +159,9 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: aspnetcore
+  type: framework
+  runtime: dotnet
+  arch: async
 path: benchmarks/csharp/aspnetcore
 
 ---
@@ -156,7 +177,10 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: spring-boot
+  type: full-stack
+  runtime: jvm
+  arch: thread-per-request
+  orm: jpa
 path: benchmarks/java/spring-boot-jpa-postgres
 
 ---
@@ -171,34 +195,40 @@ tests:
   - static_files
   - json_aggregate
 tags:
-  platform: ktor
+  type: micro-framework
+  runtime: jvm
+  arch: coroutine
 path: benchmarks/kotlin/ktor
 
 ---
 type: benchmark
 name: hono
 language: JavaScript
-language_version: "23"
+language_version: "Bun 1.3.5"
 framework: hono
 framework_version: "4.11.2"
 tests:
   - plain_text
   - json_aggregate
 tags:
-  platform: hono
+  type: micro-framework
+  runtime: bun
+  arch: event-loop
 path: benchmarks/javascript/hono
 
 ---
 type: benchmark
 name: pingora
 language: Rust
-language_version: "1.85"
+language_version: "1.92"
 framework: pingora
 framework_version: "0.6"
 tests:
   - plain_text
 tags:
-  platform: pingora
+  type: proxy
+  runtime: native
+  arch: async
 path: benchmarks/rust/pingora
 
 ---
@@ -211,7 +241,9 @@ framework_version: "1.36.4"
 tests:
   - plain_text
 tags:
-  platform: envoy
+  type: proxy
+  runtime: native
+  arch: event-loop
 path: benchmarks/cpp/envoy
 
 ---
@@ -225,7 +257,9 @@ tests:
   - plain_text
   - static_files
 tags:
-  platform: caddy
+  type: proxy
+  runtime: native
+  arch: async
 path: benchmarks/go/caddy
 
 ---
@@ -239,5 +273,7 @@ tests:
   - plain_text
   - json_aggregate
 tags:
-  platform: openresty
+  type: proxy
+  runtime: native
+  arch: event-loop
 path: benchmarks/lua/nginx

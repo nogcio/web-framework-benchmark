@@ -17,17 +17,17 @@ static DATA_DIR: OnceLock<String> = OnceLock::new();
 
 #[tokio::main]
 async fn main() {
-    let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let addr = format!("0.0.0.0:{}", port).parse::<SocketAddr>().unwrap();
 
     DATA_DIR.get_or_init(|| env::var("DATA_DIR").unwrap_or_else(|_| "benchmarks_data".to_string()));
 
     let app = Router::new()
         .route("/", get(hello_world))
+        .route("/plaintext", get(hello_world))
         .route("/health", get(health_check))
-        .route("/json/{from}/{to}", post(json_handler))
-        .nest_service("/files", ServeDir::new(DATA_DIR.get().unwrap()))
-        .layer(middleware::from_fn(x_request_id_middleware));
+        .route("/json/aggregate", post(json_aggregate))
+        .nest_service("/files", ServeDir::new(DATA_DIR.get().unwrap()));
 
     println!("Listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -35,17 +35,6 @@ async fn main() {
 }
 
 
-
-async fn x_request_id_middleware(req: Request, next: Next) -> Response {
-    let request_id = req.headers().get("x-request-id").cloned();
-    let mut response = next.run(req).await;
-
-    if let Some(request_id) = request_id {
-        response.headers_mut().insert("x-request-id", request_id);
-    }
-
-    response
-}
 
 async fn hello_world() -> &'static str {
     "Hello, World!"
@@ -55,38 +44,52 @@ async fn health_check() -> &'static str {
     "OK"
 }
 
-#[derive(Deserialize, Serialize)]
-struct Payload {
-    #[serde(rename = "web-app")]
-    web_app: WebApp,
-    #[serde(flatten)]
-    extra: HashMap<String, serde_json::Value>,
+#[derive(Deserialize)]
+struct Order {
+    status: String,
+    amount: i64,
+    country: String,
+    items: Option<Vec<OrderItem>>,
 }
 
-#[derive(Deserialize, Serialize)]
-struct WebApp {
-    #[serde(rename = "servlet")]
-    servlets: Vec<Servlet>,
-    #[serde(flatten)]
-    extra: HashMap<String, serde_json::Value>,
+#[derive(Deserialize)]
+struct OrderItem {
+    quantity: i32,
+    category: String,
 }
 
-#[derive(Deserialize, Serialize)]
-struct Servlet {
-    #[serde(rename = "servlet-name")]
-    servlet_name: String,
-    #[serde(flatten)]
-    extra: HashMap<String, serde_json::Value>,
+#[derive(Serialize)]
+struct AggregateResponse {
+    #[serde(rename = "processedOrders")]
+    processed_orders: usize,
+    results: HashMap<String, i64>,
+    #[serde(rename = "categoryStats")]
+    category_stats: HashMap<String, i32>,
 }
 
-async fn json_handler(
-    Path((from, to)): Path<(String, String)>,
-    Json(mut payload): Json<Payload>,
+async fn json_aggregate(
+    Json(orders): Json<Vec<Order>>,
 ) -> impl IntoResponse {
-    for servlet in &mut payload.web_app.servlets {
-        if servlet.servlet_name == from {
-            servlet.servlet_name = to.clone();
+    let mut processed_orders = 0;
+    let mut results = HashMap::new();
+    let mut category_stats = HashMap::new();
+
+    for order in orders {
+        if order.status == "completed" {
+            processed_orders += 1;
+            *results.entry(order.country).or_insert(0) += order.amount;
+            
+            if let Some(items) = &order.items {
+                for item in items {
+                    *category_stats.entry(item.category.clone()).or_insert(0) += item.quantity;
+                }
+            }
         }
     }
-    Json(payload)
+
+    Json(AggregateResponse {
+        processed_orders,
+        results,
+        category_stats,
+    })
 }

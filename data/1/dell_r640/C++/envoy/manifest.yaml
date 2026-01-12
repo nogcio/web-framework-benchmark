@@ -1,0 +1,8 @@
+language_version: '17'
+framework_version: 1.36.4
+tags:
+  type: proxy
+  runtime: native
+  arch: event-loop
+database: null
+path: benchmarks/cpp/envoy

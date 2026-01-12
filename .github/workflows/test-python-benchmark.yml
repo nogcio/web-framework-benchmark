@@ -23,20 +23,9 @@ jobs:
       matrix:
         include:
           - name: fastapi
-            framework_path: benchmarks/python/fastapi
-            image_tag: wfb-python-fastapi
-            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
-            database: ""
           - name: fastapi-pg
-            framework_path: benchmarks/python/fastapi-pg
-            image_tag: wfb-python-fastapi-pg
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: postgres
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml
     with:
-      framework_path: ${{ matrix.framework_path }}
-      image_tag: ${{ matrix.image_tag }}
-      tests: ${{ matrix.tests }}
-      database: ${{ matrix.database }}
+      benchmark: ${{ matrix.name }}

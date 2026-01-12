@@ -1,12 +1,12 @@
 services:
-  wfb:
+  server:
     build: .
     image: wfb:latest
-    container_name: wfb
+    container_name: wfb-server
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./data:/app/data
       - ./config/environments:/app/config/environments      
     restart: unless-stopped
-    command: serve --host 0.0.0.0 --port 8080
+    command: wfb-server --host 0.0.0.0 --port 8080

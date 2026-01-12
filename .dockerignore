@@ -10,3 +10,7 @@ node_modules
 
 ## Rust
 target
+
+## CSharp
+bin
+obj

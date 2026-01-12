@@ -13,5 +13,7 @@ COPY --from=build /app/out .
 
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0
 
-ENV ASPNETCORE_URLS=http://+:8000
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+ENV ASPNETCORE_URLS=http://+:8080
+HEALTHCHECK --interval=5s --timeout=3s --retries=3 CMD curl --fail http://localhost:8080/health || exit 1
 CMD ["dotnet", "wfb-aspnetcore.dll"]

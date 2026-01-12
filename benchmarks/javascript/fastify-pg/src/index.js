@@ -21,19 +21,6 @@ if (cluster.isMaster) {
     disableRequestLogging: true
   });
   const pool = require('./db');
-  const crypto = require('crypto');
-  const jwt = require('jsonwebtoken');
-
-  const JWT_SECRET = 'benchmark-secret';
-
-  // X-Request-ID handling
-  fastify.addHook('onSend', (request, reply, payload, done) => {
-    const requestId = request.headers['x-request-id'];
-    if (requestId) {
-      reply.header('x-request-id', requestId);
-    }
-    done();
-  });
 
   // Health Check
   fastify.get('/health', async (request, reply) => {
@@ -45,156 +32,56 @@ if (cluster.isMaster) {
     }
   });
 
-  // Database Tests
-  fastify.get('/db/read/one', async (request, reply) => {
-    const id = parseInt(request.query.id);
-    const res = await pool.query({
-      name: 'db_read_one',
-      text: 'SELECT id, name, created_at as "createdAt", updated_at as "updatedAt" FROM hello_world WHERE id = $1',
-      values: [id]
-    });
-    return res.rows[0];
-  });
+  const getUserProfile = async (email) => {
+    // Parallel: Get User and Trending
+    const [userResult, trendingResult] = await Promise.all([
+      pool.query('SELECT id, username, email, created_at as "createdAt", last_login as "lastLogin", settings FROM users WHERE email = $1', [email]),
+      pool.query('SELECT id, title, content, views, created_at as "createdAt" FROM posts ORDER BY views DESC LIMIT 5')
+    ]);
 
-  fastify.get('/db/read/many', async (request, reply) => {
-    const offset = parseInt(request.query.offset) || 0;
-    const limit = parseInt(request.query.limit) || 50;
-    const res = await pool.query({
-      name: 'db_read_many',
-      text: 'SELECT id, name, created_at as "createdAt", updated_at as "updatedAt" FROM hello_world ORDER BY id LIMIT $1 OFFSET $2',
-      values: [limit, offset]
-    });
-    return res.rows;
-  });
-
-  fastify.post('/db/write/insert', async (request, reply) => {
-    const { name } = request.body;
-    const now = new Date();
-    const res = await pool.query({
-      name: 'db_write_insert',
-      text: 'INSERT INTO hello_world (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id, name, created_at as "createdAt", updated_at as "updatedAt"',
-      values: [name, now, now]
-    });
-    return res.rows[0];
-  });
-
-  // Tweet Service
-
-  // Auth Middleware
-  const authenticate = async (request, reply) => {
-    try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader) {
-        return reply.code(401).send({ error: 'Unauthorized' });
-      }
-      const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
-      request.user = decoded;
-    } catch (err) {
-      return reply.code(401).send({ error: 'Unauthorized' });
+    if (userResult.rows.length === 0) {
+      return null;
     }
+
+    const user = userResult.rows[0];
+    
+    // Update last_login and Get User Posts
+    const [updateResult, postsResult] = await Promise.all([
+      pool.query('UPDATE users SET last_login = NOW() WHERE id = $1 RETURNING last_login as "lastLogin"', [user.id]),
+      pool.query(
+        'SELECT id, title, content, views, created_at as "createdAt" FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10',
+        [user.id]
+      )
+    ]);
+
+    user.lastLogin = updateResult.rows[0].lastLogin;
+
+    return {
+      ...user,
+      posts: postsResult.rows,
+      trending: trendingResult.rows
+    };
   };
 
-  fastify.post('/api/auth/register', async (request, reply) => {
-    const { username, password } = request.body;
-    const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+  // DB Complex Read
+  fastify.get('/db/user-profile/:email', async (request, reply) => {
+    const email = request.params.email;
     
     try {
-      await pool.query('INSERT INTO users (username, password_hash) VALUES ($1, $2)', [username, passwordHash]);
-      reply.code(201).send();
+      const result = await getUserProfile(email);
+      if (!result) {
+        return reply.code(404).send({ error: 'User not found' });
+      }
+      return result;
     } catch (err) {
-      if (err.code === '23505') { // Unique violation
-        // Treat duplicate registration as success to keep the benchmark workload stable.
-        reply.code(201).send();
-      } else {
-        throw err;
-      }
+      console.error(err);
+      return reply.code(500).send({ error: 'Internal Server Error' });
     }
-  });
-
-  fastify.post('/api/auth/login', async (request, reply) => {
-    const { username, password } = request.body;
-    const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
-    
-    const res = await pool.query('SELECT id FROM users WHERE username = $1 AND password_hash = $2', [username, passwordHash]);
-    
-    if (res.rows.length === 0) {
-      reply.code(401).send({ error: 'Invalid credentials' });
-      return;
-    }
-    
-    const user = res.rows[0];
-    const token = jwt.sign({ sub: user.id, name: username }, JWT_SECRET);
-    return { token };
-  });
-
-  fastify.get('/api/feed', { preHandler: authenticate }, async (request, reply) => {
-    const res = await pool.query(`
-      SELECT t.id, u.username, t.content, t.created_at as "createdAt", (SELECT COUNT(*) FROM likes l WHERE l.tweet_id = t.id) as likes
-      FROM tweets t
-      JOIN users u ON t.user_id = u.id
-      ORDER BY t.created_at DESC
-      LIMIT 20
-    `);
-    // Convert likes to int because COUNT returns string in pg
-    const feed = res.rows.map(row => ({
-      ...row,
-      likes: parseInt(row.likes)
-    }));
-    return feed;
-  });
-
-  fastify.get('/api/tweets/:id', { preHandler: authenticate }, async (request, reply) => {
-    const id = parseInt(request.params.id);
-    const res = await pool.query(`
-      SELECT t.id, u.username, t.content, t.created_at as "createdAt", (SELECT COUNT(*) FROM likes l WHERE l.tweet_id = t.id) as likes
-      FROM tweets t
-      JOIN users u ON t.user_id = u.id
-      WHERE t.id = $1
-    `, [id]);
-    
-    if (res.rows.length === 0) {
-      reply.code(404).send({ error: 'Tweet not found' });
-      return;
-    }
-    
-    const tweet = res.rows[0];
-    tweet.likes = parseInt(tweet.likes);
-    return tweet;
-  });
-
-  fastify.post('/api/tweets', { preHandler: authenticate }, async (request, reply) => {
-    const { content } = request.body;
-    const userId = request.user.sub;
-    
-    await pool.query(
-      'INSERT INTO tweets (user_id, content) VALUES ($1, $2)',
-      [userId, content]
-    );
-    
-    reply.code(201).send();
-  });
-
-  fastify.post('/api/tweets/:id/like', { preHandler: authenticate }, async (request, reply) => {
-    const tweetId = parseInt(request.params.id);
-    const userId = request.user.sub;
-    
-    const res = await pool.query('DELETE FROM likes WHERE user_id = $1 AND tweet_id = $2', [userId, tweetId]);
-    
-    if (res.rowCount === 0) {
-      try {
-        await pool.query('INSERT INTO likes (user_id, tweet_id) VALUES ($1, $2)', [userId, tweetId]);
-      } catch (err) {
-        // Ignore if tweet doesn't exist or race condition
-      }
-    }
-    
-    reply.send();
   });
 
   const start = async () => {
     try {
-      const port = parseInt(process.env.PORT || '8000');
+      const port = parseInt(process.env.PORT || '8080');
       await fastify.listen({ port, host: '0.0.0.0' });
       console.log(`Worker ${process.pid} listening on port ${port}`);
     } catch (err) {

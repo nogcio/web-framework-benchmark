@@ -1,6 +1,7 @@
-:8000 {
+:8080 {
     respond /health "OK" 200
     respond / "Hello, World!" 200
+    respond /plaintext "Hello, World!" 200
     
     handle /files/* {
         uri strip_prefix /files

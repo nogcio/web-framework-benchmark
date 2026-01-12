@@ -1,0 +1,8 @@
+language_version: '5.1'
+framework_version: 1.27.1.2
+tags:
+  runtime: native
+  type: proxy
+  arch: event-loop
+database: null
+path: benchmarks/lua/nginx

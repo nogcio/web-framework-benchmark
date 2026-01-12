@@ -1,0 +1,8 @@
+language_version: '25'
+framework_version: 5.2.1
+tags:
+  arch: event-loop
+  runtime: nodejs
+  type: micro-framework
+database: null
+path: benchmarks/javascript/express

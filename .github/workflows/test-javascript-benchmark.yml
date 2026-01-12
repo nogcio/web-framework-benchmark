@@ -23,30 +23,11 @@ jobs:
       matrix:
         include:
           - name: fastify
-            framework_path: benchmarks/javascript/fastify
-            image_tag: wfb-javascript-fastify
-            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
-            database: ""
           - name: fastify-pg
-            framework_path: benchmarks/javascript/fastify-pg
-            image_tag: wfb-javascript-fastify-pg
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: postgres
           - name: express
-            framework_path: benchmarks/javascript/express
-            image_tag: wfb-javascript-express
-            tests: hello_world,static_files_small,static_files_medium,static_files_large
-            database: ""
           - name: hono
-            framework_path: benchmarks/javascript/hono
-            image_tag: wfb-javascript-hono
-            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
-            database: ""
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml
     with:
-      framework_path: ${{ matrix.framework_path }}
-      image_tag: ${{ matrix.image_tag }}
-      tests: ${{ matrix.tests }}
-      database: ${{ matrix.database }}
+      benchmark: ${{ matrix.name }}

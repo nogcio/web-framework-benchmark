@@ -1,67 +1,50 @@
-db = db.getSiblingDB('benchmark');
+db = db.getSiblingDB('hello_world');
 
-function getObjectId(i) {
-  var hex = i.toString(16);
-  while (hex.length < 24) {
-    hex = '0' + hex;
-  }
-  return ObjectId(hex);
+db.createCollection("users");
+db.createCollection("posts");
+
+db.users.createIndex({ email: 1 }, { unique: true });
+db.posts.createIndex({ views: -1 });
+db.posts.createIndex({ user_id: 1, created_at: -1 });
+
+const users = [];
+const posts = [];
+
+for (let i = 1; i <= 10000; i++) {
+    const userId = new ObjectId();
+    users.push({
+        _id: userId,
+        username: `user_${i}`,
+        email: `user_${i}@example.com`,
+        created_at: new Date(),
+        last_login: null,
+        settings: { theme: "dark", notifications: true, language: "en" }
+    });
+
+    for (let j = 1; j <= 15; j++) {
+        posts.push({
+            _id: new ObjectId(),
+            user_id: userId,
+            title: `Post ${j}`,
+            content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+            views: Math.floor(Math.random() * 10000),
+            created_at: new Date(Date.now() - j * 60000)
+        });
+    }
+
+    if (users.length >= 1000) {
+        db.users.insertMany(users);
+        users.length = 0;
+    }
+    if (posts.length >= 1000) {
+        db.posts.insertMany(posts);
+        posts.length = 0;
+    }
 }
 
-// Simple LCG for deterministic random numbers
-var _seed = 12345;
-function seededRandom() {
-  var x = Math.sin(_seed++) * 10000;
-  return x - Math.floor(x);
+if (users.length > 0) {
+    db.users.insertMany(users);
 }
-
-function randomInt(min, max) {
-  return Math.floor(seededRandom() * (max - min + 1)) + min;
+if (posts.length > 0) {
+    db.posts.insertMany(posts);
 }
-
-var baseDate = new Date("2024-01-01T00:00:00Z");
-
-// hello_world
-db.createCollection('hello_world');
-var bulk = db.hello_world.initializeUnorderedBulkOp();
-for (var i = 1; i <= 1000; i++) {
-  bulk.insert({
-    _id: getObjectId(i),
-    name: 'name_' + i,
-    created_at: new Date(baseDate.getTime() - i * 1000),
-    updated_at: new Date(baseDate.getTime() - (i - 1) * 1000)
-  });
-}
-bulk.execute();
-
-// users
-db.createCollection('users');
-bulk = db.users.initializeUnorderedBulkOp();
-for (var i = 1; i <= 1000; i++) {
-  bulk.insert({
-    _id: getObjectId(i),
-    username: 'user_' + i,
-    password_hash: 'hash_' + i
-  });
-}
-bulk.execute();
-db.users.createIndex({ username: 1 }, { unique: true });
-
-// tweets
-db.createCollection('tweets');
-bulk = db.tweets.initializeUnorderedBulkOp();
-for (var i = 1; i <= 10000; i++) {
-  bulk.insert({
-    _id: getObjectId(i),
-    user_id: getObjectId(randomInt(1, 1000)),
-    content: 'Tweet content ' + i,
-    created_at: new Date(baseDate.getTime() - i * 1000)
-  });
-}
-bulk.execute();
-db.tweets.createIndex({ created_at: -1 });
-
-// likes
-db.createCollection('likes');
-db.likes.createIndex({ user_id: 1, tweet_id: 1 }, { unique: true });
-db.likes.createIndex({ tweet_id: 1 });

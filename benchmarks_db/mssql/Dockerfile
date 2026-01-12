@@ -8,3 +8,5 @@ EXPOSE 1433
 
 ENTRYPOINT ["/usr/config/entrypoint.sh"]
 CMD ["/opt/mssql/bin/sqlservr"]
+
+HEALTHCHECK --interval=5s --timeout=5s --retries=20 CMD /usr/config/check_ready.sh || exit 1

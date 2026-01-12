@@ -1,0 +1,24 @@
+[package]
+name = "wfb-runner"
+version = "0.4.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+wrkr-core = { path = "../wrkr-core" }
+wfb-storage = { path = "../wfb-storage" }
+tokio = { version = "1.8", features = ["rt-multi-thread", "time", "fs", "macros", "process", "signal"] }
+clap = {version = "4.5.53", features = ["derive", "env"]}
+thiserror = "2.0.17"
+indicatif = "0.18.3"
+humanize-bytes = "1.0.6"
+ssh2 = "0.9"
+anyhow = "1.0.100"
+rand = "0.8"
+console = "0.15"
+serde_json = "1.0.148"
+wrkr-api = { path = "../wrkr-api" }
+async-trait = "0.1.89"

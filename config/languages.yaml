@@ -1,40 +1,59 @@
-- name: Go
-  url: https://golang.org
-  color: "#00ADD8"
+type: language
+name: Go
+url: https://golang.org
+color: "#00ADD8"
 
-- name: JS
-  url: https://nodejs.org
-  color: "#F7DF1E"
+---
+type: language
+name: JavaScript
+url: https://nodejs.org
+color: "#F7DF1E"
 
-- name: Rust
-  url: https://www.rust-lang.org
-  color: "#DEA584"
+---
+type: language
+name: Rust
+url: https://www.rust-lang.org
+color: "#DEA584"
 
-- name: C#
-  url: https://dotnet.microsoft.com/
-  color: "#512BD4"
+---
+type: language
+name: C#
+url: https://dotnet.microsoft.com/
+color: "#512BD4"
 
-- name: Python
-  url: https://www.python.org
-  color: "#3776AB"
+---
+type: language
+name: Python
+url: https://www.python.org
+color: "#3776AB"
 
-- name: Kotlin
-  url: https://kotlinlang.org/
-  color: "#7F52FF"
+---
+type: language
+name: Kotlin
+url: https://kotlinlang.org/
+color: "#7F52FF"
 
-- name: C
-  url: https://en.wikipedia.org/wiki/C_(programming_language)
-  color: "#555555"
+---
+type: language
+name: C
+url: https://en.wikipedia.org/wiki/C_(programming_language)
+color: "#555555"
 
-- name: C++
-  url: https://isocpp.org/
-  color: "#f34b7d"
+---
+type: language
+name: C++
+url: https://isocpp.org/
+color: "#f34b7d"
 
-- name: Lua
-  url: https://www.lua.org
-  color: "#000080"
+---
+type: language
+name: Lua
+url: https://www.lua.org
+color: "#000080"
 
-- name: Java
-  url: https://www.java.com/
-  color: "#b07219"
+---
+type: language
+name: Java
+url: https://www.java.com/
+color: "#b07219"
 

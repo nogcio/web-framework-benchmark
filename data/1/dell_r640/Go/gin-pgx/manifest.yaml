@@ -1,0 +1,8 @@
+language_version: '1.25'
+framework_version: 1.11.0
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: postgres
+path: benchmarks/go/gin-pgx

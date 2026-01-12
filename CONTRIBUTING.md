@@ -2,27 +2,39 @@
 
 Thank you for wanting to contribute! Please follow these guidelines to help us review and merge changes quickly.
 
-1. Fork & branches
-- Fork the repository.
-- Create a branch with a descriptive name, for example: `feat/...`, `fix/...`, `chore/...`.
+## 1. Adding a New Benchmark
 
-2. Code style & checks
-- For Rust: run `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings`.
-- For the frontend: in `web-app` run `npm install` and `npm run lint`.
-- Add tests for changed logic and run `cargo test` / `npm test`.
+For a detailed step-by-step guide on adding new languages or frameworks, please read **[How to Add a New Benchmark](docs/GUIDE_ADDING_BENCHMARKS.md)**.
 
-3. Commits & pull requests
-- Use clear, imperative commit messages, e.g. "Add X", "Fix Y".
-- Open a Pull Request against `main` with a description of what changed, why, and how to test.
-- Reference related issues if applicable.
+**Quick Summary:**
+1.  **Create Directory**: `benchmarks/<language>/<framework>/` with a `Dockerfile` (port 8080).
+2.  **Implement**: Follow specs in `docs/specs/*.md`.
+3.  **Config**: Register in `config/benchmarks.yaml`, `config/frameworks.yaml`, and `config/languages.yaml`.
+4.  **Verify**: Run locally with `cargo run --release --bin wfb-runner ...`.
 
-4. PR checklist (for authors)
-- Code is formatted and linters pass.
-- Tests added/updated when applicable.
-- Documentation or `README.md` updated if necessary.
 
-5. Communication & security
-- Do not commit secrets, tokens, or private keys.
-- If you discover a security issue, report it privately following `SECURITY.md`.
+## 2. General Workflow
 
-If you need help with a PR, leave a comment on the PR or contact the maintainers.
+1.  **Fork & Branch**:
+    - Fork the repository.
+    - Create a branch: `feat/add-framework-x`, `fix/issue-y`.
+
+2.  **Code Style & Checks**:
+    - **Rust Runner**: `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings`.
+    - **Frontend**: In `web-app`, run `npm install` and `npm run lint`.
+    - **Testing**: Run `cargo test` to verify changes to the runner/server.
+
+3.  **Commits & Pull Requests**:
+    - Use clear, imperative commit messages (e.g., "Add Axum benchmark", "Fix CLI argument parsing").
+    - Open a PR against `main` describing your changes.
+
+## 3. PR Checklist
+
+- [ ] Benchmark builds and runs locally (`cargo run --release --bin wfb-runner -- run <id> --env local`).
+- [ ] Code is formatted and linters pass.
+- [ ] `config/benchmarks.yaml` is updated correctly.
+
+## 4. Communication & Security
+
+- Do not commit secrets/tokens.
+- Report security issues privately via `SECURITY.md`.

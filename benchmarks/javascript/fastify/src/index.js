@@ -27,15 +27,6 @@ if (cluster.isMaster) {
     prefix: '/files/', // optional: default '/'
   });
 
-  // X-Request-ID handling
-  fastify.addHook('onSend', (request, reply, payload, done) => {
-    const requestId = request.headers['x-request-id'];
-    if (requestId) {
-      reply.header('x-request-id', requestId);
-    }
-    done();
-  });
-
   // Health Check
   fastify.get('/health', async (request, reply) => {
     return 'OK';
@@ -46,24 +37,45 @@ if (cluster.isMaster) {
     return 'Hello, World!';
   });
 
-  // JSON Serialization
-  fastify.post('/json/:from/:to', async (request, reply) => {
-    const { from, to } = request.params;
-    const body = request.body;
+  fastify.get('/plaintext', async (request, reply) => {
+    return 'Hello, World!';
+  });
 
-    const servlets = body['web-app']['servlet'];
-    for (let i = 0; i < servlets.length; i++) {
-      if (servlets[i]['servlet-name'] === from) {
-        servlets[i]['servlet-name'] = to;
+  // JSON Aggregation
+  fastify.post('/json/aggregate', async (request, reply) => {
+    const orders = request.body;
+    let processedOrders = 0;
+    const results = {};
+    const categoryStats = {};
+
+    if (Array.isArray(orders)) {
+      for (const order of orders) {
+        if (order.status === 'completed') {
+          processedOrders++;
+
+          // results: country -> amount
+          results[order.country] = (results[order.country] || 0) + order.amount;
+
+          // categoryStats: category -> quantity
+          if (Array.isArray(order.items)) {
+            for (const item of order.items) {
+              categoryStats[item.category] = (categoryStats[item.category] || 0) + item.quantity;
+            }
+          }
+        }
       }
     }
 
-    return body;
+    return {
+      processedOrders,
+      results,
+      categoryStats
+    };
   });
 
   const start = async () => {
     try {
-      const port = parseInt(process.env.PORT || '8000');
+      const port = parseInt(process.env.PORT || '8080');
       await fastify.listen({ port, host: '0.0.0.0' });
       console.log(`Worker ${process.pid} listening on port ${port}`);
     } catch (err) {

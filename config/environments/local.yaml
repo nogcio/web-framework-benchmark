@@ -1,14 +1,4 @@
-type: local
-name: Local
-icon: laptop
-wrk:
-  duration_secs: 15
-  threads: 2
-
-limits:
-  db:
-    cpus: 2
-    memory_mb: 1024
-  app:
-    cpus: 4
-    memory_mb: 1024
+type: environment
+executor: local
+name: local
+title: Local

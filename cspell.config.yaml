@@ -17,9 +17,12 @@ words:
   - Deque
   - dotenv
   - dotenvy
+  - indicatif
+  - nogcio
   - rngs
   - serde
   - stdev
   - thiserror
+  - wrkr
 ignoreWords: []
 import: []

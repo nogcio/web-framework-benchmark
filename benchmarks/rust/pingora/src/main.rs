@@ -69,7 +69,7 @@ impl HttpServerApp for HelloServer {
         }
 
         let path = http.req_header().uri.path();
-        let (header, body) = if path == "/" {
+        let (header, body) = if path == "/" || path == "/plaintext" {
             (&self.hello_hdr, self.hello_body.clone())
         } else if path == "/health" {
             (&self.health_hdr, self.health_body.clone())
@@ -101,7 +101,7 @@ fn main() {
     my_server.bootstrap();
 
     let mut service = Service::new("pingora_http".to_string(), HelloServer::new());
-    service.add_tcp("0.0.0.0:8000");
+    service.add_tcp("0.0.0.0:8080");
     my_server.add_service(service);
     my_server.run_forever();
 }

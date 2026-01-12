@@ -1,0 +1,13 @@
+type: environment
+executor: ssh
+name: dell_r640
+title: Dell R640 8vCPU
+spec: |
+  2xIntel Xeon Gold 6254 32CPU, 128GB
+  Host OS: Windows Server 2025
+  Guest OS: Ubuntu 24.04 LTS
+  Virtualization: Hyper-V
+  APP:  4vCPU 8GB
+  DB:   16vCPU 16GB
+  WRKR: 32vCPU 32GB
+  Network: Hyper Private Network

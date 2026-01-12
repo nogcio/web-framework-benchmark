@@ -41,16 +41,17 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function BenchmarkCharts({ benchmarkName }: Props) {
-  const [data, setData] = useState<TestCaseRaw[]>([])
-  const [loading, setLoading] = useState(true)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  
   const selectedRunId = useAppStore(s => s.selectedRunId)
   const selectedEnvironment = useAppStore(s => s.selectedEnvironment)
   const selectedTest = useAppStore(s => s.selectedTest)
 
+  const [data, setData] = useState<TestCaseRaw[]>([])
+  const [loading, setLoading] = useState(!!(selectedRunId && selectedEnvironment && selectedTest))
+  const abortControllerRef = useRef<AbortController | null>(null)
+
   useEffect(() => {
     if (!selectedRunId || !selectedEnvironment || !selectedTest) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false)
       return
     }

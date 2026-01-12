@@ -8,7 +8,7 @@ use crate::benchmark::{Benchmark, BenchmarkManifest, BenchmarkTests};
 use crate::environment::Environment;
 use crate::error::Result;
 use crate::lang::Lang;
-use crate::testcase::{TestCaseSummary, TestCaseRaw};
+use crate::testcase::{TestCaseRaw, TestCaseSummary};
 
 // RunId -> Environment -> Language -> BenchmarkName -> BenchmarkResult
 pub type StorageData =
@@ -102,50 +102,60 @@ impl Storage {
                             continue;
                         }
                         let manifest_file = fs::File::open(&manifest_path)?;
-                        let manifest: BenchmarkManifest = match serde_yaml::from_reader(manifest_file) {
-                            Ok(m) => m,
-                            Err(_) => continue,
-                        };
+                        let manifest: BenchmarkManifest =
+                            match serde_yaml::from_reader(manifest_file) {
+                                Ok(m) => m,
+                                Err(_) => continue,
+                            };
 
                         let mut test_cases = HashMap::new();
                         let mut raw_data = HashMap::new();
 
                         // Load test cases
                         if let Ok(entries) = fs::read_dir(&benchmark_path) {
-                            for file_entry in entries {
-                                if let Ok(file_entry) = file_entry {
-                                    let path = file_entry.path();
-                                    if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
-                                        let file_stem =
-                                            path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                                        if file_stem == "manifest" {
-                                            continue;
-                                        }
+                            for file_entry in entries.flatten() {
+                                let path = file_entry.path();
+                                if let Some(extension) =
+                                    path.extension().and_then(|s| s.to_str())
+                                {
+                                    let file_stem =
+                                        path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                                    if file_stem == "manifest" {
+                                        continue;
+                                    }
 
-                                        if extension == "yaml" {
-                                            if let Ok(summary_file) = fs::File::open(&path) {
-                                                if let Ok(summary) = serde_yaml::from_reader::<_, TestCaseSummary>(summary_file) {
-                                                    test_cases.insert(file_stem.to_string(), summary);
+                                    if extension == "yaml" {
+                                        if let Ok(summary_file) = fs::File::open(&path) {
+                                            if let Ok(summary) =
+                                                serde_yaml::from_reader::<_, TestCaseSummary>(
+                                                    summary_file,
+                                                )
+                                            {
+                                                test_cases
+                                                    .insert(file_stem.to_string(), summary);
+                                            }
+                                        }
+                                    } else if extension == "jsonl"
+                                        && file_stem.ends_with("_raw")
+                                    {
+                                        let test_name = file_stem.trim_end_matches("_raw");
+                                        if let Ok(file) = fs::File::open(&path) {
+                                            let reader = std::io::BufReader::new(file);
+                                            let mut results = Vec::new();
+                                            use std::io::BufRead;
+                                            for line in reader.lines().map_while(|l| l.ok()) {
+                                                if line.is_empty() {
+                                                    continue;
+                                                }
+                                                if let Ok(item) =
+                                                    serde_json::from_str::<TestCaseRaw>(
+                                                        &line,
+                                                    )
+                                                {
+                                                    results.push(item);
                                                 }
                                             }
-                                        } else if extension == "jsonl" && file_stem.ends_with("_raw") {
-                                            let test_name = file_stem.trim_end_matches("_raw");
-                                            if let Ok(file) = fs::File::open(&path) {
-                                                let reader = std::io::BufReader::new(file);
-                                                let mut results = Vec::new();
-                                                use std::io::BufRead;
-                                                for line in reader.lines() {
-                                                    if let Ok(line) = line {
-                                                        if line.is_empty() {
-                                                            continue;
-                                                        }
-                                                        if let Ok(item) = serde_json::from_str::<TestCaseRaw>(&line) {
-                                                            results.push(item);
-                                                        }
-                                                    }
-                                                }
-                                                raw_data.insert(test_name.to_string(), results);
-                                            }
+                                            raw_data.insert(test_name.to_string(), results);
                                         }
                                     }
                                 }
@@ -213,7 +223,9 @@ impl Storage {
             bench_result
                 .test_cases
                 .insert(testcase.to_string(), summary.clone());
-            bench_result.raw_data.insert(testcase.to_string(), raw_data.to_vec());
+            bench_result
+                .raw_data
+                .insert(testcase.to_string(), raw_data.to_vec());
         }
 
         // Save to disk

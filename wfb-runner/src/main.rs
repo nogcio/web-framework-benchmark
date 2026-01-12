@@ -72,20 +72,33 @@ async fn main() -> Result<(), anyhow::Error> {
                     ))
                 }
                 Environment::Ssh(ref ssh_config) => {
-                    let app_executor = exec::ssh::SshExecutor::from_config(&ssh_config.app);
-                    let db_executor = exec::ssh::SshExecutor::from_config(&ssh_config.db);
-                    let wrkr_executor = exec::ssh::SshExecutor::from_config(&ssh_config.wrkr);
+                    let app_config = ssh_config
+                        .app
+                        .as_ref()
+                        .expect("SSH Config: app section missing");
+                    let db_config = ssh_config
+                        .db
+                        .as_ref()
+                        .expect("SSH Config: db section missing");
+                    let wrkr_config = ssh_config
+                        .wrkr
+                        .as_ref()
+                        .expect("SSH Config: wrkr section missing");
+
+                    let app_executor = exec::ssh::SshExecutor::from_config(app_config);
+                    let db_executor = exec::ssh::SshExecutor::from_config(db_config);
+                    let wrkr_executor = exec::ssh::SshExecutor::from_config(wrkr_config);
                     let config = runner::RunnerConfig {
-                        db_host: ssh_config.db.internal_ip.clone(),
+                        db_host: db_config.internal_ip.clone(),
                         db_port: consts::DB_PORT_EXTERNAL.to_string(),
                         app_host_url: format!(
                             "http://{}:{}",
-                            ssh_config.app.internal_ip,
+                            app_config.internal_ip,
                             consts::APP_PORT_EXTERNAL
                         ),
                         app_public_host_url: format!(
                             "http://{}:{}",
-                            ssh_config.app.ip,
+                            app_config.ip,
                             consts::APP_PORT_EXTERNAL
                         ),
                         is_remote: true,
@@ -248,20 +261,33 @@ async fn main() -> Result<(), anyhow::Error> {
                     ))
                 }
                 Environment::Ssh(ref ssh_config) => {
-                    let app_executor = exec::ssh::SshExecutor::from_config(&ssh_config.app);
-                    let db_executor = exec::ssh::SshExecutor::from_config(&ssh_config.db);
-                    let wrkr_executor = exec::ssh::SshExecutor::from_config(&ssh_config.wrkr);
+                    let app_config = ssh_config
+                        .app
+                        .as_ref()
+                        .expect("SSH Config: app section missing");
+                    let db_config = ssh_config
+                        .db
+                        .as_ref()
+                        .expect("SSH Config: db section missing");
+                    let wrkr_config = ssh_config
+                        .wrkr
+                        .as_ref()
+                        .expect("SSH Config: wrkr section missing");
+
+                    let app_executor = exec::ssh::SshExecutor::from_config(app_config);
+                    let db_executor = exec::ssh::SshExecutor::from_config(db_config);
+                    let wrkr_executor = exec::ssh::SshExecutor::from_config(wrkr_config);
                     let config = runner::RunnerConfig {
-                        db_host: ssh_config.db.internal_ip.clone(),
+                        db_host: db_config.internal_ip.clone(),
                         db_port: consts::DB_PORT_EXTERNAL.to_string(),
                         app_host_url: format!(
                             "http://{}:{}",
-                            ssh_config.app.ip,
+                            app_config.ip,
                             consts::APP_PORT_EXTERNAL
                         ),
                         app_public_host_url: format!(
                             "http://{}:{}",
-                            ssh_config.app.ip,
+                            app_config.ip,
                             consts::APP_PORT_EXTERNAL
                         ),
                         is_remote: true,
@@ -346,20 +372,33 @@ async fn main() -> Result<(), anyhow::Error> {
                     ))
                 }
                 Environment::Ssh(ref ssh_config) => {
-                    let app_executor = exec::ssh::SshExecutor::from_config(&ssh_config.app);
-                    let db_executor = exec::ssh::SshExecutor::from_config(&ssh_config.db);
-                    let wrkr_executor = exec::ssh::SshExecutor::from_config(&ssh_config.wrkr);
+                    let app_config = ssh_config
+                        .app
+                        .as_ref()
+                        .expect("SSH Config: app section missing");
+                    let db_config = ssh_config
+                        .db
+                        .as_ref()
+                        .expect("SSH Config: db section missing");
+                    let wrkr_config = ssh_config
+                        .wrkr
+                        .as_ref()
+                        .expect("SSH Config: wrkr section missing");
+
+                    let app_executor = exec::ssh::SshExecutor::from_config(app_config);
+                    let db_executor = exec::ssh::SshExecutor::from_config(db_config);
+                    let wrkr_executor = exec::ssh::SshExecutor::from_config(wrkr_config);
                     let config = runner::RunnerConfig {
-                        db_host: ssh_config.db.internal_ip.clone(),
+                        db_host: db_config.internal_ip.clone(),
                         db_port: consts::DB_PORT_EXTERNAL.to_string(),
                         app_host_url: format!(
                             "http://{}:{}",
-                            ssh_config.app.ip,
+                            app_config.ip,
                             consts::APP_PORT_EXTERNAL
                         ),
                         app_public_host_url: format!(
                             "http://{}:{}",
-                            ssh_config.app.ip,
+                            app_config.ip,
                             consts::APP_PORT_EXTERNAL
                         ),
                         is_remote: true,

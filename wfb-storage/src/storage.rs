@@ -76,9 +76,7 @@ impl Storage {
                     continue;
                 }
                 let environment = env_entry.file_name().to_string_lossy().to_string();
-                let env_data = run_data
-                    .entry(environment.clone())
-                    .or_default();
+                let env_data = run_data.entry(environment.clone()).or_default();
 
                 for lang_entry in fs::read_dir(env_entry.path())? {
                     let lang_entry = lang_entry?;
@@ -86,9 +84,7 @@ impl Storage {
                         continue;
                     }
                     let language = lang_entry.file_name().to_string_lossy().to_string();
-                    let lang_results = env_data
-                        .entry(language.clone())
-                        .or_default();
+                    let lang_results = env_data.entry(language.clone()).or_default();
 
                     for bench_entry in fs::read_dir(lang_entry.path())? {
                         let bench_entry = bench_entry?;
@@ -170,12 +166,8 @@ impl Storage {
         {
             let mut data = self.data.write().unwrap();
             let run_data = data.entry(run_id.to_string()).or_default();
-            let env_data = run_data
-                .entry(environment.name().to_string())
-                .or_default();
-            let lang_data = env_data
-                .entry(language.name.to_string())
-                .or_default();
+            let env_data = run_data.entry(environment.name().to_string()).or_default();
+            let lang_data = env_data.entry(language.name.to_string()).or_default();
 
             let bench_result = lang_data
                 .entry(benchmark.name.to_string())

@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use serde::Deserialize;
 use walkdir::WalkDir;
 
-use crate::{Benchmark, Environment, Error, Framework, Lang, Result};
+use crate::{Benchmark, Environment, EnvironmentSecrets, Error, Framework, Lang, Result};
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -18,6 +18,14 @@ struct ConfigInner {
     environments: Vec<Environment>,
 }
 
+struct ConfigAccumulator {
+    langs: Vec<Lang>,
+    frameworks: Vec<Framework>,
+    benchmarks: Vec<Benchmark>,
+    environments: Vec<Environment>,
+    secrets: Vec<EnvironmentSecrets>,
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ConfigFile {
@@ -25,6 +33,7 @@ enum ConfigFile {
     Framework(Box<Framework>),
     Benchmark(Box<Benchmark>),
     Environment(Box<Environment>),
+    EnvironmentSecrets(Box<EnvironmentSecrets>),
 }
 
 impl Config {
@@ -40,11 +49,12 @@ impl Config {
                     .unwrap_or(false)
             })
             .try_fold(
-                ConfigInner {
+                ConfigAccumulator {
                     langs: Vec::new(),
                     frameworks: Vec::new(),
                     benchmarks: Vec::new(),
                     environments: Vec::new(),
+                    secrets: Vec::new(),
                 },
                 |mut acc, entry| -> Result<_> {
                     let path = entry.path();
@@ -90,14 +100,30 @@ impl Config {
                             ConfigFile::Environment(environment) => {
                                 acc.environments.push(*environment)
                             }
+                            ConfigFile::EnvironmentSecrets(secret) => acc.secrets.push(*secret),
                         }
                     }
 
                     Ok(acc)
                 },
             )
-            .map(|inner| Config {
-                inner: Arc::new(inner),
+            .map(|mut acc| {
+                for env in &mut acc.environments {
+                    if let Environment::Ssh(ssh_env) = env
+                        && let Some(secret) = acc.secrets.iter().find(|s| s.name == ssh_env.name)
+                    {
+                        ssh_env.merge_secrets(secret.clone());
+                    }
+                }
+
+                Config {
+                    inner: Arc::new(ConfigInner {
+                        langs: acc.langs,
+                        frameworks: acc.frameworks,
+                        benchmarks: acc.benchmarks,
+                        environments: acc.environments,
+                    }),
+                }
             })
     }
 

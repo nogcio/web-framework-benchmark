@@ -29,9 +29,34 @@ pub struct SshEnvironment {
     pub title: String,
     pub spec: Option<String>,
     pub icon: Option<String>,
-    pub wrkr: SshConnection,
-    pub db: SshConnection,
-    pub app: SshConnection,
+    #[serde(default)]
+    pub wrkr: Option<SshConnection>,
+    #[serde(default)]
+    pub db: Option<SshConnection>,
+    #[serde(default)]
+    pub app: Option<SshConnection>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EnvironmentSecrets {
+    pub name: String,
+    pub wrkr: Option<SshConnection>,
+    pub db: Option<SshConnection>,
+    pub app: Option<SshConnection>,
+}
+
+impl SshEnvironment {
+    pub fn merge_secrets(&mut self, secrets: EnvironmentSecrets) {
+        if let Some(wrkr) = secrets.wrkr {
+            self.wrkr = Some(wrkr);
+        }
+        if let Some(db) = secrets.db {
+            self.db = Some(db);
+        }
+        if let Some(app) = secrets.app {
+            self.app = Some(app);
+        }
+    }
 }
 
 impl Environment {

@@ -278,53 +278,53 @@ async fn get_run_results(
     let data = state.storage.data.read().unwrap();
     let mut results = Vec::new();
     if let Some(env_data) = data.get(&run_id).and_then(|run_data| run_data.get(&env)) {
-            for (lang, lang_data) in env_data {
-                for (bench_name, bench_result) in lang_data {
-                    if let Some(test_summary) = bench_result.test_cases.get(&test) {
-                        results.push(RunResult {
-                            name: bench_name.clone(),
-                            language: lang.clone(),
-                            language_version: bench_result.manifest.language_version.clone(),
-                            framework: bench_name.clone(),
-                            framework_version: bench_result.manifest.framework_version.clone(),
-                            database: bench_result
-                                .manifest
-                                .database
-                                .as_ref()
-                                .map(|d| format!("{:?}", d).to_lowercase()),
-                            path: Some(bench_result.manifest.path.clone()),
-                            rps: test_summary.requests_per_sec,
-                            tps: test_summary.bytes_per_sec,
-                            latency_avg: Duration::from_secs_f64(
-                                test_summary.latency_mean / 1_000_000.0,
-                            ),
-                            latency_stdev: Duration::from_secs_f64(
-                                test_summary.latency_stdev / 1_000_000.0,
-                            ),
-                            latency_max: Duration::from_micros(test_summary.latency_max),
-                            latency50: Duration::from_micros(test_summary.latency_p50),
-                            latency75: Duration::from_micros(test_summary.latency_p75),
-                            latency90: Duration::from_micros(test_summary.latency_p90),
-                            latency99: Duration::from_micros(test_summary.latency_p99),
-                            latency_stdev_pct: test_summary.latency_stdev_pct,
-                            latency_distribution: test_summary
-                                .latency_distribution
-                                .iter()
-                                .map(|(p, l)| (*p, Duration::from_micros(*l)))
-                                .collect(),
-                            req_per_sec_avg: test_summary.req_per_sec_avg,
-                            req_per_sec_stdev: test_summary.req_per_sec_stdev,
-                            req_per_sec_max: test_summary.req_per_sec_max,
-                            req_per_sec_stdev_pct: test_summary.req_per_sec_stdev_pct,
-                            errors: test_summary.total_errors,
-                            memory_usage: test_summary.memory_usage_bytes,
-                            tags: bench_result.manifest.tags.clone(),
-                            has_transcript: false,
-                        });
-                    }
+        for (lang, lang_data) in env_data {
+            for (bench_name, bench_result) in lang_data {
+                if let Some(test_summary) = bench_result.test_cases.get(&test) {
+                    results.push(RunResult {
+                        name: bench_name.clone(),
+                        language: lang.clone(),
+                        language_version: bench_result.manifest.language_version.clone(),
+                        framework: bench_name.clone(),
+                        framework_version: bench_result.manifest.framework_version.clone(),
+                        database: bench_result
+                            .manifest
+                            .database
+                            .as_ref()
+                            .map(|d| format!("{:?}", d).to_lowercase()),
+                        path: Some(bench_result.manifest.path.clone()),
+                        rps: test_summary.requests_per_sec,
+                        tps: test_summary.bytes_per_sec,
+                        latency_avg: Duration::from_secs_f64(
+                            test_summary.latency_mean / 1_000_000.0,
+                        ),
+                        latency_stdev: Duration::from_secs_f64(
+                            test_summary.latency_stdev / 1_000_000.0,
+                        ),
+                        latency_max: Duration::from_micros(test_summary.latency_max),
+                        latency50: Duration::from_micros(test_summary.latency_p50),
+                        latency75: Duration::from_micros(test_summary.latency_p75),
+                        latency90: Duration::from_micros(test_summary.latency_p90),
+                        latency99: Duration::from_micros(test_summary.latency_p99),
+                        latency_stdev_pct: test_summary.latency_stdev_pct,
+                        latency_distribution: test_summary
+                            .latency_distribution
+                            .iter()
+                            .map(|(p, l)| (*p, Duration::from_micros(*l)))
+                            .collect(),
+                        req_per_sec_avg: test_summary.req_per_sec_avg,
+                        req_per_sec_stdev: test_summary.req_per_sec_stdev,
+                        req_per_sec_max: test_summary.req_per_sec_max,
+                        req_per_sec_stdev_pct: test_summary.req_per_sec_stdev_pct,
+                        errors: test_summary.total_errors,
+                        memory_usage: test_summary.memory_usage_bytes,
+                        tags: bench_result.manifest.tags.clone(),
+                        has_transcript: false,
+                    });
                 }
             }
         }
+    }
     Json(results)
 }
 
@@ -340,13 +340,13 @@ async fn get_run_transcript(
         let data = state.storage.data.read().unwrap();
         let mut found_lang = None;
         if let Some(env_data) = data.get(&run_id).and_then(|run_data| run_data.get(&env)) {
-                for (l, lang_data) in env_data {
-                    if lang_data.contains_key(&framework) {
-                        found_lang = Some(l.clone());
-                        break;
-                    }
+            for (l, lang_data) in env_data {
+                if lang_data.contains_key(&framework) {
+                    found_lang = Some(l.clone());
+                    break;
                 }
             }
+        }
         found_lang.ok_or(StatusCode::NOT_FOUND)?
     };
 

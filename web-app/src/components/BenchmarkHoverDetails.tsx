@@ -5,6 +5,7 @@ import type { Benchmark } from '../types'
 import { cn, getDatabaseColor, getSortedTags } from '../lib/utils'
 import { Tag } from './Tag'
 import { useAppStore } from '../store/useAppStore'
+import { BenchmarkCharts } from './BenchmarkCharts'
 
 const markdownComponents: Components = {
   h1: ({ className, ...props }) => (
@@ -102,9 +103,9 @@ export function BenchmarkHoverDetails({ benchmark, langColor }: BenchmarkHoverDe
   const showTranscript = benchmark.hasTranscript
 
   return (
-    <div className={cn("w-80 p-4", showTranscript && "w-[1000px]")}>
-      <div className={cn("flex gap-4", showTranscript && "h-[500px]")}>
-        <div className={cn("space-y-2", showTranscript ? "w-1/3 shrink-0 min-w-[300px]" : "w-full")}>
+    <div className={cn("p-4 group", showTranscript ? "w-[1200px]" : "w-[600px]")}>
+      <div className={cn("flex gap-4", showTranscript && "h-[600px]")}>
+        <div className={cn("space-y-2 flex flex-col", showTranscript ? "w-1/3 shrink-0 min-w-[350px]" : "w-full")}>
           <div className="font-semibold flex flex-col gap-1">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center min-w-0">
@@ -148,6 +149,10 @@ export function BenchmarkHoverDetails({ benchmark, langColor }: BenchmarkHoverDe
               </div>
             </div>
           )}
+          
+          <div className="flex-1 min-h-0 overflow-y-auto">
+             <BenchmarkCharts benchmarkName={benchmark.name} />
+          </div>
         </div>
 
         {showTranscript && (

@@ -4,5 +4,6 @@ tags:
   arch: async
   runtime: dotnet
   type: framework
+  orm: efcore
 database: postgres
 path: benchmarks/csharp/aspnetcore-efcore

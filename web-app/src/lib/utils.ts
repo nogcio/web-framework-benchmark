@@ -15,7 +15,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+const KNOWN_LANGUAGE_COLORS: Record<string, string> = {
+  "Go": "#00ADD8",
+  "JavaScript": "#F7DF1E",
+  "Rust": "#DEA584",
+  "C#": "#512BD4",
+  "Python": "#3776AB",
+  "Kotlin": "#7F52FF",
+  "C": "#555555",
+  "C++": "#f34b7d",
+  "Lua": "#000080",
+  "Java": "#b07219",
+}
+
 export function getColorForLanguage(lang: string) {
+  if (KNOWN_LANGUAGE_COLORS[lang]) {
+    return KNOWN_LANGUAGE_COLORS[lang]
+  }
   return getColorForString(lang)
 }
 

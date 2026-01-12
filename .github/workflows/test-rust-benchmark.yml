@@ -24,8 +24,11 @@ jobs:
         include:
           - name: axum
           - name: axum-sqlx-postgres
+          - name: axum-diesel-postgres
           - name: pingora
           - name: actix-web
+          - name: actix-sqlx-postgres
+          - name: actix-diesel-postgres
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml

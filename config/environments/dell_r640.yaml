@@ -1,7 +1,7 @@
 type: environment
 executor: ssh
 name: dell_r640
-title: Dell R640 8vCPU
+title: Dell R640 4vCPU
 spec: |
   2xIntel Xeon Gold 6254 32CPU, 128GB
   Host OS: Windows Server 2025

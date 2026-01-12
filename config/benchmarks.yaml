@@ -116,6 +116,39 @@ path: benchmarks/rust/actix-web
 
 ---
 type: benchmark
+name: actix-sqlx-postgres
+language: Rust
+language_version: "1.92"
+framework: actix-web
+framework_version: "4.12.1"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: postgres
+path: benchmarks/rust/actix-sqlx-postgres
+
+---
+type: benchmark
+name: actix-diesel-postgres
+language: Rust
+language_version: "1.92"
+framework: actix-web
+framework_version: "4.12.1"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+  orm: diesel
+database: postgres
+path: benchmarks/rust/actix-diesel-postgres
+
+---
+type: benchmark
 name: express
 language: JavaScript
 language_version: "25"
@@ -346,6 +379,23 @@ path: benchmarks/rust/axum-sqlx-postgres
 
 ---
 type: benchmark
+name: axum-diesel-postgres
+language: Rust
+language_version: "1.92"
+framework: axum
+framework_version: "0.8.8"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+  orm: diesel
+database: postgres
+path: benchmarks/rust/axum-diesel-postgres
+
+---
+type: benchmark
 name: aspnetcore-efcore
 language: C#
 language_version: "10.0"
@@ -357,6 +407,7 @@ tags:
   type: framework
   runtime: dotnet
   arch: async
+  orm: efcore
 database: postgres
 path: benchmarks/csharp/aspnetcore-efcore
 
@@ -373,6 +424,7 @@ tests:
 tags:
   type: framework
   runtime: dotnet
+  orm: efcore
   arch: async
 database: mysql
 path: benchmarks/csharp/aspnetcore-efcore
@@ -389,6 +441,7 @@ tests:
 tags:
   type: framework
   runtime: dotnet
+  orm: efcore
   arch: async
 database: mssql
 path: benchmarks/csharp/aspnetcore-efcore
@@ -486,6 +539,7 @@ tests:
 tags:
   type: framework
   runtime: dotnet
+  orm: efcore
   arch: async
 database: mariadb
 path: benchmarks/csharp/aspnetcore-efcore

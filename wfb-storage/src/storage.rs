@@ -8,7 +8,7 @@ use crate::benchmark::{Benchmark, BenchmarkManifest, BenchmarkTests};
 use crate::environment::Environment;
 use crate::error::Result;
 use crate::lang::Lang;
-use crate::testcase::TestCaseSummary;
+use crate::testcase::{TestCaseSummary, TestCaseRaw};
 
 // RunId -> Environment -> Language -> BenchmarkName -> BenchmarkResult
 pub type StorageData =
@@ -30,6 +30,8 @@ pub struct Storage {
 pub struct BenchmarkResult {
     pub manifest: BenchmarkManifest,
     pub test_cases: HashMap<String, TestCaseSummary>,
+    #[serde(skip)]
+    pub raw_data: HashMap<String, Vec<TestCaseRaw>>,
 }
 
 impl Storage {
@@ -100,25 +102,53 @@ impl Storage {
                             continue;
                         }
                         let manifest_file = fs::File::open(&manifest_path)?;
-                        let manifest: BenchmarkManifest = serde_yaml::from_reader(manifest_file)?;
+                        let manifest: BenchmarkManifest = match serde_yaml::from_reader(manifest_file) {
+                            Ok(m) => m,
+                            Err(_) => continue,
+                        };
 
                         let mut test_cases = HashMap::new();
+                        let mut raw_data = HashMap::new();
 
                         // Load test cases
-                        for file_entry in fs::read_dir(&benchmark_path)? {
-                            let file_entry = file_entry?;
-                            let path = file_entry.path();
-                            if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                                let file_stem =
-                                    path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                                if file_stem == "manifest" {
-                                    continue;
-                                }
+                        if let Ok(entries) = fs::read_dir(&benchmark_path) {
+                            for file_entry in entries {
+                                if let Ok(file_entry) = file_entry {
+                                    let path = file_entry.path();
+                                    if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
+                                        let file_stem =
+                                            path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                                        if file_stem == "manifest" {
+                                            continue;
+                                        }
 
-                                let summary_file = fs::File::open(&path)?;
-                                let summary: TestCaseSummary =
-                                    serde_yaml::from_reader(summary_file)?;
-                                test_cases.insert(file_stem.to_string(), summary);
+                                        if extension == "yaml" {
+                                            if let Ok(summary_file) = fs::File::open(&path) {
+                                                if let Ok(summary) = serde_yaml::from_reader::<_, TestCaseSummary>(summary_file) {
+                                                    test_cases.insert(file_stem.to_string(), summary);
+                                                }
+                                            }
+                                        } else if extension == "jsonl" && file_stem.ends_with("_raw") {
+                                            let test_name = file_stem.trim_end_matches("_raw");
+                                            if let Ok(file) = fs::File::open(&path) {
+                                                let reader = std::io::BufReader::new(file);
+                                                let mut results = Vec::new();
+                                                use std::io::BufRead;
+                                                for line in reader.lines() {
+                                                    if let Ok(line) = line {
+                                                        if line.is_empty() {
+                                                            continue;
+                                                        }
+                                                        if let Ok(item) = serde_json::from_str::<TestCaseRaw>(&line) {
+                                                            results.push(item);
+                                                        }
+                                                    }
+                                                }
+                                                raw_data.insert(test_name.to_string(), results);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -127,6 +157,7 @@ impl Storage {
                             BenchmarkResult {
                                 manifest,
                                 test_cases,
+                                raw_data,
                             },
                         );
                     }
@@ -151,7 +182,7 @@ impl Storage {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn save_benchmark_result<T: serde::Serialize>(
+    pub fn save_benchmark_result(
         &self,
         run_id: &str,
         environment: &Environment,
@@ -160,7 +191,7 @@ impl Storage {
         testcase: BenchmarkTests,
         manifest: &BenchmarkManifest,
         summary: &TestCaseSummary,
-        raw_data: &[T],
+        raw_data: &[TestCaseRaw],
     ) -> Result<()> {
         // Update memory
         {
@@ -174,6 +205,7 @@ impl Storage {
                 .or_insert_with(|| BenchmarkResult {
                     manifest: manifest.clone(),
                     test_cases: HashMap::new(),
+                    raw_data: HashMap::new(),
                 });
 
             // Update manifest in case it changed (though usually it shouldn't for same benchmark)
@@ -181,6 +213,7 @@ impl Storage {
             bench_result
                 .test_cases
                 .insert(testcase.to_string(), summary.clone());
+            bench_result.raw_data.insert(testcase.to_string(), raw_data.to_vec());
         }
 
         // Save to disk
@@ -225,6 +258,23 @@ impl Storage {
         }
 
         Ok(())
+    }
+
+    pub fn get_raw_data(
+        &self,
+        run_id: &str,
+        environment: &str,
+        language: &str,
+        benchmark: &str,
+        testcase: &str,
+    ) -> Option<Vec<TestCaseRaw>> {
+        let data = self.data.read().unwrap();
+        data.get(run_id)
+            .and_then(|env| env.get(environment))
+            .and_then(|lang| lang.get(language))
+            .and_then(|bench| bench.get(benchmark))
+            .and_then(|result| result.raw_data.get(testcase))
+            .cloned()
     }
 
     pub fn load_run(

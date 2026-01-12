@@ -47,9 +47,9 @@ export default function EnvironmentDetails() {
 
   return (
     <div className="fixed bottom-14 right-4 z-50 w-80 max-w-[calc(100vw-2rem)] hidden md:block">
-      <Card className="shadow-lg border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <Card className="shadow-lg border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 gap-0">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 border-b border-border/40">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2 mb-0">
             <Icon className="h-4 w-4" />
             {selectedEnvironment.displayName}
           </CardTitle>

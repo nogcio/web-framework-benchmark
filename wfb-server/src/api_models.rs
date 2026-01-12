@@ -131,3 +131,59 @@ pub struct RunResult {
     pub tags: HashMap<String, String>,
     pub has_transcript: bool,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestCaseRawApi {
+    pub elapsed_secs: u64,
+    pub connections: u64,
+    pub requests_per_sec: f64,
+    pub bytes_per_sec: u64,
+    pub total_requests: u64,
+    pub total_bytes: u64,
+    pub total_errors: u64,
+    pub latency_mean: f64,
+    pub latency_stdev: f64,
+    pub latency_max: u64,
+    pub latency_p50: u64,
+    pub latency_p75: u64,
+    pub latency_p90: u64,
+    pub latency_p99: u64,
+    pub latency_stdev_pct: f64,
+    pub errors: HashMap<String, u64>,
+    pub memory_usage_bytes: u64,
+    pub cpu_usage_percent: f64,
+    pub req_per_sec_avg: f64,
+    pub req_per_sec_stdev: f64,
+    pub req_per_sec_max: f64,
+    pub req_per_sec_stdev_pct: f64,
+}
+
+impl From<wfb_storage::TestCaseRaw> for TestCaseRawApi {
+    fn from(r: wfb_storage::TestCaseRaw) -> Self {
+        Self {
+            elapsed_secs: r.elapsed_secs,
+            connections: r.connections,
+            requests_per_sec: r.requests_per_sec,
+            bytes_per_sec: r.bytes_per_sec,
+            total_requests: r.total_requests,
+            total_bytes: r.total_bytes,
+            total_errors: r.total_errors,
+            latency_mean: r.latency_mean,
+            latency_stdev: r.latency_stdev,
+            latency_max: r.latency_max,
+            latency_p50: r.latency_p50,
+            latency_p75: r.latency_p75,
+            latency_p90: r.latency_p90,
+            latency_p99: r.latency_p99,
+            latency_stdev_pct: r.latency_stdev_pct,
+            errors: r.errors,
+            memory_usage_bytes: r.memory_usage_bytes,
+            cpu_usage_percent: r.cpu_usage_percent,
+            req_per_sec_avg: r.req_per_sec_avg,
+            req_per_sec_stdev: r.req_per_sec_stdev,
+            req_per_sec_max: r.req_per_sec_max,
+            req_per_sec_stdev_pct: r.req_per_sec_stdev_pct,
+        }
+    }
+}

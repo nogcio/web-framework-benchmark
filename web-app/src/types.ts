@@ -76,3 +76,28 @@ export interface VisibleColumns {
   errors: boolean
   tags: boolean
 }
+
+export interface TestCaseRaw {
+    elapsedSecs: number
+    connections: number
+    requestsPerSec: number
+    bytesPerSec: number
+    totalRequests: number
+    totalBytes: number
+    totalErrors: number
+    latencyMean: number
+    latencyStdev: number
+    latencyMax: number
+    latencyP50: number
+    latencyP75: number
+    latencyP90: number
+    latencyP99: number
+    latencyStdevPct: number
+    errors: Record<string, number>
+    memoryUsageBytes: number
+    cpuUsagePercent: number
+    reqPerSecAvg: number
+    reqPerSecStdev: number
+    reqPerSecMax: number
+    reqPerSecStdevPct: number
+}

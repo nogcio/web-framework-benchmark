@@ -1,0 +1,9 @@
+language_version: '1.92'
+framework_version: 0.8.8
+tags:
+  arch: async
+  type: micro-framework
+  runtime: native
+  orm: diesel
+database: postgres
+path: benchmarks/rust/axum-diesel-postgres

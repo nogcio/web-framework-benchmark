@@ -115,6 +115,10 @@ async fn main() -> anyhow::Result<()> {
             "/api/runs/{run_id}/environments/{env}/tests/{test}/frameworks/{framework}/transcript",
             get(get_run_transcript),
         )
+        .route(
+            "/api/runs/{run_id}/environments/{env}/tests/{test}/frameworks/{framework}/raw",
+            get(get_run_raw_data),
+        )
         .with_state(state)
         .layer(CorsLayer::permissive());
 
@@ -153,10 +157,19 @@ async fn get_tags(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
 }
 
 async fn get_environments(State(state): State<Arc<AppState>>) -> Json<Vec<EnvironmentInfo>> {
+    let data = state.storage.data.read().unwrap();
+    let mut used_envs = std::collections::HashSet::new();
+    for run_data in data.values() {
+        for env_name in run_data.keys() {
+            used_envs.insert(env_name.clone());
+        }
+    }
+
     let config = state.config.read().unwrap();
     let envs = config
         .environments()
         .iter()
+        .filter(|e| used_envs.contains(e.name()))
         .map(|e| EnvironmentInfo {
             name: e.name().to_string(),
             display_name: e.title().to_string(),
@@ -375,4 +388,36 @@ async fn get_run_transcript(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+async fn get_run_raw_data(
+    State(state): State<Arc<AppState>>,
+    Path((run_id, env, test, framework)): Path<(String, String, String, String)>,
+    Query(params): Query<TranscriptParams>,
+) -> Result<Json<Vec<TestCaseRawApi>>, StatusCode> {
+    let lang = if let Some(l) = params.lang {
+        l
+    } else {
+        // Try to find language
+        let data = state.storage.data.read().unwrap();
+        let mut found_lang = None;
+        if let Some(env_data) = data.get(&run_id).and_then(|run_data| run_data.get(&env)) {
+            for (l, lang_data) in env_data {
+                if lang_data.contains_key(&framework) {
+                    found_lang = Some(l.clone());
+                    break;
+                }
+            }
+        }
+        found_lang.ok_or(StatusCode::NOT_FOUND)?
+    };
+
+    let raw_data = state
+        .storage
+        .get_raw_data(&run_id, &env, &lang, &framework, &test)
+        .unwrap_or_default();
+
+    let api_data: Vec<TestCaseRawApi> = raw_data.into_iter().map(Into::into).collect();
+
+    Ok(Json(api_data))
 }

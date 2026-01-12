@@ -4,5 +4,6 @@ tags:
   arch: async
   type: framework
   runtime: dotnet
+  orm: efcore
 database: mariadb
 path: benchmarks/csharp/aspnetcore-efcore

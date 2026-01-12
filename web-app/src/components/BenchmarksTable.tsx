@@ -297,7 +297,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
             
             // Add opacity to the color for the background row
             const rowColor = langColor.startsWith('hsl') 
-              ? langColor.replace(')', ', 0.2)') 
+              ? langColor.replace(')', ', 0.1)') 
               : langColor
 
             return (
@@ -357,7 +357,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                             style={{ backgroundColor: langColor }}
                           />
                           <span className="text-sm md:text-[10px] md:text-muted-foreground md:ml-2 truncate min-w-0 text-left md:text-right font-medium md:font-normal">
-                            {benchmark.name}
+                            <span className="md:hidden font-normal opacity-75">{benchmark.language}/</span>{benchmark.name}
                           </span>
                         </div>
                       </div>
@@ -369,7 +369,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                         <div className="flex-1 hidden md:block">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                             <div
-                              className="h-2"
+                              className="h-2 rounded"
                               style={{
                                 width: `${(() => {
                                   const rpsPercent = maxRps > 0 ? (benchmark.rps / maxRps) * 100 : 0
@@ -400,7 +400,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                         <div className="flex-1">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                             <div
-                              className="h-2"
+                              className="h-2 rounded"
                               style={{
                                 width: `${(() => {
                                   const minMem = Math.min(...benchmarks.map((b) => b.memoryUsage))
@@ -436,7 +436,7 @@ export default function BenchmarksTable({ benchmarks }: Props) {
                         <div className="flex-1">
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                             <div
-                              className="h-2"
+                              className="h-2 rounded"
                               style={{
                                 width: `${(() => {
                                   const maxTps = Math.max(...benchmarks.map((b) => b.tps))

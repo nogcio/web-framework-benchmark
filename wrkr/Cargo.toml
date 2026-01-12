@@ -1,6 +1,6 @@
 [package]
 name = "wrkr"
-version = "0.1.0"
+version = "0.4.0"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -18,5 +18,5 @@ hdrhistogram = "7.5.4"
 textplots = "0.8.7"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
-wrkr-api = { version = "0.1.0", path = "../wrkr-api" }
+wrkr-api = { path = "../wrkr-api" }
 mimalloc = "0.1.48"

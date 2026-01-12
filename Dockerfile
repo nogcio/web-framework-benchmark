@@ -2,24 +2,21 @@
 FROM rust:1.92-alpine AS backend-builder
 WORKDIR /app
 # Install build dependencies
-RUN apk add --no-cache musl-dev
-# Create a new empty shell project
-RUN cargo new --bin wfb
-WORKDIR /app/wfb
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev libssh2-dev luajit-dev openssl-libs-static zlib-static libssh2-static build-base
 
-# Copy manifests
+# Copy workspace configuration
 COPY Cargo.toml Cargo.lock ./
 
-# Build only the dependencies to cache them
-RUN cargo build --release
-RUN rm src/*.rs
+# Copy crate directories
+COPY wfb-runner ./wfb-runner
+COPY wfb-server ./wfb-server
+COPY wfb-storage ./wfb-storage
+COPY wrkr ./wrkr
+COPY wrkr-api ./wrkr-api
+COPY wrkr-core ./wrkr-core
 
-# Copy the source code
-COPY src ./src
-
-# Build for release
-RUN rm ./target/release/deps/wfb*
-RUN cargo build --release
+# Build wfb targets
+RUN RUSTFLAGS="-C link-arg=-lgcc" cargo build --release -p wfb-runner -p wfb-server
 
 # Stage 2: Build Frontend
 FROM node:20-alpine AS frontend-builder
@@ -35,22 +32,21 @@ RUN npm run build
 FROM alpine:3.23
 WORKDIR /app
 
-# Install necessary runtime dependencies (e.g. ca-certificates, openssl if needed)
-RUN apk add --no-cache ca-certificates
+# Install necessary runtime dependencies
+RUN apk add --no-cache ca-certificates libgcc libssh2 openssl luajit
 
-# Copy the binary
-COPY --from=backend-builder /app/wfb/target/release/wfb .
+# Copy the binaries to /usr/local/bin so they are in PATH
+COPY --from=backend-builder /app/target/release/wfb-runner /usr/local/bin/wfb-runner
+COPY --from=backend-builder /app/target/release/wfb-server /usr/local/bin/wfb-server
 
 # Copy the frontend build to static
 COPY --from=frontend-builder /app/dist ./static
 
-# Copy configuration and other assets if needed
+# Copy configuration and other assets
 COPY config ./config
 COPY benchmarks ./benchmarks
 COPY benchmarks_db ./benchmarks_db
 COPY scripts ./scripts
 
-# Expose port
-EXPOSE 8080
-
-ENTRYPOINT ["./wfb"]
+# Default to running the server
+CMD ["wfb-server"]

@@ -32,7 +32,7 @@ The dashboard relies on the Rust API server to fetch benchmark data. Make sure t
 
 ```bash
 # In the project root
-cargo run --release -- serve
+cargo run --release --bin wfb-server
 ```
 
 ### 3. Start the Development Server

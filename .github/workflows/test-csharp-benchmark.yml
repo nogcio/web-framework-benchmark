@@ -23,60 +23,17 @@ jobs:
       matrix:
         include:
           - name: aspnetcore
-            framework_path: benchmarks/csharp/aspnetcore
-            image_tag: wfb-aspnetcore
-            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
-            database: ""
           - name: aspnetcore-npgsql
-            framework_path: benchmarks/csharp/aspnetcore-npgsql
-            image_tag: wfb-aspnetcore-npgsql
-            tests: db_read_one,db_read_paging,db_write
-            database: postgres
           - name: aspnetcore-mysql
-            framework_path: benchmarks/csharp/aspnetcore-mysql
-            image_tag: wfb-aspnetcore-mysql
-            tests: db_read_one,db_read_paging,db_write
-            database: mysql
           - name: aspnetcore-mariadb
-            framework_path: benchmarks/csharp/aspnetcore-mysql
-            image_tag: wfb-aspnetcore-mariadb
-            tests: db_read_one,db_read_paging,db_write
-            database: mariadb
           - name: aspnetcore-mssql
-            framework_path: benchmarks/csharp/aspnetcore-mssql
-            image_tag: wfb-aspnetcore-mssql
-            tests: db_read_one,db_read_paging,db_write
-            database: mssql
           - name: aspnetcore-mongodb
-            framework_path: benchmarks/csharp/aspnetcore-mongodb
-            image_tag: wfb-aspnetcore-mongodb
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: mongodb
-          - name: aspnetcore-efcore-postgres
-            framework_path: benchmarks/csharp/aspnetcore-efcore
-            image_tag: wfb-aspnetcore-efcore-postgres
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: postgres
+          - name: aspnetcore-efcore
           - name: aspnetcore-efcore-mysql
-            framework_path: benchmarks/csharp/aspnetcore-efcore
-            image_tag: wfb-aspnetcore-efcore-mysql
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: mysql
           - name: aspnetcore-efcore-mariadb
-            framework_path: benchmarks/csharp/aspnetcore-efcore
-            image_tag: wfb-aspnetcore-efcore-mariadb
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: mariadb
           - name: aspnetcore-efcore-mssql
-            framework_path: benchmarks/csharp/aspnetcore-efcore
-            image_tag: wfb-aspnetcore-efcore-mssql
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: mssql
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml
     with:
-      framework_path: ${{ matrix.framework_path }}
-      image_tag: ${{ matrix.image_tag }}
-      tests: ${{ matrix.tests }}
-      database: ${{ matrix.database }}
+      benchmark: ${{ matrix.name }}

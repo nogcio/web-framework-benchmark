@@ -23,30 +23,11 @@ jobs:
       matrix:
         include:
           - name: axum
-            framework_path: benchmarks/rust/axum
-            image_tag: wfb-rust-axum
-            tests: hello_world,json,static_files_small,static_files_medium,static_files_large
-            database: ""
           - name: axum-sqlx-postgres
-            framework_path: benchmarks/rust/axum-sqlx-postgres
-            image_tag: wfb-rust-axum-sqlx-postgres
-            tests: db_read_one,db_read_paging,db_write,tweet_service
-            database: "postgres"
           - name: pingora
-            framework_path: benchmarks/rust/pingora
-            image_tag: wfb-rust-pingora
-            tests: hello_world
-            database: ""
           - name: actix-web
-            framework_path: benchmarks/rust/actix-web
-            image_tag: wfb-rust-actix-web
-            tests: hello_world,static_files_small,static_files_medium,static_files_large
-            database: ""
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml
     with:
-      framework_path: ${{ matrix.framework_path }}
-      image_tag: ${{ matrix.image_tag }}
-      tests: ${{ matrix.tests }}
-      database: ${{ matrix.database }}
+      benchmark: ${{ matrix.name }}

@@ -167,7 +167,7 @@ path: benchmarks/csharp/aspnetcore
 
 ---
 type: benchmark
-name: spring-boot
+name: spring-boot-jpa-postgres
 language: Java
 language_version: "23"
 framework: spring-boot

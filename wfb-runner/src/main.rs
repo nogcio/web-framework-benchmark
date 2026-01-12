@@ -192,8 +192,7 @@ async fn main() -> Result<(), anyhow::Error> {
             if let Some(ref benchmark_name) = benchmark {
                 benchmarks.retain(|b| b.name == *benchmark_name);
                 if benchmarks.is_empty() {
-                    eprintln!("No benchmark found with name: {}", benchmark_name);
-                    return Ok(());
+                    return Err(anyhow::anyhow!("No benchmark found with name: {}", benchmark_name));
                 }
             }
 
@@ -320,12 +319,21 @@ async fn main() -> Result<(), anyhow::Error> {
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message("Verifying benchmarks...");
 
+            let mut failed = false;
+
             for b in &benchmarks {
                 pb.set_message(format!("{} verifying", b.name));
-                let _ = runner.verify_benchmark(b, &m).await;
+                if let Err(e) = runner.verify_benchmark(b, &m).await {
+                    pb.println(format!("Benchmark {} verification failed: {}", b.name, e));
+                    failed = true;
+                }
                 pb.inc(1);
             }
             pb.finish_with_message("Done");
+
+            if failed {
+                return Err(anyhow::anyhow!("Verification failed for some benchmarks"));
+            }
         }
         cli::Commands::Dev { name, env } => {
             let benchmark = config

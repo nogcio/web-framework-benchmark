@@ -192,7 +192,10 @@ async fn main() -> Result<(), anyhow::Error> {
             if let Some(ref benchmark_name) = benchmark {
                 benchmarks.retain(|b| b.name == *benchmark_name);
                 if benchmarks.is_empty() {
-                    return Err(anyhow::anyhow!("No benchmark found with name: {}", benchmark_name));
+                    return Err(anyhow::anyhow!(
+                        "No benchmark found with name: {}",
+                        benchmark_name
+                    ));
                 }
             }
 

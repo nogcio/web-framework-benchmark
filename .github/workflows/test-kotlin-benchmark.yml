@@ -23,7 +23,6 @@ jobs:
       matrix:
         include:
           - name: ktor
-          - name: ktor-jdbc-postgres
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml

@@ -15,7 +15,8 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             .app_docker
             .run_command(&benchmark.name, &benchmark.name)
             .port(consts::APP_PORT_EXTERNAL, consts::APP_PORT_INTERNAL)
-            .ulimit("nofile=1000000:1000000");
+            .ulimit("nofile=1000000:1000000")
+            .add_host("host.docker.internal:host-gateway");
 
         if let Some(db_kind) = &benchmark.database {
             let db_pass = if matches!(db_kind, DatabaseKind::Mssql) {

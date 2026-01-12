@@ -224,6 +224,7 @@ pub struct DockerRunCommand<'a> {
     detach: bool,
     ulimit: Option<&'a str>,
     sysctl: Vec<(&'a str, &'a str)>,
+    extra_hosts: Vec<&'a str>,
     args: Vec<&'a str>,
 }
 
@@ -240,6 +241,7 @@ impl<'a> DockerRunCommand<'a> {
             detach: true,
             ulimit: None,
             sysctl: Vec::new(),
+            extra_hosts: Vec::new(),
             args: Vec::new(),
         }
     }
@@ -278,6 +280,11 @@ impl<'a> DockerRunCommand<'a> {
         self
     }
 
+    pub fn add_host(mut self, host: &'a str) -> Self {
+        self.extra_hosts.push(host);
+        self
+    }
+
     pub fn arg(mut self, arg: &'a str) -> Self {
         self.args.push(arg);
         self
@@ -299,6 +306,10 @@ impl<'a> fmt::Display for DockerRunCommand<'a> {
 
         for (k, v) in &self.sysctl {
             write!(f, "--sysctl {}={} ", k, v)?;
+        }
+
+        for host in &self.extra_hosts {
+            write!(f, "--add-host {} ", host)?;
         }
 
         if let Some(net) = self.network {

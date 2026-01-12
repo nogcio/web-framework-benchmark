@@ -115,9 +115,7 @@ impl Storage {
                         if let Ok(entries) = fs::read_dir(&benchmark_path) {
                             for file_entry in entries.flatten() {
                                 let path = file_entry.path();
-                                if let Some(extension) =
-                                    path.extension().and_then(|s| s.to_str())
-                                {
+                                if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
                                     let file_stem =
                                         path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                                     if file_stem == "manifest" {
@@ -131,13 +129,10 @@ impl Storage {
                                                     summary_file,
                                                 )
                                             {
-                                                test_cases
-                                                    .insert(file_stem.to_string(), summary);
+                                                test_cases.insert(file_stem.to_string(), summary);
                                             }
                                         }
-                                    } else if extension == "jsonl"
-                                        && file_stem.ends_with("_raw")
-                                    {
+                                    } else if extension == "jsonl" && file_stem.ends_with("_raw") {
                                         let test_name = file_stem.trim_end_matches("_raw");
                                         if let Ok(file) = fs::File::open(&path) {
                                             let reader = std::io::BufReader::new(file);
@@ -148,9 +143,7 @@ impl Storage {
                                                     continue;
                                                 }
                                                 if let Ok(item) =
-                                                    serde_json::from_str::<TestCaseRaw>(
-                                                        &line,
-                                                    )
+                                                    serde_json::from_str::<TestCaseRaw>(&line)
                                                 {
                                                     results.push(item);
                                                 }

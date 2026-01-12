@@ -1,0 +1,8 @@
+language_version: '21'
+framework_version: 3.17.6
+tags:
+  arch: reactive
+  runtime: jvm
+  type: full-stack
+database: null
+path: benchmarks/java/quarkus-reactive

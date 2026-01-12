@@ -54,6 +54,22 @@ HEALTHCHECK --interval=5s --timeout=3s --retries=3 \
 CMD ["./wfb-rust-axum"]
 ```
 
+### Environment Variables
+
+The runner injects the following environment variables into your container. Your application **MUST** support these variables, especially for database connections.
+
+| Variable | Description | Default Value |
+| :--- | :--- | :--- |
+| `PORT` | The port the application listens on. | `8080` |
+| `DATA_DIR` | Directory containing benchmark data files. | `benchmarks_data` |
+| `DB_HOST` | Database hostname. | *Dynamic* |
+| `DB_PORT` | Database port. | *Dynamic* |
+| `DB_USER` | Database username. | `user` |
+| `DB_PASSWORD` | Database password. | `password` (or `Benchmark!12345` for MSSQL) |
+| `DB_NAME` | Database name. | `hello_world` |
+| `DB_KIND` | Type of database (e.g., `postgres`, `mysql`). | *Depends on benchmark config* |
+| `DB_POOL_SIZE` | Recommended database connection pool size. | `256` |
+
 ### Implementing Test Cases
 
 You need to implement endpoints that correspond to the test specifications in `docs/specs/`.
@@ -63,6 +79,7 @@ You need to implement endpoints that correspond to the test specifications in `d
 *   **Method**: `GET`
 *   **Response**: `200 OK`
 *   **Purpose**: Used by Docker and the runner to verify the service is ready.
+*   **Database**: If the benchmark uses a database, this endpoint **MUST** verify the database connection is active before returning `200 OK`.
 
 #### 1. Plaintext (`/plaintext`)
 *   **Spec**: [docs/specs/plaintext_spec.md](specs/plaintext_spec.md)

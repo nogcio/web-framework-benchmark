@@ -101,6 +101,12 @@ url: https://openresty.org/
 
 ---
 type: framework
+name: laravel
+language: PHP
+url: https://laravel.com/
+
+---
+type: framework
 name: spring-boot
 language: Java
 url: https://spring.io/projects/spring-boot
@@ -117,3 +123,38 @@ name: hono
 language: JS
 url: https://hono.dev/
 
+---
+type: framework
+name: django
+language: Python
+url: https://www.djangoproject.com/
+
+---
+type: framework
+name: rails
+language: Ruby
+url: https://rubyonrails.org/
+
+---
+type: framework
+name: phoenix
+language: Elixir
+url: https://www.phoenixframework.org/
+
+---
+type: framework
+name: elysia
+language: JS
+url: https://elysiajs.com/
+
+---
+type: framework
+name: hyperf
+language: PHP
+url: https://hyperf.io/
+
+---
+type: framework
+name: quarkus
+language: Java
+url: https://quarkus.io/

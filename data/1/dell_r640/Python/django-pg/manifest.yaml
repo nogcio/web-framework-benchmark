@@ -1,0 +1,8 @@
+language_version: '3.14'
+framework_version: '5.2'
+tags:
+  arch: sync
+  type: full-stack
+  runtime: python-wsgi
+database: postgres
+path: benchmarks/python/django-pg

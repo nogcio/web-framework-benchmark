@@ -1,0 +1,5 @@
+django>=5.2,<6.0
+gunicorn
+psycopg[binary]
+orjson
+whitenoise

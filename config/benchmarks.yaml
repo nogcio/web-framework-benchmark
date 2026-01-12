@@ -543,3 +543,163 @@ tags:
   arch: async
 database: mariadb
 path: benchmarks/csharp/aspnetcore-efcore
+
+---
+type: benchmark
+name: laravel
+language: PHP
+language_version: "8.5"
+framework: laravel
+framework_version: "12.46.0"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+  - db_complex
+tags:
+  type: full-stack
+  runtime: vm
+  arch: sync
+database: postgres
+path: benchmarks/php/laravel
+
+---
+type: benchmark
+name: django-pg
+language: Python
+language_version: "3.14"
+framework: django
+framework_version: "5.2"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+  - db_complex
+tags:
+  type: full-stack
+  runtime: python-wsgi
+  arch: sync
+database: postgres
+path: benchmarks/python/django-pg
+
+---
+type: benchmark
+name: rails
+language: Ruby
+language_version: "4.0"
+framework: rails
+framework_version: "8.0"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+  - db_complex
+tags:
+  type: full-stack
+  runtime: vm
+  orm: active-record
+database: postgres
+path: benchmarks/ruby/rails
+
+---
+type: benchmark
+name: phoenix-ecto-postgres
+language: Elixir
+language_version: "1.18"
+framework: phoenix
+framework_version: "1.8.3"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+  - db_complex
+tags:
+  type: full-stack
+  runtime: beam
+  arch: actor-model
+database: postgres
+path: benchmarks/elixir/phoenix-ecto-postgres
+
+---
+type: benchmark
+name: elysia-pg
+language: JavaScript
+language_version: "Bun 1.1.42"
+framework: elysia
+framework_version: "1.2.9"
+tests:
+  - plain_text
+  - json_aggregate
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: bun
+  arch: event-loop
+database: postgres
+path: benchmarks/javascript/elysia-pg
+
+---
+type: benchmark
+name: fastify-prisma
+language: JavaScript
+language_version: "22"
+framework: fastify
+framework_version: "5.6.2"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: nodejs
+  arch: event-loop
+  orm: prisma
+database: postgres
+path: benchmarks/javascript/fastify-prisma
+
+---
+type: benchmark
+name: hyperf-swoole-pg
+language: PHP
+language_version: "8.2"
+framework: hyperf
+framework_version: "3.1.0"
+tests:
+  - plain_text
+  - json_aggregate
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: swoole
+  arch: coroutine
+database: postgres
+path: benchmarks/php/hyperf-swoole-pg
+
+---
+type: benchmark
+name: go-stdlib
+language: Go
+language_version: "1.24"
+framework: stdlib
+framework_version: "1.24"
+tests:
+  - plain_text
+tags:
+  type: standard-library
+  runtime: native
+  arch: event-loop
+path: benchmarks/go/stdlib
+
+---
+type: benchmark
+name: quarkus-reactive
+language: Java
+language_version: "21"
+framework: quarkus
+framework_version: "3.17.6"
+tests:
+  - plain_text
+  - json_aggregate
+tags:
+  type: full-stack
+  runtime: jvm
+  arch: reactive
+path: benchmarks/java/quarkus-reactive

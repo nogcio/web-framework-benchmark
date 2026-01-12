@@ -57,3 +57,20 @@ name: Java
 url: https://www.java.com/
 color: "#b07219"
 
+---
+type: language
+name: PHP
+url: https://www.php.net/
+color: "#777BB4"
+
+---
+type: language
+name: Ruby
+url: https://www.ruby-lang.org
+color: "#701516"
+
+---
+type: language
+name: Elixir
+url: https://elixir-lang.org
+color: "#4e2a8e"

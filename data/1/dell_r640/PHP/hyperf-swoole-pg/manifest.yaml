@@ -1,0 +1,8 @@
+language_version: '8.2'
+framework_version: 3.1.0
+tags:
+  arch: coroutine
+  runtime: swoole
+  type: micro-framework
+database: postgres
+path: benchmarks/php/hyperf-swoole-pg

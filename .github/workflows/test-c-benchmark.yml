@@ -23,6 +23,7 @@ jobs:
       matrix:
         include:
           - name: nginx
+          - name: haproxy
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml

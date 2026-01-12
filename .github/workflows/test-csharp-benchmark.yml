@@ -24,14 +24,12 @@ jobs:
         include:
           - name: aspnetcore
           - name: aspnetcore-npgsql
-          - name: aspnetcore-mysql
-          - name: aspnetcore-mariadb
           - name: aspnetcore-mssql
           - name: aspnetcore-mongodb
+          - name: aspnetcore-mariadb
           - name: aspnetcore-efcore
-          - name: aspnetcore-efcore-mysql
-          - name: aspnetcore-efcore-mariadb
           - name: aspnetcore-efcore-mssql
+          - name: aspnetcore-efcore-mariadb
 
     name: ${{ matrix.name }}
     uses: ./.github/workflows/reusable-benchmark-test.yml

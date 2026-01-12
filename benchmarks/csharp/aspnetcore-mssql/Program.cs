@@ -16,12 +16,13 @@ builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Error);
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8000";
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "db";
 var dbPort = Environment.GetEnvironmentVariable("DB_PORT") ?? "1433";
 var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "benchmark";
 var dbPass = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "Benchmark!12345";
 var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "benchmark";
+var dbPoolSize = int.Parse(Environment.GetEnvironmentVariable("DB_POOL_SIZE") ?? "256");
 
 var connectionStringBuilder = new SqlConnectionStringBuilder
 {
@@ -32,8 +33,8 @@ var connectionStringBuilder = new SqlConnectionStringBuilder
     TrustServerCertificate = true,
     Encrypt = false,
     Pooling = true,
-    MinPoolSize = 256,
-    MaxPoolSize = 256,
+    MinPoolSize = dbPoolSize,
+    MaxPoolSize = dbPoolSize,
     ConnectTimeout = 5,
 };
 
@@ -60,106 +61,94 @@ app.MapGet("/health", async (HttpContext ctx, [FromServices] string connectionSt
     }
 });
 
-app.MapGet("/db/read/one", async (int id, HttpContext ctx, [FromServices] string connectionString) =>
+app.MapGet("/db/user-profile/{email}", async (string email, HttpContext ctx, [FromServices] string connectionString) =>
 {
     await using var conn = new SqlConnection(connectionString);
     await conn.OpenAsync(ctx.RequestAborted);
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = "SELECT TOP (1) id, name, created_at, updated_at FROM hello_world WHERE id = @id";
-    cmd.Parameters.Add(new SqlParameter("@id", SqlDbType.Int) { Value = id });
 
-    await using var reader = await cmd.ExecuteReaderAsync(ctx.RequestAborted);
-    if (await reader.ReadAsync(ctx.RequestAborted))
+    // Step 1: Get User + Trending Posts (Batch)
+    await using var cmd1 = conn.CreateCommand();
+    cmd1.CommandText = @"
+        SELECT id, username, email, created_at, last_login, settings FROM users WHERE email = @email;
+        SELECT TOP 5 id, title, content, views, created_at FROM posts ORDER BY views DESC;
+    ";
+    cmd1.Parameters.Add(new SqlParameter("@email", SqlDbType.NVarChar, 255) { Value = email });
+
+    int userId = 0;
+    string username = "";
+    DateTime createdAt = default;
+    string settingsJson = "";
+    var trending = new List<object>();
+
+    await using (var reader = await cmd1.ExecuteReaderAsync(ctx.RequestAborted))
     {
-        var row = new
+        if (await reader.ReadAsync(ctx.RequestAborted))
         {
-            id = reader.GetInt32(0),
-            name = reader.GetString(1),
-            createdAt = reader.GetDateTime(2),
-            updatedAt = reader.GetDateTime(3)
-        };
-        return Results.Json(row);
-    }
-
-    return Results.NotFound();
-});
-
-app.MapGet("/db/read/many", async (int offset, int? limit, HttpContext ctx, [FromServices] string connectionString) =>
-{
-    var actualLimit = limit ?? 50;
-    await using var conn = new SqlConnection(connectionString);
-    await conn.OpenAsync(ctx.RequestAborted);
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = "SELECT id, name, created_at, updated_at FROM hello_world ORDER BY id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY";
-    cmd.Parameters.Add(new SqlParameter("@offset", SqlDbType.Int) { Value = offset });
-    cmd.Parameters.Add(new SqlParameter("@limit", SqlDbType.Int) { Value = actualLimit });
-
-    var results = new List<object>();
-    await using var reader = await cmd.ExecuteReaderAsync(ctx.RequestAborted);
-    while (await reader.ReadAsync(ctx.RequestAborted))
-    {
-        results.Add(new
+            userId = reader.GetInt32(0);
+            username = reader.GetString(1);
+            // email is arg
+            createdAt = reader.GetDateTime(3);
+            // last_login (4) ignored for read, we update it later
+            settingsJson = reader.GetString(5);
+        }
+        else
         {
-            id = reader.GetInt32(0),
-            name = reader.GetString(1),
-            createdAt = reader.GetDateTime(2),
-            updatedAt = reader.GetDateTime(3)
-        });
-    }
+            return Results.NotFound();
+        }
 
-    return Results.Json(results);
-});
+        await reader.NextResultAsync(ctx.RequestAborted);
 
-app.MapPost("/db/write/insert", async (HttpRequest request, HttpContext ctx, [FromServices] string connectionString) =>
-{
-    string? name = request.Query["name"];
-    if (string.IsNullOrEmpty(name))
-    {
-        try
+        while (await reader.ReadAsync(ctx.RequestAborted))
         {
-            var body = await JsonSerializer.DeserializeAsync<JsonElement>(request.Body, cancellationToken: ctx.RequestAborted);
-            if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
+            trending.Add(new
             {
-                name = nameProp.GetString();
-            }
+                id = reader.GetInt32(0),
+                title = reader.GetString(1),
+                content = reader.GetString(2),
+                views = reader.GetInt32(3),
+                createdAt = reader.GetDateTime(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
+            });
         }
-        catch
+    }
+
+    // Step 2: Update Last Login + Get User Posts
+    await using var cmd2 = conn.CreateCommand();
+    cmd2.CommandText = @"
+        UPDATE users SET last_login = SYSDATETIME() WHERE id = @id;
+        SELECT TOP 10 id, title, content, views, created_at FROM posts WHERE user_id = @id ORDER BY created_at DESC;
+    ";
+    cmd2.Parameters.Add(new SqlParameter("@id", SqlDbType.Int) { Value = userId });
+
+    var posts = new List<object>();
+    await using (var reader = await cmd2.ExecuteReaderAsync(ctx.RequestAborted))
+    {
+        // UPDATE produces no result set, so the first result set is from SELECT
+        while (await reader.ReadAsync(ctx.RequestAborted))
         {
-            // Ignore malformed JSON
+            posts.Add(new
+            {
+                id = reader.GetInt32(0),
+                title = reader.GetString(1),
+                content = reader.GetString(2),
+                views = reader.GetInt32(3),
+                createdAt = reader.GetDateTime(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
+            });
         }
     }
 
-    if (string.IsNullOrEmpty(name))
+    object settingsObj;
+    try { settingsObj = JsonSerializer.Deserialize<JsonElement>(settingsJson); } catch { settingsObj = settingsJson; }
+
+    return Results.Ok(new
     {
-        return Results.BadRequest("Missing name");
-    }
-
-    var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-    await using var conn = new SqlConnection(connectionString);
-    await conn.OpenAsync(ctx.RequestAborted);
-
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"INSERT INTO hello_world (name, created_at, updated_at)
-                        OUTPUT INSERTED.id, INSERTED.name, INSERTED.created_at, INSERTED.updated_at
-                        VALUES (@name, @created_at, @updated_at)";
-    cmd.Parameters.Add(new SqlParameter("@name", SqlDbType.NVarChar, 255) { Value = name! });
-    cmd.Parameters.Add(new SqlParameter("@created_at", SqlDbType.DateTime2) { Value = now });
-    cmd.Parameters.Add(new SqlParameter("@updated_at", SqlDbType.DateTime2) { Value = now });
-
-    await using var reader = await cmd.ExecuteReaderAsync(ctx.RequestAborted);
-    if (await reader.ReadAsync(ctx.RequestAborted))
-    {
-        var row = new
-        {
-            id = reader.GetInt32(0),
-            name = reader.GetString(1),
-            createdAt = reader.GetDateTime(2),
-            updatedAt = reader.GetDateTime(3)
-        };
-        return Results.Json(row);
-    }
-
-    return Results.StatusCode(500);
+        username,
+        email,
+        createdAt = createdAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        lastLogin = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        settings = settingsObj,
+        posts,
+        trending
+    });
 });
 
 app.Run($"http://0.0.0.0:{port}");

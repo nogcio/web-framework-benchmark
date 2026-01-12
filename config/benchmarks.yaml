@@ -107,6 +107,7 @@ framework_version: "4.12.1"
 tests:
   - plain_text
   - static_files
+  - json_aggregate
 tags:
   type: micro-framework
   runtime: native
@@ -176,6 +177,7 @@ tests:
   - plain_text
   - static_files
   - json_aggregate
+  - db_complex
 tags:
   type: full-stack
   runtime: jvm
@@ -277,3 +279,213 @@ tags:
   runtime: native
   arch: event-loop
 path: benchmarks/lua/nginx
+
+---
+type: benchmark
+name: fastify-pg
+language: JavaScript
+language_version: "25.2.1"
+framework: fastify
+framework_version: "5.6.2"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: nodejs
+  arch: event-loop
+database: postgres
+path: benchmarks/javascript/fastify-pg
+
+---
+type: benchmark
+name: fastapi-pg
+language: Python
+language_version: "3.14"
+framework: fastapi
+framework_version: "0.127.0"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: python-asyncio
+  arch: async
+database: postgres
+path: benchmarks/python/fastapi-pg
+
+---
+type: benchmark
+name: gin-pgx
+language: Go
+language_version: "1.25"
+framework: gin
+framework_version: "1.11.0"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: postgres
+path: benchmarks/go/gin-pgx
+
+---
+type: benchmark
+name: axum-sqlx-postgres
+language: Rust
+language_version: "1.92"
+framework: axum
+framework_version: "0.8.8"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: postgres
+path: benchmarks/rust/axum-sqlx-postgres
+
+---
+type: benchmark
+name: aspnetcore-efcore
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: postgres
+path: benchmarks/csharp/aspnetcore-efcore
+
+---
+type: benchmark
+name: aspnetcore-efcore-mysql
+disabled: true
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mysql
+path: benchmarks/csharp/aspnetcore-efcore
+
+---
+type: benchmark
+name: aspnetcore-efcore-mssql
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mssql
+path: benchmarks/csharp/aspnetcore-efcore
+
+---
+type: benchmark
+name: aspnetcore-mongodb
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mongodb
+path: benchmarks/csharp/aspnetcore-mongodb
+
+---
+type: benchmark
+name: aspnetcore-npgsql
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: postgres
+path: benchmarks/csharp/aspnetcore-npgsql
+
+---
+type: benchmark
+name: aspnetcore-mysql
+disabled: true
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mysql
+path: benchmarks/csharp/aspnetcore-mysql
+
+---
+type: benchmark
+name: aspnetcore-mssql
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mssql
+path: benchmarks/csharp/aspnetcore-mssql
+
+---
+type: benchmark
+name: aspnetcore-mariadb
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mariadb
+path: benchmarks/csharp/aspnetcore-mysql
+
+---
+type: benchmark
+name: aspnetcore-efcore-mariadb
+language: C#
+language_version: "10.0"
+framework: aspnetcore
+framework_version: "9.0.0"
+tests:
+  - db_complex
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mariadb
+path: benchmarks/csharp/aspnetcore-efcore

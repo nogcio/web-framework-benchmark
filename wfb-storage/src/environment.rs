@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "executor", rename_all = "snake_case")]
 pub enum Environment {
@@ -27,7 +26,7 @@ pub struct SshConnection {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SshEnvironment {
     pub name: String,
-    pub title: String,  
+    pub title: String,
     pub spec: Option<String>,
     pub icon: Option<String>,
     pub wrkr: SshConnection,

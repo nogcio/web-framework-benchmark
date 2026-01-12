@@ -1,6 +1,8 @@
 language_version: '1.25'
 framework_version: 2.10.2
 tags:
-  platform: caddy
+  type: proxy
+  arch: async
+  runtime: native
 database: null
 path: benchmarks/go/caddy

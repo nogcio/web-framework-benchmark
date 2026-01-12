@@ -18,7 +18,7 @@ pub struct Args {
     /// Path to Lua script
     #[arg(short, long)]
     pub script: PathBuf,
-    
+
     /// Number of connections (VUs) to start with
     #[arg(long, default_value_t = 0)]
     pub start_connections: u64,

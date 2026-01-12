@@ -1,51 +1,44 @@
 package main
 
 import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"strconv"
-	"time"
+"context"
+"fmt"
+"io"
+"net/http"
+"os"
+"time"
 
-	"github.com/gin-gonic/gin"
-	_ "github.com/goccy/go-json"
-	"github.com/golang-jwt/jwt/v5"
+"github.com/gin-gonic/gin"
+"github.com/goccy/go-json"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var jwtSecret = []byte("secret")
-
-type Claims struct {
-	UserID   int32  `json:"sub"`
-	Username string `json:"name"`
-	jwt.RegisteredClaims
-}
-
-type HelloWorld struct {
-	ID        int32     `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
 type User struct {
-	ID           int32  `json:"id"`
-	Username     string `json:"username"`
-	PasswordHash string `json:"-"`
+	ID        int32           `json:"-"`
+	Username  string          `json:"username"`
+	Email     string          `json:"email"`
+	CreatedAt time.Time       `json:"createdAt"`
+	LastLogin *time.Time      `json:"lastLogin"`
+	Settings  json.RawMessage `json:"settings"`
 }
 
-type Tweet struct {
+type Post struct {
 	ID        int32     `json:"id"`
-	UserID    int32     `json:"-"`
-	Username  string    `json:"username,omitempty"`
+	Title     string    `json:"title"`
 	Content   string    `json:"content"`
+	Views     int32     `json:"views"`
 	CreatedAt time.Time `json:"createdAt"`
-	Likes     int64     `json:"likes"`
+}
+
+type UserProfile struct {
+	Username  string          `json:"username"`
+	Email     string          `json:"email"`
+	CreatedAt time.Time       `json:"createdAt"`
+	LastLogin *time.Time      `json:"lastLogin"`
+	Settings  json.RawMessage `json:"settings"`
+	Posts     []Post          `json:"posts"`
+	Trending  []Post          `json:"trending"`
 }
 
 var db *pgxpool.Pool
@@ -62,285 +55,130 @@ func main() {
 	r.Use(gin.Recovery())
 
 	r.GET("/health", func(c *gin.Context) {
+		if err := db.Ping(context.Background()); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
 		c.String(http.StatusOK, "OK")
 	})
 
-	r.GET("/db/read/one", func(c *gin.Context) {
-		idStr := c.Query("id")
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			c.Status(http.StatusBadRequest)
-			return
-		}
-
-		var hw HelloWorld
-		err = db.QueryRow(context.Background(), "SELECT id, name, created_at, updated_at FROM hello_world WHERE id = $1", id).Scan(&hw.ID, &hw.Name, &hw.CreatedAt, &hw.UpdatedAt)
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-		c.JSON(http.StatusOK, hw)
+	r.GET("/db/user-profile/:email", func(c *gin.Context) {
+		email := c.Param("email")
+		handleUserProfile(c, email)
 	})
-
-	r.GET("/db/read/many", func(c *gin.Context) {
-		offsetStr := c.Query("offset")
-		limitStr := c.DefaultQuery("limit", "50")
-
-		offset, err := strconv.Atoi(offsetStr)
-		if err != nil {
-			c.Status(http.StatusBadRequest)
-			return
-		}
-		limit, err := strconv.Atoi(limitStr)
-		if err != nil {
-			c.Status(http.StatusBadRequest)
-			return
-		}
-
-		rows, err := db.Query(context.Background(), "SELECT id, name, created_at, updated_at FROM hello_world ORDER BY id LIMIT $1 OFFSET $2", limit, offset)
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
-
-		results := make([]HelloWorld, 0)
-		for rows.Next() {
-			var hw HelloWorld
-			if err := rows.Scan(&hw.ID, &hw.Name, &hw.CreatedAt, &hw.UpdatedAt); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-			results = append(results, hw)
-		}
-		if err := rows.Err(); err != nil {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-		c.JSON(http.StatusOK, results)
-	})
-
-	r.POST("/db/write/insert", func(c *gin.Context) {
-		var input struct {
-			Name string `json:"name"`
-		}
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.Status(http.StatusBadRequest)
-			return
-		}
-
-		now := time.Now()
-		var hw HelloWorld
-		err := db.QueryRow(
-			context.Background(),
-			"INSERT INTO hello_world (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id, name, created_at, updated_at",
-			input.Name,
-			now,
-			now,
-		).Scan(&hw.ID, &hw.Name, &hw.CreatedAt, &hw.UpdatedAt)
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		c.JSON(http.StatusOK, hw)
-	})
-
-	// Tweet Service Endpoints
-	api := r.Group("/api")
-	{
-		api.POST("/auth/register", func(c *gin.Context) {
-			var input struct {
-				Username string `json:"username"`
-				Password string `json:"password"`
-			}
-			if err := c.ShouldBindJSON(&input); err != nil {
-				c.Status(http.StatusBadRequest)
-				return
-			}
-
-			hash := sha256.Sum256([]byte(input.Password))
-			passwordHash := hex.EncodeToString(hash[:])
-
-			_, err := db.Exec(context.Background(), "INSERT INTO users (username, password_hash) VALUES ($1, $2)", input.Username, passwordHash)
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-			c.Status(http.StatusCreated)
-		})
-
-		api.POST("/auth/login", func(c *gin.Context) {
-			var input struct {
-				Username string `json:"username"`
-				Password string `json:"password"`
-			}
-			if err := c.ShouldBindJSON(&input); err != nil {
-				c.Status(http.StatusBadRequest)
-				return
-			}
-
-			hash := sha256.Sum256([]byte(input.Password))
-			passwordHash := hex.EncodeToString(hash[:])
-
-			var id int32
-			err := db.QueryRow(context.Background(), "SELECT id FROM users WHERE username = $1 AND password_hash = $2", input.Username, passwordHash).Scan(&id)
-			if err != nil {
-				c.Status(http.StatusUnauthorized)
-				return
-			}
-
-			claims := Claims{
-				UserID:   id,
-				Username: input.Username,
-				RegisteredClaims: jwt.RegisteredClaims{
-					ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-				},
-			}
-
-			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-			tokenString, err := token.SignedString(jwtSecret)
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{"token": tokenString})
-		})
-
-		authorized := api.Group("/")
-		authorized.Use(authMiddleware())
-		{
-			authorized.GET("/feed", func(c *gin.Context) {
-				rows, err := db.Query(context.Background(), `
-					SELECT t.id, t.user_id, u.username, t.content, t.created_at, (SELECT COUNT(*) FROM likes l WHERE l.tweet_id = t.id) as likes
-					FROM tweets t
-					JOIN users u ON t.user_id = u.id
-					ORDER BY t.created_at DESC
-					LIMIT 20
-				`)
-				if err != nil {
-					c.Status(http.StatusInternalServerError)
-					return
-				}
-				defer rows.Close()
-
-				tweets := make([]Tweet, 0)
-				for rows.Next() {
-					var t Tweet
-					if err := rows.Scan(&t.ID, &t.UserID, &t.Username, &t.Content, &t.CreatedAt, &t.Likes); err != nil {
-						c.Status(http.StatusInternalServerError)
-						return
-					}
-					tweets = append(tweets, t)
-				}
-				if err := rows.Err(); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return
-				}
-				c.JSON(http.StatusOK, tweets)
-			})
-
-			authorized.GET("/tweets/:id", func(c *gin.Context) {
-				idStr := c.Param("id")
-				id, err := strconv.Atoi(idStr)
-				if err != nil {
-					c.Status(http.StatusBadRequest)
-					return
-				}
-
-				var t Tweet
-				err = db.QueryRow(context.Background(), `
-					SELECT t.id, t.user_id, u.username, t.content, t.created_at, (SELECT COUNT(*) FROM likes l WHERE l.tweet_id = t.id) as likes
-					FROM tweets t
-					JOIN users u ON t.user_id = u.id
-					WHERE t.id = $1
-				`, id).Scan(&t.ID, &t.UserID, &t.Username, &t.Content, &t.CreatedAt, &t.Likes)
-				if err != nil {
-					c.Status(http.StatusNotFound)
-					return
-				}
-				c.JSON(http.StatusOK, t)
-			})
-
-			authorized.POST("/tweets", func(c *gin.Context) {
-				userID := c.MustGet("userID").(int32)
-
-				var input struct {
-					Content string `json:"content"`
-				}
-				if err := c.ShouldBindJSON(&input); err != nil {
-					c.Status(http.StatusBadRequest)
-					return
-				}
-
-				_, err := db.Exec(context.Background(), "INSERT INTO tweets (user_id, content) VALUES ($1, $2)", userID, input.Content)
-				if err != nil {
-					c.Status(http.StatusInternalServerError)
-					return
-				}
-				c.Status(http.StatusCreated)
-			})
-
-			authorized.POST("/tweets/:id/like", func(c *gin.Context) {
-				userID := c.MustGet("userID").(int32)
-
-				tweetIDStr := c.Param("id")
-				tweetID, err := strconv.Atoi(tweetIDStr)
-				if err != nil {
-					c.Status(http.StatusBadRequest)
-					return
-				}
-
-				// Toggle like
-				tag, err := db.Exec(context.Background(), "DELETE FROM likes WHERE user_id = $1 AND tweet_id = $2", userID, tweetID)
-				if err != nil {
-					c.Status(http.StatusInternalServerError)
-					return
-				}
-
-				if tag.RowsAffected() == 0 {
-					_, err = db.Exec(context.Background(), "INSERT INTO likes (user_id, tweet_id) VALUES ($1, $2)", userID, tweetID)
-					if err != nil {
-						c.Status(http.StatusInternalServerError)
-						return
-					}
-				}
-
-				c.Status(http.StatusOK)
-			})
-		}
-	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8000"
+		port = "8080"
 	}
 	r.Run(":" + port)
 }
 
-func authMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		tokenString := authHeader[7:]
+func handleUserProfile(c *gin.Context, email string) {
+	ctx := context.Background()
 
-		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtSecret, nil
-		})
-
-		if err != nil || !token.Valid {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-
-		c.Set("userID", claims.UserID)
-		c.Next()
+	// Parallel Execution: Query A (User) and Query B (Trending)
+	type UserResult struct {
+		User User
+		Err  error
 	}
+	type TrendingResult struct {
+		Posts []Post
+		Err   error
+	}
+
+	chUser := make(chan UserResult, 1)
+	chTrending := make(chan TrendingResult, 1)
+
+	go func() {
+		var u User
+		err := db.QueryRow(ctx, "SELECT id, username, email, created_at, last_login, settings FROM users WHERE email = $1", email).
+			Scan(&u.ID, &u.Username, &u.Email, &u.CreatedAt, &u.LastLogin, &u.Settings)
+		chUser <- UserResult{User: u, Err: err}
+	}()
+
+	go func() {
+		rows, err := db.Query(ctx, "SELECT id, title, content, views, created_at FROM posts ORDER BY views DESC LIMIT 5")
+		if err != nil {
+			chTrending <- TrendingResult{Err: err}
+			return
+		}
+		defer rows.Close()
+		var posts []Post
+		for rows.Next() {
+			var p Post
+			if err := rows.Scan(&p.ID, &p.Title, &p.Content, &p.Views, &p.CreatedAt); err != nil {
+				chTrending <- TrendingResult{Err: err}
+				return
+			}
+			posts = append(posts, p)
+		}
+		chTrending <- TrendingResult{Posts: posts, Err: nil}
+	}()
+
+	userRes := <-chUser
+	trendingRes := <-chTrending
+
+	if userRes.Err != nil {
+		if userRes.Err == pgx.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		} else {
+			c.Status(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if trendingRes.Err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	// Query D: Update Last Login
+	var newLastLogin time.Time
+	err := db.QueryRow(ctx, "UPDATE users SET last_login = NOW() WHERE id = $1 RETURNING last_login", userRes.User.ID).Scan(&newLastLogin)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	userRes.User.LastLogin = &newLastLogin
+
+	// Query C: User Posts
+	rows, err := db.Query(ctx, "SELECT id, title, content, views, created_at FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10", userRes.User.ID)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var userPosts []Post
+	for rows.Next() {
+		var p Post
+		if err := rows.Scan(&p.ID, &p.Title, &p.Content, &p.Views, &p.CreatedAt); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		userPosts = append(userPosts, p)
+	}
+
+	// Ensure empty slices are serialized as [] instead of null
+	if userPosts == nil {
+		userPosts = []Post{}
+	}
+	if trendingRes.Posts == nil {
+		trendingRes.Posts = []Post{}
+	}
+
+	profile := UserProfile{
+		Username:  userRes.User.Username,
+		Email:     userRes.User.Email,
+		CreatedAt: userRes.User.CreatedAt,
+		LastLogin: userRes.User.LastLogin,
+		Settings:  userRes.User.Settings,
+		Posts:     userPosts,
+		Trending:  trendingRes.Posts,
+	}
+
+	c.JSON(http.StatusOK, profile)
 }
 
 func initDB() {
@@ -371,13 +209,20 @@ func initDB() {
 		fmt.Fprintf(os.Stderr, "Unable to parse config: %v\n", err)
 		os.Exit(1)
 	}
-	config.MaxConns = 256
-	config.MinConns = 256
-	// Cache prepared statements & result descriptions to reduce per-request overhead on hot SQL.
-	// This makes db_read_one/db_write more representative of a tuned production setup.
+	
+	poolSize := 256
+	if ps := os.Getenv("DB_POOL_SIZE"); ps != "" {
+		var p int
+		if _, err := fmt.Sscanf(ps, "%d", &p); err == nil {
+			poolSize = p
+		}
+	}
+	
+	config.MaxConns = int32(poolSize)
+	config.MinConns = int32(poolSize)
 	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeCacheStatement
-	config.ConnConfig.StatementCacheCapacity = 512
-	config.ConnConfig.DescriptionCacheCapacity = 512
+	config.ConnConfig.StatementCacheCapacity = 1024
+	config.ConnConfig.DescriptionCacheCapacity = 1024
 
 	db, err = pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {

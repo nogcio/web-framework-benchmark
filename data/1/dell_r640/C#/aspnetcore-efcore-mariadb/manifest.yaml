@@ -1,0 +1,8 @@
+language_version: '10.0'
+framework_version: 9.0.0
+tags:
+  arch: async
+  type: framework
+  runtime: dotnet
+database: mariadb
+path: benchmarks/csharp/aspnetcore-efcore

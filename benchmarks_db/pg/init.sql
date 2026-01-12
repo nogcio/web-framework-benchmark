@@ -1,53 +1,50 @@
 ALTER SYSTEM SET max_connections = 1024;
 
--- Create table and populate with 1000 rows for benchmarks
-CREATE TABLE IF NOT EXISTS hello_world (
+--
+-- Schema for Complex Read Test (User Profile)
+--
+
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    last_login TIMESTAMP,
+    settings JSONB NOT NULL
 );
 
--- Insert 1000 rows with names name_1 .. name_1000 and sample timestamps
-INSERT INTO hello_world (name, created_at, updated_at)
-SELECT
-    'name_' || gs AS name,
-    (NOW() - (gs || ' seconds')::interval) AS created_at,
-    (NOW() - ((gs - 1) || ' seconds')::interval) AS updated_at
-FROM generate_series(1, 1000) AS gs;
-
--- Tweet Service Tables
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(128) NOT NULL UNIQUE,
-    password_hash VARCHAR(64) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS tweets (
+CREATE TABLE posts (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id),
-    content VARCHAR(256) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    views INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_tweets_created_at ON tweets(created_at DESC);
 
-CREATE TABLE IF NOT EXISTS likes (
-    user_id INT NOT NULL REFERENCES users(id),
-    tweet_id INT NOT NULL REFERENCES tweets(id),
-    PRIMARY KEY (user_id, tweet_id)
-);
-CREATE INDEX IF NOT EXISTS idx_likes_tweet_id ON likes(tweet_id);
+-- Index for trending posts
+CREATE INDEX idx_posts_views ON posts(views DESC);
+-- Index for user posts (by date)
+CREATE INDEX idx_posts_user_created ON posts(user_id, created_at DESC);
 
--- Pre-seed Users (1000)
-INSERT INTO users (username, password_hash)
-SELECT 'user_' || gs, 'hash_' || gs
-FROM generate_series(1, 1000) AS gs
-ON CONFLICT DO NOTHING;
+--
+-- Seeding Data (10,000 users, 150,000 posts)
+--
 
--- Pre-seed Tweets (10000)
-INSERT INTO tweets (user_id, content, created_at)
-SELECT
-    (random() * 999 + 1)::INT,
-    'Tweet content ' || gs,
-    NOW() - (gs || ' seconds')::interval
-FROM generate_series(1, 10000) AS gs;
+INSERT INTO users (username, email, created_at, settings)
+SELECT 
+    'user_' || s,
+    'user_' || s || '@example.com', 
+    NOW(), 
+    '{"theme": "dark", "notifications": true, "language": "en"}'::jsonb
+FROM generate_series(1, 10000) AS s;
+
+INSERT INTO posts (user_id, title, content, views, created_at)
+SELECT 
+    u.id, 
+    'Post ' || p, 
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.', 
+    (random() * 10000)::int,
+    NOW() - (p || ' minutes')::interval
+FROM users u
+CROSS JOIN generate_series(1, 15) AS p;

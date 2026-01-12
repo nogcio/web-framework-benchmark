@@ -2,5 +2,5 @@
 pub struct Framework {
     pub name: String,
     pub language: String,
-    pub url: String
+    pub url: String,
 }

@@ -1,6 +1,5 @@
-use reqwest::header::HeaderMap;
 use mlua::{LuaSerdeExt, UserData, UserDataFields, UserDataRef};
-
+use reqwest::header::HeaderMap;
 
 pub struct Response {
     status: u16,
@@ -15,28 +14,26 @@ impl Response {
         let status = res.status().as_u16();
         let headers = res.headers().clone();
         // Calculate headers size once during construction
-        let headers_size = headers.iter().map(|(k, v)| k.as_str().len() + v.len() + 4).sum::<usize>() + 12;
+        let headers_size = headers
+            .iter()
+            .map(|(k, v)| k.as_str().len() + v.len() + 4)
+            .sum::<usize>()
+            + 12;
         let b = res.bytes().await.unwrap_or_default();
         let len = b.len();
-        Ok(Self { status, headers, body: b, body_len: len, headers_size })
+        Ok(Self {
+            status,
+            headers,
+            body: b,
+            body_len: len,
+            headers_size,
+        })
     }
 
     pub fn status(&self) -> u16 {
         self.status
     }
 
-    pub fn headers(&self) -> &HeaderMap {
-        &self.headers
-    }
-
-    pub fn body(&self) -> &bytes::Bytes {
-        &self.body
-    }
-
-    pub fn body_len(&self) -> usize {
-        self.body_len
-    }
-    
     /// Returns total response size (body + headers + status line approximation)
     pub fn total_size(&self) -> usize {
         self.body_len + self.headers_size
@@ -46,7 +43,7 @@ impl Response {
 impl UserData for Response {
     fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("bytes", |_, this| Ok(this.body.to_vec()));
-        
+
         fields.add_field_method_get("headers", |lua, this| {
             let t = lua.create_table()?;
             for (k, v) in this.headers.iter() {
@@ -83,15 +80,19 @@ impl UserData for Response {
             Ok(val.as_bytes() == this.body.as_ref())
         });
 
-        methods.add_method("check_body_resp", |_, this, other: UserDataRef<Response>| {
-            Ok(this.body == other.body)
-        });
+        methods.add_method(
+            "check_body_resp",
+            |_, this, other: UserDataRef<Response>| Ok(this.body == other.body),
+        );
 
-        methods.add_method("check_body_resp_prefix", |_, this, (other, len): (UserDataRef<Response>, usize)| {
-            if len > other.body.len() {
-                return Ok(false);
-            }
-            Ok(this.body.as_ref() == &other.body[..len])
-        });
+        methods.add_method(
+            "check_body_resp_prefix",
+            |_, this, (other, len): (UserDataRef<Response>, usize)| {
+                if len > other.body.len() {
+                    return Ok(false);
+                }
+                Ok(this.body.as_ref() == &other.body[..len])
+            },
+        );
     }
 }

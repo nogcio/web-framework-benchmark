@@ -36,7 +36,11 @@ pub fn get_db_config(db_kind: &DatabaseKind) -> DatabaseConfig {
             image_name: "mongodb",
             build_path: "benchmarks_db/mongodb",
             port: 27017,
-            env_vars: vec![],
+            env_vars: vec![
+                ("MONGO_INITDB_ROOT_USERNAME", consts::DB_USER),
+                ("MONGO_INITDB_ROOT_PASSWORD", consts::DB_PASS),
+                ("MONGO_INITDB_DATABASE", consts::DB_NAME),
+            ],
         },
         DatabaseKind::Mssql => DatabaseConfig {
             image_name: "mssql",
@@ -45,6 +49,7 @@ pub fn get_db_config(db_kind: &DatabaseKind) -> DatabaseConfig {
             env_vars: vec![
                 ("ACCEPT_EULA", "Y"),
                 ("MSSQL_SA_PASSWORD", "Benchmark!12345"),
+                ("MSSQL_PID", "Developer"),
             ],
         },
         DatabaseKind::Mariadb => DatabaseConfig {
@@ -60,4 +65,3 @@ pub fn get_db_config(db_kind: &DatabaseKind) -> DatabaseConfig {
         },
     }
 }
-

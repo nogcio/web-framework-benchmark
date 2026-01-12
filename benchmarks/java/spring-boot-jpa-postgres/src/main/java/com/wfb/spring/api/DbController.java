@@ -1,77 +1,95 @@
 package com.wfb.spring.api;
 
-import com.wfb.spring.api.dto.HelloWorldDto;
-import com.wfb.spring.api.dto.WriteRequest;
-import com.wfb.spring.db.entity.HelloWorldEntity;
-import com.wfb.spring.db.repo.HelloWorldRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.transaction.Transactional;
+import com.wfb.spring.api.dto.PostDto;
+import com.wfb.spring.api.dto.UserProfileDto;
+import com.wfb.spring.db.entity.PostEntity;
+import com.wfb.spring.db.entity.UserEntity;
+import com.wfb.spring.db.repo.PostRepository;
+import com.wfb.spring.db.repo.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 @RestController
 @RequestMapping("/db")
 public class DbController {
-    private final HelloWorldRepository helloWorldRepository;
+    private final UserRepository userRepository;
+    private final PostRepository postRepository;
+    private final DataSource dataSource;
+    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of("UTC"));
+    private static final Executor VT_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
-    public DbController(HelloWorldRepository helloWorldRepository) {
-        this.helloWorldRepository = helloWorldRepository;
+    public DbController(UserRepository userRepository, PostRepository postRepository, DataSource dataSource) {
+        this.userRepository = userRepository;
+        this.postRepository = postRepository;
+        this.dataSource = dataSource;
     }
 
-    @GetMapping("/read/one")
-    public ResponseEntity<HelloWorldDto> readOne(@RequestParam int id) {
-        return helloWorldRepository.findById(id)
-                .map(DbController::toDto)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
-    }
+    @GetMapping("/user-profile/{email}")
+    public UserProfileDto getUserProfile(@PathVariable String email) {
+        CompletableFuture<UserEntity> userFuture = CompletableFuture.supplyAsync(() -> 
+            userRepository.findByEmail(email).orElse(null), VT_EXECUTOR
+        );
+        CompletableFuture<List<PostEntity>> trendingFuture = CompletableFuture.supplyAsync(() -> 
+            postRepository.findTop5ByOrderByViewsDesc(), VT_EXECUTOR
+        );
 
-    @GetMapping("/read/many")
-    public List<HelloWorldDto> readMany(@RequestParam int offset, @RequestParam(required = false) Integer limit) {
-        int actualLimit = (limit == null) ? 50 : limit;
+        CompletableFuture.allOf(userFuture, trendingFuture).join();
 
-        @SuppressWarnings("unchecked")
-        List<HelloWorldEntity> rows = entityManager
-                .createQuery("select h from HelloWorldEntity h order by h.id")
-                .setFirstResult(offset)
-                .setMaxResults(actualLimit)
-                .getResultList();
-
-        return rows.stream().map(DbController::toDto).toList();
-    }
-
-    @PostMapping("/write/insert")
-    @Transactional
-    public ResponseEntity<HelloWorldDto> insert(
-            @RequestParam(required = false) String name,
-            @RequestBody(required = false) WriteRequest body
-    ) {
-        String resolvedName = name;
-        if ((resolvedName == null || resolvedName.isEmpty()) && body != null) {
-            resolvedName = body.name();
-        }
-        if (resolvedName == null || resolvedName.isEmpty()) {
-            return ResponseEntity.badRequest().build();
+        UserEntity user = userFuture.join();
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
         }
 
-        Instant now = Instant.now();
-        HelloWorldEntity entity = new HelloWorldEntity();
-        entity.setName(resolvedName);
-        entity.setCreatedAt(now);
-        entity.setUpdatedAt(now);
-        HelloWorldEntity saved = helloWorldRepository.save(entity);
+        user.setLastLogin(Instant.now());
+        userRepository.save(user);
 
-        return ResponseEntity.ok(toDto(saved));
+        List<PostEntity> posts = postRepository.findTop10ByUserIdOrderByCreatedAtDesc(user.getId());
+
+        return mapToDto(user, posts, trendingFuture.join());
     }
 
-    private static HelloWorldDto toDto(HelloWorldEntity e) {
-        return new HelloWorldDto(e.getId(), e.getName(), e.getCreatedAt(), e.getUpdatedAt());
+    private UserProfileDto mapToDto(UserEntity user, List<PostEntity> posts, List<PostEntity> trending) {
+        return new UserProfileDto(
+            user.getUsername(),
+            user.getEmail(),
+            user.getCreatedAt() != null ? ISO_FORMATTER.format(user.getCreatedAt()) : null,
+            user.getLastLogin() != null ? ISO_FORMATTER.format(user.getLastLogin()) : null,
+            user.getSettings(),
+            posts.stream().map(this::mapPost).toList(),
+            trending.stream().map(this::mapPost).toList()
+        );
+    }
+
+    private PostDto mapPost(PostEntity p) {
+        return new PostDto(
+            p.getId(),
+            p.getTitle(),
+            p.getContent(),
+            p.getViews(),
+            p.getCreatedAt() != null ? ISO_FORMATTER.format(p.getCreatedAt()) : null
+        );
+    }
+    
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        try (Connection conn = dataSource.getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.execute("SELECT 1");
+            return ResponseEntity.ok("OK");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Database unavailable");
+        }
     }
 }

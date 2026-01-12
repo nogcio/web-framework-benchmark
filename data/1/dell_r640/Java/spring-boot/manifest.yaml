@@ -1,6 +1,9 @@
 language_version: '23'
 framework_version: 4.0.1
 tags:
-  platform: spring-boot
+  runtime: jvm
+  orm: jpa
+  type: full-stack
+  arch: thread-per-request
 database: postgres
 path: benchmarks/java/spring-boot-jpa-postgres

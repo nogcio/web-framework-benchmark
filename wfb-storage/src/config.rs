@@ -5,7 +5,6 @@ use walkdir::WalkDir;
 
 use crate::{Benchmark, Environment, Error, Framework, Lang, Result};
 
-
 #[derive(Debug, Clone)]
 pub struct Config {
     inner: Arc<ConfigInner>,
@@ -37,9 +36,7 @@ impl Config {
             .filter(|e| {
                 e.path()
                     .extension()
-                    .map(|ext| {
-                        ext == "yaml" || ext == "yml" || ext == "json" || ext == "jsonl"
-                    })
+                    .map(|ext| ext == "yaml" || ext == "yml" || ext == "json" || ext == "jsonl")
                     .unwrap_or(false)
             })
             .try_fold(
@@ -52,10 +49,7 @@ impl Config {
                 |mut acc, entry| -> Result<_> {
                     let path = entry.path();
                     let content = std::fs::read_to_string(path)?;
-                    let ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("");
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
                     let items: Vec<ConfigFile> = match ext {
                         "json" => {
@@ -75,7 +69,9 @@ impl Config {
                             let mut items = Vec::new();
                             for doc in serde_yaml::Deserializer::from_str(&content) {
                                 let value = serde_yaml::Value::deserialize(doc)?;
-                                if let Ok(list) = serde_yaml::from_value::<Vec<ConfigFile>>(value.clone()) {
+                                if let Ok(list) =
+                                    serde_yaml::from_value::<Vec<ConfigFile>>(value.clone())
+                                {
                                     items.extend(list);
                                 } else {
                                     items.push(serde_yaml::from_value(value)?);
@@ -91,7 +87,9 @@ impl Config {
                             ConfigFile::Language(lang) => acc.langs.push(*lang),
                             ConfigFile::Framework(framework) => acc.frameworks.push(*framework),
                             ConfigFile::Benchmark(benchmark) => acc.benchmarks.push(*benchmark),
-                            ConfigFile::Environment(environment) => acc.environments.push(*environment),
+                            ConfigFile::Environment(environment) => {
+                                acc.environments.push(*environment)
+                            }
                         }
                     }
 
@@ -104,11 +102,7 @@ impl Config {
     }
 
     pub fn get_benchmarks(&self) -> Vec<&Benchmark> {
-        let has_only = self
-            .inner
-            .benchmarks
-            .iter()
-            .any(|b| b.only);
+        let has_only = self.inner.benchmarks.iter().any(|b| b.only);
         if has_only {
             self.inner
                 .benchmarks

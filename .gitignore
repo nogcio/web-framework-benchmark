@@ -25,6 +25,8 @@ Session.vim
 
 ## Build
 target/
+obj/
+bin/
 
 
 ## Temporary files

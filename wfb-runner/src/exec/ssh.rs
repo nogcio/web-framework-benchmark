@@ -1,14 +1,14 @@
 use super::{Executor, OutputLogger};
 use anyhow::{Context, Result};
+use async_trait::async_trait;
+use indicatif::ProgressBar;
+use ssh2::Session;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use ssh2::Session;
-use async_trait::async_trait;
-use indicatif::ProgressBar;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Clone)]
 pub struct SshExecutor {
@@ -106,12 +106,19 @@ where
                 let _ = sftp.mkdir(dst, 0o755);
             }
         }
-        
+
         for entry in std::fs::read_dir(src)? {
             let entry = entry?;
             let entry_path = entry.path();
             let dst_path = dst.join(entry.file_name());
-            upload_recursive_sync(sess, &entry_path, &dst_path, total_size, copied, on_progress)?;
+            upload_recursive_sync(
+                sess,
+                &entry_path,
+                &dst_path,
+                total_size,
+                copied,
+                on_progress,
+            )?;
         }
     } else {
         let mut src_file = File::open(src).context("Failed to open local source file")?;
@@ -123,7 +130,7 @@ where
             .context("Failed to start SCP send")?;
 
         let mut buffer = [0u8; 8192];
-        
+
         loop {
             let n = src_file
                 .read(&mut buffer)
@@ -137,12 +144,14 @@ where
             let c = copied.fetch_add(n as u64, Ordering::Relaxed) + n as u64;
             on_progress(&src.to_string_lossy(), c, total_size);
         }
-        
+
         // Close scp channel for this file
         remote_file.send_eof().context("Failed to send EOF")?;
         remote_file.wait_eof().context("Failed to wait for EOF")?;
         remote_file.close().context("Failed to close channel")?;
-        remote_file.wait_close().context("Failed to wait for close")?;
+        remote_file
+            .wait_close()
+            .context("Failed to wait for close")?;
     }
     Ok(())
 }
@@ -151,25 +160,35 @@ where
 impl Executor for SshExecutor {
     async fn execute<S>(&self, script: S, pb: &ProgressBar) -> Result<String, anyhow::Error>
     where
-        S: std::fmt::Display + Send + Sync {
+        S: std::fmt::Display + Send + Sync,
+    {
         self.execute_with_std_out(script, |_| {}, pb).await
     }
-    
-    async fn execute_with_std_out<S, F>(&self, script: S, on_stdout: F, pb: &ProgressBar) -> Result<String, anyhow::Error>
+
+    async fn execute_with_std_out<S, F>(
+        &self,
+        script: S,
+        on_stdout: F,
+        pb: &ProgressBar,
+    ) -> Result<String, anyhow::Error>
     where
         F: Fn(&str) + Send + Sync + 'static,
-        S: std::fmt::Display + Send + Sync
+        S: std::fmt::Display + Send + Sync,
     {
         let script = script.to_string();
-        let logger = Arc::new(OutputLogger::new(pb.clone(), format!("ssh {}@{} {}", self.username, self.host, script)));
-        
+        let logger = Arc::new(OutputLogger::new(
+            pb.clone(),
+            format!("ssh {}@{} {}", self.username, self.host, script),
+        ));
+
         let host = self.host.clone();
         let port = self.port;
         let username = self.username.clone();
         let private_key_path = self.private_key_path.clone();
 
         tokio::task::spawn_blocking(move || {
-            let tcp = TcpStream::connect((host.as_str(), port)).context("Failed to connect to SSH host")?;
+            let tcp = TcpStream::connect((host.as_str(), port))
+                .context("Failed to connect to SSH host")?;
             let mut sess = Session::new().context("Failed to create SSH session")?;
             sess.set_tcp_stream(tcp);
             sess.handshake().context("SSH handshake failed")?;
@@ -177,7 +196,9 @@ impl Executor for SshExecutor {
             sess.userauth_pubkey_file(&username, None, &private_key_path, None)
                 .context("SSH authentication failed")?;
 
-            let mut channel = sess.channel_session().context("Failed to create SSH channel")?;
+            let mut channel = sess
+                .channel_session()
+                .context("Failed to create SSH channel")?;
             channel.exec(&script).context("Failed to execute script")?;
 
             sess.set_blocking(false);
@@ -231,7 +252,7 @@ impl Executor for SshExecutor {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
             }
-            
+
             // Flush remaining buffers
             if let Some(s) = stdout_buffer.flush() {
                 logger.on_stdout(&s);
@@ -246,9 +267,18 @@ impl Executor for SshExecutor {
             if exit_status != 0 {
                 let stderr = logger.get_stderr();
                 if !stderr.is_empty() {
-                    return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}\nStderr:\n{}", exit_status, script, stderr));
+                    eprintln!("{}", stderr);
+                    return Err(anyhow::anyhow!(
+                        "Command failed with status: {}\nCommand: {}",
+                        exit_status,
+                        script
+                    ));
                 }
-                return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}", exit_status, script));
+                return Err(anyhow::anyhow!(
+                    "Command failed with status: {}\nCommand: {}",
+                    exit_status,
+                    script
+                ));
             }
 
             Ok(output)
@@ -292,7 +322,8 @@ impl Executor for SshExecutor {
         };
 
         tokio::task::spawn_blocking(move || {
-            let tcp = TcpStream::connect((host.as_str(), port)).context("Failed to connect to SSH host")?;
+            let tcp = TcpStream::connect((host.as_str(), port))
+                .context("Failed to connect to SSH host")?;
             let mut sess = Session::new().context("Failed to create SSH session")?;
             sess.set_tcp_stream(tcp);
             sess.handshake().context("SSH handshake failed")?;
@@ -301,14 +332,12 @@ impl Executor for SshExecutor {
 
             let src_path = Path::new(&src);
             let dst_path = Path::new(&dst);
-            
+
             let total_size = get_dir_size_sync(src_path).context("Failed to get size")?;
             let copied = AtomicU64::new(0);
-            
+
             upload_recursive_sync(&sess, src_path, dst_path, total_size, &copied, &on_progress)
         })
         .await?
     }
 }
-
-

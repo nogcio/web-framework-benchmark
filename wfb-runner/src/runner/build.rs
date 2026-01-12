@@ -1,15 +1,19 @@
+use crate::consts;
+use crate::db_config::get_db_config;
+use crate::docker::DockerManager;
+use crate::exec::Executor;
+use crate::exec::local::LocalExecutor;
+use crate::runner::Runner;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::time::Duration;
 use wfb_storage::{Benchmark, DatabaseKind};
-use crate::exec::Executor;
-use crate::consts;
-use crate::db_config::get_db_config;
-use crate::runner::Runner;
-use crate::exec::local::LocalExecutor;
-use crate::docker::DockerManager;
 
 impl<E: Executor + Clone + Send + 'static> Runner<E> {
-    pub async fn build_database_images_impl(&self, db_kinds: Vec<DatabaseKind>, mb: &MultiProgress) -> anyhow::Result<()> {
+    pub async fn build_database_images_impl(
+        &self,
+        db_kinds: Vec<DatabaseKind>,
+        mb: &MultiProgress,
+    ) -> anyhow::Result<()> {
         if db_kinds.is_empty() {
             return Ok(());
         }
@@ -25,18 +29,14 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             pb.set_prefix(format!("[{:?}]", db));
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message(format!("Building: {:?}", db));
-            
+
             let runner = self.clone();
             handles.push(tokio::spawn(async move {
                 let res = runner.build_database_image(&db, &pb).await;
                 pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
                 match res {
                     Ok(_) => {
-                        pb.finish_with_message(format!(
-                            "{} {:?}",
-                            console::style("✔").green(),
-                            db
-                        ));
+                        pb.finish_with_message(format!("{} {:?}", console::style("✔").green(), db));
                         Ok(())
                     }
                     Err(e) => {
@@ -74,7 +74,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             if self.config.is_remote {
                 let local_exec = LocalExecutor::new();
                 let local_docker = DockerManager::new(local_exec.clone(), false);
-                
+
                 let image_name = consts::WRKR_IMAGE;
                 let tar_path = "/tmp/wrkr.tar";
                 let remote_tar_path = format!("{}/wrkr.tar", consts::REMOTE_WRKR_PATH);
@@ -86,21 +86,26 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     "x86_64" => "linux/amd64",
                     "aarch64" | "arm64" => "linux/arm64",
                     _ => {
-                        pb.set_message(format!("Unknown architecture: {}, defaulting to linux/amd64", arch));
+                        pb.set_message(format!(
+                            "Unknown architecture: {}, defaulting to linux/amd64",
+                            arch
+                        ));
                         "linux/amd64"
                     }
                 };
 
                 pb.set_message(format!("Building wrkr image locally for {}", platform));
-                
-                local_docker.build_with_platform_and_output(
-                    Some("Dockerfile.wrkr"),
-                    image_name, 
-                    ".", 
-                    platform, 
-                    &format!("type=docker,dest={}", tar_path),
-                    &pb
-                ).await?;
+
+                local_docker
+                    .build_with_platform_and_output(
+                        Some("Dockerfile.wrkr"),
+                        image_name,
+                        ".",
+                        platform,
+                        &format!("type=docker,dest={}", tar_path),
+                        &pb,
+                    )
+                    .await?;
 
                 pb.set_message("Copying wrkr image to remote");
                 pb.set_style(
@@ -109,7 +114,9 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                         .unwrap()
                         .progress_chars("#>-"),
                 );
-                self.wrkr_executor.cp(tar_path, &remote_tar_path, &pb).await?;
+                self.wrkr_executor
+                    .cp(tar_path, &remote_tar_path, &pb)
+                    .await?;
 
                 pb.set_style(
                     ProgressStyle::default_spinner()
@@ -123,51 +130,54 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 let local_exec = LocalExecutor::new();
                 let local_docker = DockerManager::new(local_exec.clone(), false);
                 pb.set_message("Building wrkr image locally");
-                local_docker.build(Some("Dockerfile.wrkr"), consts::WRKR_IMAGE, ".", &pb).await?;
+                local_docker
+                    .build(Some("Dockerfile.wrkr"), consts::WRKR_IMAGE, ".", &pb)
+                    .await?;
             }
             Ok::<(), anyhow::Error>(())
-        }.await;
+        }
+        .await;
 
         pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
 
         match res {
             Ok(_) => {
-                pb.finish_with_message(format!(
-                    "{} wrkr",
-                    console::style("✔").green()
-                ));
+                pb.finish_with_message(format!("{} wrkr", console::style("✔").green()));
                 Ok(())
             }
             Err(e) => {
-                pb.finish_with_message(format!(
-                    "{} wrkr Failed: {}",
-                    console::style("✘").red(),
-                    e
-                ));
+                pb.finish_with_message(format!("{} wrkr Failed: {}", console::style("✘").red(), e));
                 Err(e)
             }
         }
     }
 
-    pub async fn build_database_image(&self, db_kind: &DatabaseKind, pb: &ProgressBar) -> anyhow::Result<()> {
+    pub async fn build_database_image(
+        &self,
+        db_kind: &DatabaseKind,
+        pb: &ProgressBar,
+    ) -> anyhow::Result<()> {
         let config = get_db_config(db_kind);
         let temp_dir = format!("{}/{}", consts::REMOTE_DB_PATH, config.image_name);
-        
+
         self.build_image_with_progress(
             &self.db_executor,
             &self.db_docker,
             config.image_name,
             &temp_dir,
             pb,
-            || async {
-                self.db_executor.cp(config.build_path, &temp_dir, pb).await
-            }
-        ).await
+            || async { self.db_executor.cp(config.build_path, &temp_dir, pb).await },
+        )
+        .await
     }
 
-    pub async fn build_benchmark_image(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
+    pub async fn build_benchmark_image(
+        &self,
+        benchmark: &Benchmark,
+        pb: &ProgressBar,
+    ) -> anyhow::Result<()> {
         let temp_dir = format!("{}/{}", consts::REMOTE_APP_PATH, benchmark.name);
-        
+
         self.build_image_with_progress(
             &self.executor,
             &self.app_docker,
@@ -179,10 +189,13 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 self.executor.mkdir(&temp_dir_benchmarks_data).await?;
                 self.executor.cp(&benchmark.path, &temp_dir, pb).await?;
                 pb.set_position(0);
-                self.executor.cp(consts::BENCHMARK_DATA, &temp_dir_benchmarks_data, pb).await?;
+                self.executor
+                    .cp(consts::BENCHMARK_DATA, &temp_dir_benchmarks_data, pb)
+                    .await?;
                 Ok(())
-            }
-        ).await
+            },
+        )
+        .await
     }
 
     async fn build_image_with_progress<F, Fut>(
@@ -193,7 +206,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         temp_dir: &str,
         pb: &ProgressBar,
         prepare_context: F,
-    ) -> anyhow::Result<()> 
+    ) -> anyhow::Result<()>
     where
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = anyhow::Result<()>>,
@@ -207,12 +220,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 .progress_chars("#>-"),
         );
         pb.set_length(100);
-        
+
         prepare_context().await?;
-        
+
         pb.set_style(original_style);
         pb.set_position(0);
-        
+
         docker.build(None, image_name, temp_dir, pb).await
     }
 }

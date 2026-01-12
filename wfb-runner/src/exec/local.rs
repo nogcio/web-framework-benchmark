@@ -1,14 +1,14 @@
 use super::{Executor, OutputLogger};
 use anyhow::{Context, Result};
+use async_trait::async_trait;
+use indicatif::ProgressBar;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
-use async_trait::async_trait;
-use indicatif::ProgressBar;
 
 #[derive(Default, Clone)]
 pub struct LocalExecutor;
@@ -63,7 +63,9 @@ where
             .await?;
         }
     } else {
-        let mut src_file = fs::File::open(src).await.context("Failed to open source file")?;
+        let mut src_file = fs::File::open(src)
+            .await
+            .context("Failed to open source file")?;
         let mut dst_file = fs::File::create(dst)
             .await
             .context("Failed to create destination file")?;
@@ -93,18 +95,24 @@ where
 impl Executor for LocalExecutor {
     async fn execute<S>(&self, script: S, pb: &ProgressBar) -> Result<String, anyhow::Error>
     where
-        S: std::fmt::Display + Send + Sync {
+        S: std::fmt::Display + Send + Sync,
+    {
         self.execute_with_std_out(script, |_| {}, pb).await
     }
-    
-    async fn execute_with_std_out<S, F>(&self, script: S, on_stdout: F, pb: &ProgressBar) -> Result<String, anyhow::Error>
+
+    async fn execute_with_std_out<S, F>(
+        &self,
+        script: S,
+        on_stdout: F,
+        pb: &ProgressBar,
+    ) -> Result<String, anyhow::Error>
     where
         F: Fn(&str) + Send + Sync + 'static,
-        S: std::fmt::Display + Send + Sync
+        S: std::fmt::Display + Send + Sync,
     {
         let script = script.to_string();
         let logger = Arc::new(OutputLogger::new(pb.clone(), script.clone()));
-        
+
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("powershell");
             c.arg("-Command").arg(&script);
@@ -153,21 +161,34 @@ impl Executor for LocalExecutor {
         if !status.success() {
             let stderr = logger.get_stderr();
             if !stderr.is_empty() {
-                return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}\nStderr:\n{}", status, script, stderr));
+                return Err(anyhow::anyhow!(
+                    "Command failed with status: {}\nCommand: {}\nStderr:\n{}",
+                    status,
+                    script,
+                    stderr
+                ));
             }
-            return Err(anyhow::anyhow!("Command failed with status: {}\nCommand: {}", status, script));
+            return Err(anyhow::anyhow!(
+                "Command failed with status: {}\nCommand: {}",
+                status,
+                script
+            ));
         }
 
         Ok(stdout_str)
     }
 
     async fn mkdir(&self, path: &str) -> Result<(), anyhow::Error> {
-        fs::create_dir_all(path).await.context("Failed to create directory")
+        fs::create_dir_all(path)
+            .await
+            .context("Failed to create directory")
     }
 
     async fn rm(&self, path: &str) -> Result<(), anyhow::Error> {
         if fs::metadata(path).await.is_ok() {
-            fs::remove_dir_all(path).await.context("Failed to remove directory")
+            fs::remove_dir_all(path)
+                .await
+                .context("Failed to remove directory")
         } else {
             Ok(())
         }
@@ -194,4 +215,3 @@ impl Executor for LocalExecutor {
         copy_recursive(src_path, dst_path, total_size, copied, &on_progress).await
     }
 }
-

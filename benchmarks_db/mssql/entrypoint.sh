@@ -22,7 +22,7 @@ done
 
 # Run initialization script if present
 if [ -f /docker-entrypoint-initdb.d/init.sql ]; then
-  "$SQLCMD" "${SQLCMD_OPTS[@]}" -i /docker-entrypoint-initdb.d/init.sql
+  "$SQLCMD" "${SQLCMD_OPTS[@]}" -b -i /docker-entrypoint-initdb.d/init.sql
 fi
 
 wait

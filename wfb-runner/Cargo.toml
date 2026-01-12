@@ -10,7 +10,7 @@ repository.workspace = true
 [dependencies]
 wrkr-core = { path = "../wrkr-core" }
 wfb-storage = { path = "../wfb-storage" }
-tokio = { version = "1.8", features = ["rt-multi-thread", "time", "fs", "macros", "process"] }
+tokio = { version = "1.8", features = ["rt-multi-thread", "time", "fs", "macros", "process", "signal"] }
 clap = {version = "4.5.53", features = ["derive", "env"]}
 thiserror = "2.0.17"
 indicatif = "0.18.3"

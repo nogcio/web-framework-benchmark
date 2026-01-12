@@ -71,10 +71,7 @@ pub struct RunSummary {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-fn serialize_duration_as_nanos<S>(
-    duration: &Duration,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
+fn serialize_duration_as_nanos<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {

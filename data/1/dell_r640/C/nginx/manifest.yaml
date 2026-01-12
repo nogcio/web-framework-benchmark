@@ -1,6 +1,8 @@
 language_version: C11
 framework_version: 1.29.4
 tags:
-  platform: nginx
+  type: proxy
+  runtime: native
+  arch: event-loop
 database: null
 path: benchmarks/c/nginx

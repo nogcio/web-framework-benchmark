@@ -1,23 +1,32 @@
+pub mod benchmark;
 pub mod build;
 pub mod database;
-pub mod benchmark;
 
-use crate::exec::Executor;
-use crate::docker::DockerManager;
 use crate::consts;
-use indicatif::{ProgressBar, MultiProgress};
-use tokio::time::sleep;
-use std::time::Duration;
-use wfb_storage::{Benchmark, DatabaseKind, Storage, Config, Environment};
+use crate::docker::DockerManager;
+use crate::exec::Executor;
 use async_trait::async_trait;
+use indicatif::{MultiProgress, ProgressBar};
+use std::time::Duration;
+use tokio::time::sleep;
+use wfb_storage::{Benchmark, Config, DatabaseKind, Environment, Storage};
 
 #[async_trait]
 pub trait BenchmarkRunner: Send + Sync {
     async fn prepare(&self, mb: &MultiProgress) -> anyhow::Result<()>;
-    async fn build_database_images(&self, db_kinds: Vec<DatabaseKind>, mb: &MultiProgress) -> anyhow::Result<()>;
+    async fn build_database_images(
+        &self,
+        db_kinds: Vec<DatabaseKind>,
+        mb: &MultiProgress,
+    ) -> anyhow::Result<()>;
     async fn deploy_wrkr(&self, mb: &MultiProgress) -> anyhow::Result<()>;
-    async fn verify_benchmark(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()>;
+    async fn verify_benchmark(
+        &self,
+        benchmark: &Benchmark,
+        mb: &MultiProgress,
+    ) -> anyhow::Result<()>;
     async fn run_benchmark(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()>;
+    async fn dev_benchmark(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()>;
 }
 
 #[derive(Clone)]
@@ -57,7 +66,6 @@ impl<E: Executor + Clone + Send + Sync + 'static> BenchmarkRunner for Runner<E> 
         pb.set_prefix("prepare");
         pb.set_message("Preparing remote environment...");
 
-        
         // Stop and remove all containers on all hosts
         self.wrkr_docker.stop_all_containers(&pb).await;
         self.app_docker.stop_all_containers(&pb).await;
@@ -82,7 +90,11 @@ impl<E: Executor + Clone + Send + Sync + 'static> BenchmarkRunner for Runner<E> 
         Ok(())
     }
 
-    async fn build_database_images(&self, db_kinds: Vec<DatabaseKind>, mb: &MultiProgress) -> anyhow::Result<()> {
+    async fn build_database_images(
+        &self,
+        db_kinds: Vec<DatabaseKind>,
+        mb: &MultiProgress,
+    ) -> anyhow::Result<()> {
         self.build_database_images_impl(db_kinds, mb).await
     }
 
@@ -90,16 +102,25 @@ impl<E: Executor + Clone + Send + Sync + 'static> BenchmarkRunner for Runner<E> 
         self.deploy_wrkr_impl(mb).await
     }
 
-    async fn verify_benchmark(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()> {
+    async fn verify_benchmark(
+        &self,
+        benchmark: &Benchmark,
+        mb: &MultiProgress,
+    ) -> anyhow::Result<()> {
         self.verify_benchmark_impl(benchmark, mb).await
     }
 
     async fn run_benchmark(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()> {
         self.run_benchmark_impl(benchmark, mb).await
     }
+
+    async fn dev_benchmark(&self, benchmark: &Benchmark, mb: &MultiProgress) -> anyhow::Result<()> {
+        self.dev_benchmark_impl(benchmark, mb).await
+    }
 }
 
 impl<E: Executor + Clone> Runner<E> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         app_executor: E,
         db_executor: E,
@@ -134,31 +155,34 @@ impl<E: Executor + Clone> Runner<E> {
     ) -> anyhow::Result<()> {
         let max_retries = consts::CONTAINER_HEALTH_RETRIES;
         let mut retries = 0;
-    
+
         loop {
             let format = "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}";
             let output = docker.inspect(container_name, format).await?;
             let status = output.trim();
-    
+
             if status == "healthy" {
                 pb.set_message(format!("Container {} is healthy", container_name));
                 return Ok(());
             } else if status == "unhealthy" {
                 anyhow::bail!("Container {} is unhealthy", container_name);
             }
-    
+
             pb.set_message(format!(
                 "Waiting for {} (Health: {})",
                 container_name, status
             ));
-    
+
             if retries >= max_retries {
+                if let Ok(logs) = docker.logs(container_name).await {
+                    pb.println(format!("Container {} logs:\n{}", container_name, logs));
+                }
                 anyhow::bail!(
                     "Timeout waiting for container {} to be healthy",
                     container_name
                 );
             }
-    
+
             sleep(Duration::from_secs(consts::CONTAINER_HEALTH_INTERVAL_SECS)).await;
             retries += 1;
         }

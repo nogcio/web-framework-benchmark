@@ -2,7 +2,7 @@ use anyhow::Result;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use tokio::sync::mpsc;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 pub enum FileChangeEvent {
     ConfigChanged,
@@ -31,45 +31,42 @@ impl FileWatcherService {
         let runtime_handle = tokio::runtime::Handle::current();
 
         let watcher = RecommendedWatcher::new(
-            move |res: notify::Result<Event>| {
-                match res {
-                    Ok(event) => {
-                        for path in &event.paths {
-                            let tx = tx_clone.clone();
-                            
-                            let change_event = if path.starts_with(&config_path) {
-                                Some(FileChangeEvent::ConfigChanged)
-                            } else if path.starts_with(&data_path) {
-                                Some(FileChangeEvent::DataChanged)
-                            } else {
-                                None
-                            };
+            move |res: notify::Result<Event>| match res {
+                Ok(event) => {
+                    for path in &event.paths {
+                        let tx = tx_clone.clone();
 
-                            if let Some(evt) = change_event {
-                                runtime_handle.spawn(async move {
-                                    if let Err(e) = tx.send(evt).await {
-                                        warn!("Failed to send file change event: {}", e);
-                                    }
-                                });
-                            }
+                        let change_event = if path.starts_with(&config_path) {
+                            Some(FileChangeEvent::ConfigChanged)
+                        } else if path.starts_with(&data_path) {
+                            Some(FileChangeEvent::DataChanged)
+                        } else {
+                            None
+                        };
+
+                        if let Some(evt) = change_event {
+                            runtime_handle.spawn(async move {
+                                if let Err(e) = tx.send(evt).await {
+                                    warn!("Failed to send file change event: {}", e);
+                                }
+                            });
                         }
                     }
-                    Err(e) => error!("File watcher error: {:?}", e),
                 }
+                Err(e) => error!("File watcher error: {:?}", e),
             },
             Config::default(),
         )?;
 
-        let service = FileWatcherService {
-            _watcher: watcher,
-        };
+        let service = FileWatcherService { _watcher: watcher };
 
         Ok((service, rx))
     }
 
     pub fn watch<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         info!("Watching path: {}", path.as_ref().display());
-        self._watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
+        self._watcher
+            .watch(path.as_ref(), RecursiveMode::Recursive)?;
         Ok(())
     }
 }

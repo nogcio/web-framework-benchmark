@@ -1,6 +1,8 @@
-language_version: '1.85'
+language_version: '1.92'
 framework_version: 4.12.1
 tags:
-  platform: actix-web
+  arch: async
+  type: micro-framework
+  runtime: native
 database: null
 path: benchmarks/rust/actix-web

@@ -43,23 +43,35 @@ impl Stats {
         *self.errors_map.entry(error).or_insert(0) += 1;
     }
 
-    pub fn merge(&self, requests: u64, bytes_received: u64, errors: &HashMap<String, u64>, histogram: &Histogram<u64>) {
+    pub fn merge(
+        &self,
+        requests: u64,
+        bytes_received: u64,
+        errors: &HashMap<String, u64>,
+        histogram: &Histogram<u64>,
+    ) {
         self.total_requests.fetch_add(requests, Ordering::Relaxed);
-        self.total_bytes_received.fetch_add(bytes_received, Ordering::Relaxed);
-        
+        self.total_bytes_received
+            .fetch_add(bytes_received, Ordering::Relaxed);
+
         let error_count: u64 = errors.values().sum();
         self.total_errors.fetch_add(error_count, Ordering::Relaxed);
 
         for (k, v) in errors {
             *self.errors_map.entry(k.clone()).or_insert(0) += v;
         }
-        
+
         if let Ok(mut h) = self.latency_histogram.lock() {
             let _ = h.add(histogram);
         }
     }
 
-    pub fn snapshot(&self, duration: Duration, elapsed: Duration, rps_samples: Vec<f64>) -> StatsSnapshot {
+    pub fn snapshot(
+        &self,
+        duration: Duration,
+        elapsed: Duration,
+        rps_samples: Vec<f64>,
+    ) -> StatsSnapshot {
         StatsSnapshot {
             duration,
             elapsed,
@@ -75,7 +87,9 @@ impl Stats {
             latency_histogram: if let Ok(hist) = self.latency_histogram.lock() {
                 hist.clone()
             } else {
-                Histogram::new(3).unwrap_or_else(|_| Histogram::new(2).expect("Failed to create fallback histogram"))
+                Histogram::new(3).unwrap_or_else(|_| {
+                    Histogram::new(2).expect("Failed to create fallback histogram")
+                })
             },
             rps_samples,
         }

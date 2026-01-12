@@ -1,21 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using Npgsql;
-
-ThreadPool.SetMinThreads(Environment.ProcessorCount * 32, Environment.ProcessorCount * 32);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options =>
@@ -28,20 +20,22 @@ builder.Logging.AddSimpleConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Error);
 
 // --- Database Configuration ---
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8000";
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "db";
-var dbPortEnv = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
+var dbPortEnv = Environment.GetEnvironmentVariable("DB_PORT");
 var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "benchmark";
 var dbPass = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "benchmark";
 var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "benchmark";
-var dbKindEnv = Environment.GetEnvironmentVariable("DB_KIND") ?? "postgres";
+var dbKindEnv = Environment.GetEnvironmentVariable("DB_KIND");
+
 var dbKind = dbKindEnv.ToLowerInvariant();
 var isMysql = dbKind == "mysql" || dbKind == "mariadb";
+BenchmarkContext.IsMySql = isMysql;
 var isMssql = dbKind == "mssql" || dbKind == "sqlserver";
+var dbPoolSize = int.Parse(Environment.GetEnvironmentVariable("DB_POOL_SIZE") ?? "256");
 
-var dbPort = ushort.TryParse(dbPortEnv, out var parsedPort)
-    ? parsedPort
-    : (ushort)(isMysql ? 3306 : isMssql ? 1433 : 5432);
+var dbPortStr = dbPortEnv ?? (isMysql ? "3306" : isMssql ? "1433" : "5432");
+var dbPort = ushort.Parse(dbPortStr);
 
 if (isMysql)
 {
@@ -52,11 +46,11 @@ if (isMysql)
         UserID = dbUser,
         Password = dbPass,
         Database = dbName,
-        MinimumPoolSize = 256,
-        MaximumPoolSize = 256,
+        MinimumPoolSize = (uint)dbPoolSize,
+        MaximumPoolSize = (uint)dbPoolSize,
         ConnectionReset = false,
         Pooling = true,
-        SslMode = MySqlSslMode.Preferred,
+        SslMode = MySqlSslMode.None,
     };
     builder.Services.AddDbContextPool<BenchmarkContext>(options =>
         options.UseMySql(csb.ConnectionString, ServerVersion.AutoDetect(csb.ConnectionString), my => my.EnableRetryOnFailure()));
@@ -72,8 +66,8 @@ else if (isMssql)
         TrustServerCertificate = true,
         Encrypt = false,
         Pooling = true,
-        MinPoolSize = 256,
-        MaxPoolSize = 256,
+        MinPoolSize = dbPoolSize,
+        MaxPoolSize = dbPoolSize,
         ConnectTimeout = 5,
     };
     builder.Services.AddDbContextPool<BenchmarkContext>(options =>
@@ -88,8 +82,8 @@ else
         Username = dbUser,
         Password = dbPass,
         Database = dbName,
-        MaxPoolSize = 256,
-        MinPoolSize = 256,
+        MaxPoolSize = dbPoolSize,
+        MinPoolSize = dbPoolSize,
         AutoPrepareMinUsages = 2,
         MaxAutoPrepare = 128,
     };
@@ -97,28 +91,7 @@ else
         options.UseNpgsql(csb.ConnectionString, npgsql => npgsql.EnableRetryOnFailure()));
 }
 
-// --- Auth Configuration ---
-var jwtKey = Encoding.UTF8.GetBytes("super_secret_key_for_benchmarking_only_12345");
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(jwtKey)
-        };
-    });
-builder.Services.AddAuthorization();
-
 var app = builder.Build();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-// --- Standard Benchmark Endpoints ---
 
 app.MapGet("/health", async (BenchmarkContext db) =>
 {
@@ -126,289 +99,122 @@ app.MapGet("/health", async (BenchmarkContext db) =>
     return canConnect ? Results.Text("OK") : Results.Text("Service Unavailable", statusCode: 503);
 });
 
-app.MapGet("/db/read/one", async (int id, BenchmarkContext db, CancellationToken ct) =>
+async Task<IResult> GetUserProfile(string email, BenchmarkContext db, ILogger logger)
 {
-    var row = await db.HelloWorld
-        .AsNoTracking()
-        .Where(r => r.Id == id)
-        .Select(r => new { id = r.Id, name = r.Name, createdAt = r.CreatedAt, updatedAt = r.UpdatedAt })
-        .FirstOrDefaultAsync(ct);
+    // Sequential execution
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+    if (user == null) return Results.NotFound();
 
-    return row is null ? Results.NotFound() : Results.Json(row);
-});
-
-app.MapGet("/db/read/many", async (int offset, int? limit, BenchmarkContext db, CancellationToken ct) =>
-{
-    var actualLimit = limit ?? 50;
-    var rows = await db.HelloWorld
-        .AsNoTracking()
-        .OrderBy(r => r.Id)
-        .Skip(offset)
-        .Take(actualLimit)
-        .Select(r => new { id = r.Id, name = r.Name, createdAt = r.CreatedAt, updatedAt = r.UpdatedAt })
-        .ToListAsync(ct);
-
-    return Results.Json(rows);
-});
-
-app.MapPost("/db/write/insert", async (HttpRequest request, BenchmarkContext db, CancellationToken ct) =>
-{
-    string? name = request.Query["name"];
-    if (string.IsNullOrEmpty(name))
-    {
-        try
-        {
-            var body = await JsonSerializer.DeserializeAsync<JsonElement>(request.Body, cancellationToken: ct);
-            if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
-            {
-                name = nameProp.GetString();
-            }
-        }
-        catch
-        {
-            // Ignore malformed JSON
-        }
-    }
-
-    if (string.IsNullOrEmpty(name))
-    {
-        return Results.BadRequest("Missing name");
-    }
-
-    var now = DateTime.UtcNow;
-    var entity = new HelloWorld
-    {
-        Name = name!,
-        CreatedAt = now,
-        UpdatedAt = now,
-    };
-
-    db.HelloWorld.Add(entity);
-    await db.SaveChangesAsync(ct);
-
-    var result = new { id = entity.Id, name = entity.Name, createdAt = entity.CreatedAt, updatedAt = entity.UpdatedAt };
-    return Results.Json(result);
-});
-
-// --- Tweet Service Endpoints ---
-
-// Register
-app.MapPost("/api/auth/register", async (RegisterRequest req, BenchmarkContext db) =>
-{
-    using var sha256 = SHA256.Create();
-    var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(req.Password));
-    var hash = Convert.ToBase64String(hashBytes);
-
-    var user = new User { Username = req.Username, PasswordHash = hash };
-    try
-    {
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-        return Results.Created($"/api/users/{user.Id}", null);
-    }
-    catch
-    {
-        return Results.Conflict();
-    }
-});
-
-// Login
-app.MapPost("/api/auth/login", async (LoginRequest req, BenchmarkContext db) =>
-{
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
-    if (user == null) return Results.Unauthorized();
-
-    using var sha256 = SHA256.Create();
-    var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(req.Password));
-    var hash = Convert.ToBase64String(hashBytes);
-
-    if (user.PasswordHash != hash) return Results.Unauthorized();
-
-    var tokenHandler = new JwtSecurityTokenHandler();
-    var tokenDescriptor = new SecurityTokenDescriptor
-    {
-        Subject = new ClaimsIdentity(new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username)
-        }),
-        Expires = DateTime.UtcNow.AddHours(1),
-        SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(jwtKey), SecurityAlgorithms.HmacSha256Signature)
-    };
-    var token = tokenHandler.CreateToken(tokenDescriptor);
-    return Results.Ok(new { token = tokenHandler.WriteToken(token) });
-});
-
-// Feed
-app.MapGet("/api/feed", [Authorize] async (BenchmarkContext db) =>
-{
-    var tweets = await db.Tweets
-        .AsNoTracking()
-        .OrderByDescending(t => t.CreatedAt)
-        .Take(20)
-        .Select(t => new TweetDto
-        {
-            Id = t.Id,
-            Username = t.User.Username,
-            Content = t.Content,
-            CreatedAt = t.CreatedAt,
-            Likes = t.Likes.Count
-        })
-        .ToListAsync();
-    return Results.Ok(tweets);
-});
-
-// Get Tweet
-app.MapGet("/api/tweets/{id:int}", [Authorize] async (int id, BenchmarkContext db) =>
-{
-    var tweet = await db.Tweets
-        .AsNoTracking()
-        .Where(t => t.Id == id)
-        .Select(t => new TweetDto
-        {
-            Id = t.Id,
-            Username = t.User.Username,
-            Content = t.Content,
-            CreatedAt = t.CreatedAt,
-            Likes = t.Likes.Count
-        })
-        .FirstOrDefaultAsync();
-    return tweet is null ? Results.NotFound() : Results.Ok(tweet);
-});
-
-// Create Tweet
-app.MapPost("/api/tweets", [Authorize] async (CreateTweetRequest req, ClaimsPrincipal user, BenchmarkContext db) =>
-{
-    var userId = int.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-    var tweet = new Tweet
-    {
-        UserId = userId,
-        Content = req.Content,
-        CreatedAt = DateTime.UtcNow
-    };
-    db.Tweets.Add(tweet);
+    // Update LastLogin
+    user.LastLogin = DateTime.UtcNow;
     await db.SaveChangesAsync();
-    return Results.Created($"/api/tweets/{tweet.Id}", new { id = tweet.Id });
-});
 
-// Like Tweet (Toggle)
-app.MapPost("/api/tweets/{id:int}/like", [Authorize] async (int id, ClaimsPrincipal user, BenchmarkContext db) =>
-{
-    var userId = int.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+    var trending = await db.Posts.AsNoTracking().OrderByDescending(p => p.Views).Take(5).ToListAsync();
+    var posts = await db.Posts.AsNoTracking().Where(p => p.UserId == user.Id).OrderByDescending(p => p.CreatedAt).Take(10).ToListAsync();
 
-    // Check if tweet exists
-    if (!await db.Tweets.AnyAsync(t => t.Id == id))
-    {
-        return Results.NotFound();
-    }
-    
-    // Check if like exists
-    var existingLike = await db.Likes.FindAsync(userId, id);
-    if (existingLike != null)
-    {
-        db.Likes.Remove(existingLike);
-    }
-    else
-    {
-        db.Likes.Add(new Like { UserId = userId, TweetId = id });
-    }
-
+    object settings;
     try
     {
-        await db.SaveChangesAsync();
-        return Results.Ok();
+        settings = JsonSerializer.Deserialize<JsonElement>(user.Settings);
     }
-    catch (DbUpdateConcurrencyException)
+    catch (Exception ex)
     {
-        return Results.Conflict();
+        logger.LogError(ex, "Failed to deserialize settings for user {Email}. Settings value: {Settings}", user.Email, user.Settings);
+        settings = user.Settings;
     }
-    catch (DbUpdateException)
+
+    return Results.Ok(new
     {
-        return Results.Conflict();
+        username = user.Username,
+        email = user.Email,
+        createdAt = user.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        lastLogin = user.LastLogin?.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        settings = settings,
+        posts = posts.Select(p => new
+        {
+            id = p.Id,
+            title = p.Title,
+            content = p.Content,
+            views = p.Views,
+            createdAt = p.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+        }),
+        trending = trending.Select(p => new
+        {
+            id = p.Id,
+            title = p.Title,
+            content = p.Content,
+            views = p.Views,
+            createdAt = p.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+        })
+    });
+}
+
+app.MapGet("/db/user-profile/{email}", async (string email, BenchmarkContext db, ILogger<Program> logger) =>
+{
+    try
+    {
+        return await GetUserProfile(email, db, logger);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Unhandled exception for {Email}", email);
+        return Results.StatusCode(500);
     }
 });
 
 app.Run($"http://0.0.0.0:{port}");
 
-// --- Entities & Context ---
-
 public class BenchmarkContext : DbContext
 {
+    public static bool IsMySql { get; set; }
+
     public BenchmarkContext(DbContextOptions<BenchmarkContext> options) : base(options) { }
 
-    public DbSet<HelloWorld> HelloWorld => Set<HelloWorld>();
     public DbSet<User> Users => Set<User>();
-    public DbSet<Tweet> Tweets => Set<Tweet>();
-    public DbSet<Like> Likes => Set<Like>();
+    public DbSet<Post> Posts => Set<Post>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Standard Benchmark Table
-        var helloWorld = modelBuilder.Entity<HelloWorld>();
-        helloWorld.ToTable("hello_world");
-        helloWorld.HasKey(e => e.Id);
-        helloWorld.Property(e => e.Id).HasColumnName("id");
-        helloWorld.Property(e => e.Name).HasColumnName("name");
-        helloWorld.Property(e => e.CreatedAt).HasColumnName("created_at");
-        helloWorld.Property(e => e.UpdatedAt).HasColumnName("updated_at");
-        // Tweet Service Tables
-        modelBuilder.Entity<User>().ToTable("users");
-        modelBuilder.Entity<User>().Property(u => u.Id).HasColumnName("id");
-        modelBuilder.Entity<User>().Property(u => u.Username).HasColumnName("username");
-        modelBuilder.Entity<User>().Property(u => u.PasswordHash).HasColumnName("password_hash");
+        var user = modelBuilder.Entity<User>();
+        user.ToTable("users");
+        user.Property(u => u.Id).HasColumnName("id");
+        user.Property(u => u.Username).HasColumnName("username");
+        user.Property(u => u.Email).HasColumnName("email");
+        user.Property(u => u.CreatedAt).HasColumnName("created_at");
+        user.Property(u => u.LastLogin).HasColumnName("last_login");
+        user.Property(u => u.Settings).HasColumnName("settings");
+        if (IsMySql)
+        {
+            user.Property(u => u.Settings).HasColumnType("longtext");
+        }
 
-        modelBuilder.Entity<Tweet>().ToTable("tweets");
-        modelBuilder.Entity<Tweet>().Property(t => t.Id).HasColumnName("id");
-        modelBuilder.Entity<Tweet>().Property(t => t.UserId).HasColumnName("user_id");
-        modelBuilder.Entity<Tweet>().Property(t => t.Content).HasColumnName("content");
-        modelBuilder.Entity<Tweet>().Property(t => t.CreatedAt).HasColumnName("created_at");
-
-        modelBuilder.Entity<Like>().ToTable("likes");
-        modelBuilder.Entity<Like>().HasKey(l => new { l.UserId, l.TweetId });
-        modelBuilder.Entity<Like>().Property(l => l.UserId).HasColumnName("user_id");
-        modelBuilder.Entity<Like>().Property(l => l.TweetId).HasColumnName("tweet_id");
+        var post = modelBuilder.Entity<Post>();
+        post.ToTable("posts");
+        post.Property(p => p.Id).HasColumnName("id");
+        post.Property(p => p.UserId).HasColumnName("user_id");
+        post.Property(p => p.Title).HasColumnName("title");
+        post.Property(p => p.Content).HasColumnName("content");
+        post.Property(p => p.Views).HasColumnName("views");
+        post.Property(p => p.CreatedAt).HasColumnName("created_at");
     }
-}
-
-public class HelloWorld
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
 }
 
 public class User
 {
     public int Id { get; set; }
     public string Username { get; set; } = "";
-    public string PasswordHash { get; set; } = "";
+    public string Email { get; set; } = "";
+    public DateTime? LastLogin { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string Settings { get; set; } = "";
 }
 
-public class Tweet
+public class Post
 {
     public int Id { get; set; }
     public int UserId { get; set; }
-    public User User { get; set; } = null!;
+    public string Title { get; set; } = "";
     public string Content { get; set; } = "";
+    public int Views { get; set; }
     public DateTime CreatedAt { get; set; }
-    public ICollection<Like> Likes { get; set; } = new List<Like>();
-}
-
-public class Like
-{
-    public int UserId { get; set; }
-    public int TweetId { get; set; }
-}
-
-public record RegisterRequest(string Username, string Password);
-public record LoginRequest(string Username, string Password);
-public record CreateTweetRequest(string Content);
-public class TweetDto
-{
-    public int Id { get; set; }
-    public string Username { get; set; } = "";
-    public string Content { get; set; } = "";
-    public DateTime CreatedAt { get; set; }
-    public int Likes { get; set; }
 }

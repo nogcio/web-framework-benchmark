@@ -1,2 +1,7 @@
 [mysqld]
 max_connections = 1024
+bind-address = 0.0.0.0
+
+skip-log-bin
+performance_schema = 0
+skip-name-resolve

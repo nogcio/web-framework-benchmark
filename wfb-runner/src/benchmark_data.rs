@@ -1,7 +1,10 @@
-use std::{fs::OpenOptions, io::{self, BufWriter, Write}, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    io::{self, BufWriter, Write},
+    path::PathBuf,
+};
 
 use rand::{RngCore, rngs::OsRng};
-
 
 pub async fn ensure_data() -> std::result::Result<(), io::Error> {
     let mut base = std::env::current_dir()?;

@@ -1,0 +1,8 @@
+language_version: '10.0'
+framework_version: 9.0.0
+tags:
+  type: framework
+  runtime: dotnet
+  arch: async
+database: mssql
+path: benchmarks/csharp/aspnetcore-mssql

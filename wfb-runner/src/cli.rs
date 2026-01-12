@@ -33,6 +33,7 @@ pub enum Commands {
     },
     Verify {
         /// Environment to use
+        #[arg(short, long, default_value = "local")]
         env: String,
 
         /// Filter by specific benchmark name
@@ -42,5 +43,13 @@ pub enum Commands {
         /// Filter by specific test case (plaintext, json_aggregate, static_files)
         #[arg(short, long)]
         testcase: Option<String>,
+    },
+    Dev {
+        /// Benchmark to run
+        name: String,
+
+        /// Environment to use
+        #[arg(short, long, default_value = "local")]
+        env: String,
     },
 }

@@ -1,6 +1,8 @@
 language_version: 2.3.0
 framework_version: 3.3.3
 tags:
-  platform: ktor
+  type: micro-framework
+  runtime: jvm
+  arch: coroutine
 database: null
 path: benchmarks/kotlin/ktor

@@ -3,7 +3,7 @@ local statuses = {"completed", "pending", "failed"}
 local categories = {"Electronics", "Books", "Clothing", "Home"}
 
 local data_pool = {}
-local pool_size = 20000
+local pool_size = 200
 local current_index = 1
 
 local function generate_entry()

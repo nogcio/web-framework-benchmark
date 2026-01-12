@@ -11,7 +11,8 @@ use crate::lang::Lang;
 use crate::testcase::TestCaseSummary;
 
 // RunId -> Environment -> Language -> BenchmarkName -> BenchmarkResult
-pub type StorageData = HashMap<String, HashMap<String, HashMap<String, HashMap<String, BenchmarkResult>>>>;
+pub type StorageData =
+    HashMap<String, HashMap<String, HashMap<String, HashMap<String, BenchmarkResult>>>>;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RunManifest {
@@ -42,6 +43,7 @@ impl Storage {
         })
     }
 
+    #[allow(clippy::collapsible_if)]
     fn load_all(base_path: &Path) -> Result<(StorageData, HashMap<String, RunManifest>)> {
         let mut data = HashMap::new();
         let mut runs = HashMap::new();
@@ -55,7 +57,7 @@ impl Storage {
                 continue;
             }
             let run_id = run_entry.file_name().to_string_lossy().to_string();
-            
+
             // Load run manifest
             let manifest_path = run_entry.path().join("manifest.yaml");
             if manifest_path.exists() {
@@ -66,7 +68,7 @@ impl Storage {
                 }
             }
 
-            let run_data = data.entry(run_id.clone()).or_insert_with(HashMap::new);
+            let run_data = data.entry(run_id.clone()).or_default();
 
             for env_entry in fs::read_dir(run_entry.path())? {
                 let env_entry = env_entry?;
@@ -74,7 +76,9 @@ impl Storage {
                     continue;
                 }
                 let environment = env_entry.file_name().to_string_lossy().to_string();
-                let env_data = run_data.entry(environment.clone()).or_insert_with(HashMap::new);
+                let env_data = run_data
+                    .entry(environment.clone())
+                    .or_default();
 
                 for lang_entry in fs::read_dir(env_entry.path())? {
                     let lang_entry = lang_entry?;
@@ -82,7 +86,9 @@ impl Storage {
                         continue;
                     }
                     let language = lang_entry.file_name().to_string_lossy().to_string();
-                    let lang_results = env_data.entry(language.clone()).or_insert_with(HashMap::new);
+                    let lang_results = env_data
+                        .entry(language.clone())
+                        .or_default();
 
                     for bench_entry in fs::read_dir(lang_entry.path())? {
                         let bench_entry = bench_entry?;
@@ -107,13 +113,15 @@ impl Storage {
                             let file_entry = file_entry?;
                             let path = file_entry.path();
                             if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                                let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                                let file_stem =
+                                    path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                                 if file_stem == "manifest" {
                                     continue;
                                 }
 
                                 let summary_file = fs::File::open(&path)?;
-                                let summary: TestCaseSummary = serde_yaml::from_reader(summary_file)?;
+                                let summary: TestCaseSummary =
+                                    serde_yaml::from_reader(summary_file)?;
                                 test_cases.insert(file_stem.to_string(), summary);
                             }
                         }
@@ -146,6 +154,7 @@ impl Storage {
             .join(&benchmark.name)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn save_benchmark_result<T: serde::Serialize>(
         &self,
         run_id: &str,
@@ -160,18 +169,26 @@ impl Storage {
         // Update memory
         {
             let mut data = self.data.write().unwrap();
-            let run_data = data.entry(run_id.to_string()).or_insert_with(HashMap::new);
-            let env_data = run_data.entry(environment.name().to_string()).or_insert_with(HashMap::new);
-            let lang_data = env_data.entry(language.name.to_string()).or_insert_with(HashMap::new);
-            
-            let bench_result = lang_data.entry(benchmark.name.to_string()).or_insert_with(|| BenchmarkResult {
-                manifest: manifest.clone(),
-                test_cases: HashMap::new(),
-            });
-            
+            let run_data = data.entry(run_id.to_string()).or_default();
+            let env_data = run_data
+                .entry(environment.name().to_string())
+                .or_default();
+            let lang_data = env_data
+                .entry(language.name.to_string())
+                .or_default();
+
+            let bench_result = lang_data
+                .entry(benchmark.name.to_string())
+                .or_insert_with(|| BenchmarkResult {
+                    manifest: manifest.clone(),
+                    test_cases: HashMap::new(),
+                });
+
             // Update manifest in case it changed (though usually it shouldn't for same benchmark)
             bench_result.manifest = manifest.clone();
-            bench_result.test_cases.insert(testcase.to_string(), summary.clone());
+            bench_result
+                .test_cases
+                .insert(testcase.to_string(), summary.clone());
         }
 
         // Save to disk
@@ -187,9 +204,12 @@ impl Storage {
             };
             let file = fs::File::create(&run_manifest_path)?;
             serde_yaml::to_writer(file, &manifest)?;
-            
+
             // Update memory
-            self.runs.write().unwrap().insert(run_id.to_string(), manifest);
+            self.runs
+                .write()
+                .unwrap()
+                .insert(run_id.to_string(), manifest);
         }
 
         // Save manifest if it doesn't exist
@@ -221,10 +241,11 @@ impl Storage {
         environment: &Environment,
     ) -> Result<HashMap<String, HashMap<String, BenchmarkResult>>> {
         let data = self.data.read().unwrap();
-        if let Some(run_data) = data.get(run_id) {
-            if let Some(env_data) = run_data.get(environment.name()) {
-                return Ok(env_data.clone());
-            }
+        if let Some(env_data) = data
+            .get(run_id)
+            .and_then(|run_data| run_data.get(environment.name()))
+        {
+            return Ok(env_data.clone());
         }
         Ok(HashMap::new())
     }
@@ -238,27 +259,23 @@ impl Storage {
         testcase: BenchmarkTests,
     ) -> bool {
         let data = self.data.read().unwrap();
-        if let Some(run_data) = data.get(run_id) {
-            if let Some(env_data) = run_data.get(environment.name()) {
-                if let Some(lang_data) = env_data.get(&language.name) {
-                    if let Some(bench_result) = lang_data.get(&benchmark.name) {
-                        return bench_result.test_cases.contains_key(&testcase.to_string());
-                    }
-                }
-            }
-        }
-        false
+        data.get(run_id)
+            .and_then(|run_data| run_data.get(environment.name()))
+            .and_then(|env_data| env_data.get(&language.name))
+            .and_then(|lang_data| lang_data.get(&benchmark.name))
+            .map(|bench_result| bench_result.test_cases.contains_key(&testcase.to_string()))
+            .unwrap_or(false)
     }
 
     pub fn reload(&self) -> Result<()> {
         let (new_data, new_runs) = Self::load_all(&self.base_path)?;
-        
+
         let mut data = self.data.write().unwrap();
         *data = new_data;
-        
+
         let mut runs = self.runs.write().unwrap();
         *runs = new_runs;
-        
+
         Ok(())
     }
 }

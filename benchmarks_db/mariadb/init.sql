@@ -1,78 +1,61 @@
-CREATE TABLE IF NOT EXISTS hello_world (
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS users;
+
+CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME,
+    settings JSON NOT NULL
 );
 
-INSERT INTO hello_world (name, created_at, updated_at)
-SELECT
-    CONCAT('name_', n) AS name,
-    NOW() - INTERVAL n SECOND AS created_at,
-    NOW() - INTERVAL (n - 1) SECOND AS updated_at
-FROM (
-    SELECT hundreds.n * 100 + tens.n * 10 + ones.n + 1 AS n
-    FROM (
-        SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
-    ) AS ones
-    CROSS JOIN (
-        SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
-    ) AS tens
-    CROSS JOIN (
-        SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
-    ) AS hundreds
-) AS seq
-WHERE n BETWEEN 1 AND 1000
-ORDER BY n;
-
--- Tweet Service Tables
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(128) NOT NULL UNIQUE,
-    password_hash VARCHAR(64) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS tweets (
+CREATE TABLE posts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    content VARCHAR(256) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,    
-    INDEX idx_created_at (created_at DESC),
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    views INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-CREATE TABLE IF NOT EXISTS likes (
-    user_id INT NOT NULL,
-    tweet_id INT NOT NULL,
-    PRIMARY KEY (user_id, tweet_id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (tweet_id) REFERENCES tweets(id),
-    INDEX idx_likes_tweet_id (tweet_id)
-);
+CREATE INDEX idx_posts_views ON posts(views DESC);
+CREATE INDEX idx_posts_user_created ON posts(user_id, created_at DESC);
 
--- Pre-seed Users (1000)
-INSERT IGNORE INTO users (username, password_hash)
-SELECT CONCAT('user_', n), CONCAT('hash_', n)
-FROM (
-    SELECT hundreds.n * 100 + tens.n * 10 + ones.n + 1 AS n
-    FROM (SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS ones
-    CROSS JOIN (SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS tens
-    CROSS JOIN (SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS hundreds
-) AS seq
-WHERE n BETWEEN 1 AND 1000;
+-- Optimized data seeding using CTEs (Common Table Expressions) for bulk inserts
+-- This is significantly faster than row-by-row insertion in a loop
 
--- Pre-seed Tweets (10000)
-INSERT INTO tweets (user_id, content, created_at)
-SELECT
-    FLOOR(1 + RAND() * 1000),
-    CONCAT('Tweet content ', n),
-    NOW() - INTERVAL n SECOND
-FROM (
-    SELECT t1.n * 1000 + t2.n * 100 + t3.n * 10 + t4.n + 1 AS n
-    FROM
-    (SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS t1,
-    (SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS t2,
-    (SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS t3,
-    (SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS t4
-) AS seq
-WHERE n BETWEEN 1 AND 10000;
+INSERT INTO users (username, email, created_at, settings)
+WITH digits AS (
+    SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+),
+seq AS (
+    SELECT d1.d + d2.d * 10 + d3.d * 100 + d4.d * 1000 + 1 AS n
+    FROM digits d1
+    CROSS JOIN digits d2
+    CROSS JOIN digits d3
+    CROSS JOIN digits d4
+)
+SELECT 
+    CONCAT('user_', n), 
+    CONCAT('user_', n, '@example.com'), 
+    NOW(), 
+    '{"theme": "dark", "notifications": true, "language": "en"}'
+FROM seq;
+
+INSERT INTO posts (user_id, title, content, views, created_at)
+WITH RECURSIVE seq_posts AS (
+    SELECT 1 AS n
+    UNION ALL
+    SELECT n + 1 FROM seq_posts WHERE n < 15
+)
+SELECT 
+    u.id, 
+    CONCAT('Post ', p.n), 
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.', 
+    FLOOR(RAND() * 10000), 
+    DATE_SUB(NOW(), INTERVAL p.n MINUTE)
+FROM users u
+CROSS JOIN seq_posts p;
+

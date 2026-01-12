@@ -1,11 +1,17 @@
-use std::{collections::HashMap, fmt::{self}};
+use std::{
+    collections::HashMap,
+    fmt::{self},
+};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum BenchmarkTests {
     PlainText,
     JsonAggregate,
     StaticFiles,
+    DbComplex,
 }
 
 impl fmt::Display for BenchmarkTests {
@@ -14,11 +20,14 @@ impl fmt::Display for BenchmarkTests {
             BenchmarkTests::PlainText => write!(f, "plaintext"),
             BenchmarkTests::JsonAggregate => write!(f, "json_aggregate"),
             BenchmarkTests::StaticFiles => write!(f, "static_files"),
+            BenchmarkTests::DbComplex => write!(f, "db_complex"),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseKind {
     Postgres,
@@ -26,6 +35,18 @@ pub enum DatabaseKind {
     Mariadb,
     Mssql,
     Mongodb,
+}
+
+impl fmt::Display for DatabaseKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DatabaseKind::Postgres => write!(f, "postgres"),
+            DatabaseKind::Mysql => write!(f, "mysql"),
+            DatabaseKind::Mariadb => write!(f, "mariadb"),
+            DatabaseKind::Mssql => write!(f, "mssql"),
+            DatabaseKind::Mongodb => write!(f, "mongodb"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

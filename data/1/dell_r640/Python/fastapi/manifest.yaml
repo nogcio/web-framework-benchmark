@@ -1,6 +1,8 @@
-language_version: '3.13'
+language_version: '3.14'
 framework_version: 0.127.0
 tags:
-  platform: fastapi
+  type: micro-framework
+  runtime: python-asyncio
+  arch: async
 database: null
 path: benchmarks/python/fastapi

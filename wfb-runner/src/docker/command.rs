@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::fmt;
 
 fn docker_cmd(sudo: bool) -> &'static str {
@@ -14,8 +15,20 @@ pub struct DockerBuildCommand<'a> {
 }
 
 impl<'a> DockerBuildCommand<'a> {
-    pub fn new(sudo: bool, docker_file: Option<&'a str>, tag: &'a str, context_path: &'a str) -> Self {
-        Self { sudo, docker_file, tag, context_path, platform: None, output: None }
+    pub fn new(
+        sudo: bool,
+        docker_file: Option<&'a str>,
+        tag: &'a str,
+        context_path: &'a str,
+    ) -> Self {
+        Self {
+            sudo,
+            docker_file,
+            tag,
+            context_path,
+            platform: None,
+            output: None,
+        }
     }
 
     pub fn with_platform(mut self, platform: &'a str) -> Self {
@@ -46,7 +59,16 @@ impl<'a> fmt::Display for DockerBuildCommand<'a> {
         } else {
             String::new()
         };
-        write!(f, "{} build {} {} {} -t {}:latest {}", docker_cmd(self.sudo), platform_arg, output_arg, docker_file_arg, self.tag, self.context_path)
+        write!(
+            f,
+            "{} build {} {} {} -t {}:latest {}",
+            docker_cmd(self.sudo),
+            platform_arg,
+            output_arg,
+            docker_file_arg,
+            self.tag,
+            self.context_path
+        )
     }
 }
 
@@ -58,13 +80,23 @@ pub struct DockerSaveCommand<'a> {
 
 impl<'a> DockerSaveCommand<'a> {
     pub fn new(sudo: bool, image: &'a str, output_path: &'a str) -> Self {
-        Self { sudo, image, output_path }
+        Self {
+            sudo,
+            image,
+            output_path,
+        }
     }
 }
 
 impl<'a> fmt::Display for DockerSaveCommand<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} save -o {} {}:latest", docker_cmd(self.sudo), self.output_path, self.image)
+        write!(
+            f,
+            "{} save -o {} {}:latest",
+            docker_cmd(self.sudo),
+            self.output_path,
+            self.image
+        )
     }
 }
 
@@ -92,7 +124,10 @@ pub struct DockerStopCommand<'a> {
 
 impl<'a> DockerStopCommand<'a> {
     pub fn new(sudo: bool, container_name: &'a str) -> Self {
-        Self { sudo, container_name }
+        Self {
+            sudo,
+            container_name,
+        }
     }
 }
 
@@ -109,7 +144,10 @@ pub struct DockerRmCommand<'a> {
 
 impl<'a> DockerRmCommand<'a> {
     pub fn new(sudo: bool, container_name: &'a str) -> Self {
-        Self { sudo, container_name }
+        Self {
+            sudo,
+            container_name,
+        }
     }
 }
 
@@ -127,13 +165,23 @@ pub struct DockerInspectCommand<'a> {
 
 impl<'a> DockerInspectCommand<'a> {
     pub fn new(sudo: bool, container_name: &'a str, format: &'a str) -> Self {
-        Self { sudo, container_name, format }
+        Self {
+            sudo,
+            container_name,
+            format,
+        }
     }
 }
 
 impl<'a> fmt::Display for DockerInspectCommand<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} inspect --format \"{}\" {}", docker_cmd(self.sudo), self.format, self.container_name)
+        write!(
+            f,
+            "{} inspect --format \"{}\" {}",
+            docker_cmd(self.sudo),
+            self.format,
+            self.container_name
+        )
     }
 }
 
@@ -145,13 +193,23 @@ pub struct DockerStatsCommand<'a> {
 
 impl<'a> DockerStatsCommand<'a> {
     pub fn new(sudo: bool, container_name: &'a str, format: &'a str) -> Self {
-        Self { sudo, container_name, format }
+        Self {
+            sudo,
+            container_name,
+            format,
+        }
     }
 }
 
 impl<'a> fmt::Display for DockerStatsCommand<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} stats --no-stream --format \"{}\" {}", docker_cmd(self.sudo), self.format, self.container_name)
+        write!(
+            f,
+            "{} stats --no-stream --format \"{}\" {}",
+            docker_cmd(self.sudo),
+            self.format,
+            self.container_name
+        )
     }
 }
 
@@ -229,11 +287,11 @@ impl<'a> DockerRunCommand<'a> {
 impl<'a> fmt::Display for DockerRunCommand<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} run ", docker_cmd(self.sudo))?;
-        
+
         if self.detach {
             write!(f, "-d ")?;
         }
-        
+
         write!(f, "--name {} ", self.name)?;
         if let Some(ulimit) = self.ulimit {
             write!(f, "--ulimit {} ", ulimit)?;
@@ -242,7 +300,7 @@ impl<'a> fmt::Display for DockerRunCommand<'a> {
         for (k, v) in &self.sysctl {
             write!(f, "--sysctl {}={} ", k, v)?;
         }
-        
+
         if let Some(net) = self.network {
             write!(f, "--network {} ", net)?;
         }
@@ -250,15 +308,15 @@ impl<'a> fmt::Display for DockerRunCommand<'a> {
         for (host, container) in &self.ports {
             write!(f, "-p {}:{} ", host, container)?;
         }
-        
+
         for (k, v) in &self.env {
             write!(f, "-e {}={} ", k, v)?;
         }
-        
+
         for (host, container) in &self.volumes {
             write!(f, "-v {}:{} ", host, container)?;
         }
-        
+
         write!(f, "{}:latest", self.image)?;
 
         for arg in &self.args {
@@ -266,5 +324,39 @@ impl<'a> fmt::Display for DockerRunCommand<'a> {
         }
 
         Ok(())
+    }
+}
+
+pub struct DockerLogsCommand<'a> {
+    sudo: bool,
+    container_name: &'a str,
+    follow: bool,
+}
+
+impl<'a> DockerLogsCommand<'a> {
+    pub fn new(sudo: bool, container_name: &'a str) -> Self {
+        Self {
+            sudo,
+            container_name,
+            follow: false,
+        }
+    }
+
+    pub fn follow(mut self, follow: bool) -> Self {
+        self.follow = follow;
+        self
+    }
+}
+
+impl<'a> fmt::Display for DockerLogsCommand<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let follow_arg = if self.follow { "-f " } else { "" };
+        write!(
+            f,
+            "{} logs {}{} 2>&1",
+            docker_cmd(self.sudo),
+            follow_arg,
+            self.container_name
+        )
     }
 }

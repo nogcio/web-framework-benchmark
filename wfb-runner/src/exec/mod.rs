@@ -1,17 +1,25 @@
 pub mod local;
 pub mod ssh;
 
-use std::{collections::VecDeque, sync::{Arc, Mutex}};
+use async_trait::async_trait;
 use console::style;
 use indicatif::ProgressBar;
-use async_trait::async_trait;
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 #[async_trait]
 pub trait Executor: Send + Sync {
     async fn execute<S>(&self, script: S, pb: &ProgressBar) -> Result<String, anyhow::Error>
     where
         S: std::fmt::Display + Send + Sync;
-    async fn execute_with_std_out<S, F>(&self, script: S, on_stdout: F, pb: &ProgressBar) -> Result<String, anyhow::Error>
+    async fn execute_with_std_out<S, F>(
+        &self,
+        script: S,
+        on_stdout: F,
+        pb: &ProgressBar,
+    ) -> Result<String, anyhow::Error>
     where
         F: Fn(&str) + Send + Sync + 'static,
         S: std::fmt::Display + Send + Sync;
@@ -42,8 +50,14 @@ impl OutputLogger {
     pub fn on_stdout(&self, line: &str) {
         {
             let mut lines = self.last_lines.lock().unwrap();
-            if lines.len() >= 6 { lines.pop_front(); }
-            lines.push_back(format!("{}  {}", style("===>").black().bright(), style(line).black().bright()));
+            if lines.len() >= 6 {
+                lines.pop_front();
+            }
+            lines.push_back(format!(
+                "{}  {}",
+                style("===>").black().bright(),
+                style(line).black().bright()
+            ));
         }
         self.update_state();
     }
@@ -51,9 +65,15 @@ impl OutputLogger {
     pub fn on_stderr(&self, line: &str) {
         {
             let mut lines = self.last_lines.lock().unwrap();
-            if lines.len() >= 6 { lines.pop_front(); }
-            lines.push_back(format!("{}  {}", style("===>").red(), style(line).black().bright()));
-            
+            if lines.len() >= 6 {
+                lines.pop_front();
+            }
+            lines.push_back(format!(
+                "{}  {}",
+                style("===>").red(),
+                style(line).black().bright()
+            ));
+
             let mut log = self.stderr_log.lock().unwrap();
             log.push_str(line);
             log.push('\n');
@@ -63,7 +83,14 @@ impl OutputLogger {
     }
 
     pub fn update_state(&self) {
-        let gray_lines = self.last_lines.lock().unwrap().iter().cloned().collect::<Vec<_>>().join("\n");
+        let gray_lines = self
+            .last_lines
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
         self.pb.set_message(format!("{}\n{}", self.cmd, gray_lines));
     }
 

@@ -9,7 +9,7 @@ use mlua::{Function, Lua};
 use reqwest::Client;
 use reqwest::redirect::Policy;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 use tokio::task::JoinSet;
 use tokio::time::{Duration, Instant, sleep};
 
@@ -26,7 +26,7 @@ enum ExecutionMode {
 fn build_client(timeout: Duration) -> Result<Client> {
     Client::builder()
         // One connection per VU: single idle slot and no cross-VU pooling
-        .pool_max_idle_per_host(1)
+        .pool_max_idle_per_host(2)
         .http1_only()
         .tcp_nodelay(true)
         .no_brotli()

@@ -1,0 +1,19 @@
+---
+type: benchmark
+name: rails
+language: Ruby
+language_version: "4.0"
+framework: rails
+framework_version: "8.0"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+  - db_complex
+tags:
+  type: full-stack
+  runtime: vm
+  orm: active-record
+database: postgres
+path: benchmarks/ruby/rails
+

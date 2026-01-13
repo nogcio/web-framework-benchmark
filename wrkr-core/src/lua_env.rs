@@ -294,8 +294,9 @@ impl UserData for BenchmarkContext {
                     if let Some(b) = body {
                         match b {
                             Value::String(s) => {
-                                let s_str = s.to_str()?;
-                                req = req.body(s_str.to_string());
+                                // Use as_bytes to support binary data (like Protobuf)
+                                let bytes = s.as_bytes().to_vec();
+                                req = req.body(bytes);
                             }
                             Value::Table(t) => {
                                 let json_val: serde_json::Value =
@@ -323,6 +324,7 @@ pub fn create_lua_env(
     vu_id: u64,
 ) -> Result<(Lua, BenchmarkContext)> {
     let lua = Lua::new();
+    crate::pb_utils::register_utils(&lua)?;
     let ctx = BenchmarkContext::new(client, base_url, stats, vu_id).ok_or_else(|| {
         mlua::Error::RuntimeError("Failed to create benchmark context (out of memory?)".to_string())
     })?;

@@ -1,0 +1,32 @@
+---
+type: benchmark
+name: ktor
+language: Kotlin
+language_version: "2.3.0"
+framework: ktor
+framework_version: "3.3.3"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+tags:
+  type: micro-framework
+  runtime: jvm
+  arch: coroutine
+path: benchmarks/kotlin/ktor
+
+
+---
+type: benchmark
+name: grpc-kotlin
+language: Kotlin
+language_version: "1.9.22"
+framework: grpc-kotlin
+framework_version: "1.4.1"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: jvm
+  arch: coroutine
+path: benchmarks/kotlin/grpc

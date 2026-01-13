@@ -2,7 +2,7 @@ FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
-RUN mvn -B package -DskipTests -Dquarkus.package.type=uber-jar
+RUN mvn -B package -DskipTests -Dquarkus.package.jar.type=uber-jar
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app

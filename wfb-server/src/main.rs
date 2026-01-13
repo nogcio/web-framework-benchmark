@@ -195,6 +195,12 @@ async fn get_tests() -> Json<Vec<TestInfo>> {
             children: vec![],
         },
         TestInfo {
+            id: Some(BenchmarkTests::GrpcAggregate.to_string()),
+            name: "gRPC".to_string(),
+            icon: "server".to_string(), // best guess for icon
+            children: vec![],
+        },
+        TestInfo {
             id: Some(BenchmarkTests::DbComplex.to_string()),
             name: "Database".to_string(),
             icon: "database".to_string(),

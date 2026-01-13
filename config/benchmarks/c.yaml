@@ -1,0 +1,31 @@
+---
+type: benchmark
+name: nginx
+language: C
+language_version: "C11"
+framework: nginx
+framework_version: "1.29.4"
+tests:
+  - plain_text
+  - static_files
+tags:
+  type: proxy
+  runtime: native
+  arch: event-loop
+path: benchmarks/c/nginx
+
+---
+type: benchmark
+name: haproxy
+language: C
+language_version: "C11"
+framework: haproxy
+framework_version: "2.8.4"
+tests:
+  - plain_text
+tags:
+  type: proxy
+  runtime: native
+  arch: event-loop
+path: benchmarks/c/haproxy
+

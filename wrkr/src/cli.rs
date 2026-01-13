@@ -47,6 +47,10 @@ pub struct Args {
     #[arg(long, default_value_t = 10)]
     pub timeout: u64,
 
+    /// Force HTTP/2 (useful for gRPC)
+    #[arg(long, default_value_t = false)]
+    pub http2: bool,
+
     /// Output format
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Text)]
     pub output: OutputFormat,

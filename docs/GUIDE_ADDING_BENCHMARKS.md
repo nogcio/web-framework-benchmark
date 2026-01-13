@@ -99,7 +99,13 @@ You need to implement endpoints that correspond to the test specifications in `d
 #### 4. Database Complex (`/db/user-profile/:email`)
 *   **Spec**: [docs/specs/db_complex_spec.md](specs/db_complex_spec.md)
 *   **Method**: `GET`
-*   **Logic**: Fetch user by email, related posts, update timestamp, return nested JSON.
+*   **Logic**: Fetch complex user profile from 4 related tables, calculate stats, return JSON.
+
+#### 5. gRPC Aggregate (`/AnalyticsService/AggregateOrders`)
+*   **Spec**: [docs/specs/grpc_aggregate_spec.md](specs/grpc_aggregate_spec.md)
+*   **Method**: `gRPC Client Streaming` (POST over HTTP/2)
+*   **Logic**: Streaming Order messages, aggregation logic (same as JSON), return AggregateResult.
+*   **Note**: Requires implementing the protobuf service definition.
 
 ## 3. Configuration
 
@@ -123,7 +129,7 @@ language: Rust
 url: https://github.com/tokio-rs/axum
 ```
 
-### C. `config/benchmarks.yaml`
+### C. `config/benchmarks/<language>.yaml`
 ```yaml
 ---
 type: benchmark
@@ -151,7 +157,7 @@ Before running a full benchmark, you **MUST** verify that your implementation sa
 The `verify` command starts your container and checks endpoints against the specs.
 
 ```bash
-# Verify the specific benchmark defined in config/benchmarks.yaml
+# Verify the specific benchmark defined in config/benchmarks/<language>.yaml
 cargo run --release --bin wfb-runner -- verify --benchmark axum --env local
 ```
 

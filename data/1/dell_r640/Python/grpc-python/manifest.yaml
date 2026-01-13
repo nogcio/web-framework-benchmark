@@ -1,0 +1,8 @@
+language_version: '3.12'
+framework_version: 1.67.0
+tags:
+  type: micro-framework
+  arch: async
+  runtime: python-asyncio
+database: null
+path: benchmarks/python/grpc

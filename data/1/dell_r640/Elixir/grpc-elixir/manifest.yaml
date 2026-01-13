@@ -1,0 +1,8 @@
+language_version: '1.16'
+framework_version: 0.9.0
+tags:
+  arch: actor-model
+  runtime: beam
+  type: micro-framework
+database: null
+path: benchmarks/elixir/grpc

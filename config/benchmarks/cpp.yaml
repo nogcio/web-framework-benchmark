@@ -1,0 +1,45 @@
+---
+type: benchmark
+name: envoy
+language: C++
+language_version: "17"
+framework: envoy
+framework_version: "1.36.4"
+tests:
+  - plain_text
+tags:
+  type: proxy
+  runtime: native
+  arch: event-loop
+path: benchmarks/cpp/envoy
+
+---
+type: benchmark
+name: grpc-cpp
+language: C++
+language_version: "17"
+framework: grpc
+framework_version: "1.57.0"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/cpp/grpc
+
+---
+type: benchmark
+name: grpc-cpp-callback
+language: C++
+language_version: "17"
+framework: grpc-callback
+framework_version: "1.57.0"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: callback
+path: benchmarks/cpp/grpc-callback
+

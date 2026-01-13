@@ -1,0 +1,130 @@
+---
+type: benchmark
+name: axum
+language: Rust
+language_version: "1.92"
+framework: axum
+framework_version: "0.8.8"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/rust/axum
+
+---
+type: benchmark
+name: actix-web
+language: Rust
+language_version: "1.92"
+framework: actix-web
+framework_version: "4.12.1"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/rust/actix-web
+
+---
+type: benchmark
+name: actix-sqlx-postgres
+language: Rust
+language_version: "1.92"
+framework: actix-web
+framework_version: "4.12.1"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: postgres
+path: benchmarks/rust/actix-sqlx-postgres
+
+---
+type: benchmark
+name: actix-diesel-postgres
+language: Rust
+language_version: "1.92"
+framework: actix-web
+framework_version: "4.12.1"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+  orm: diesel
+database: postgres
+path: benchmarks/rust/actix-diesel-postgres
+
+---
+type: benchmark
+name: pingora
+language: Rust
+language_version: "1.92"
+framework: pingora
+framework_version: "0.6"
+tests:
+  - plain_text
+tags:
+  type: proxy
+  runtime: native
+  arch: async
+path: benchmarks/rust/pingora
+
+---
+type: benchmark
+name: axum-sqlx-postgres
+language: Rust
+language_version: "1.92"
+framework: axum
+framework_version: "0.8.8"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: postgres
+path: benchmarks/rust/axum-sqlx-postgres
+
+---
+type: benchmark
+name: axum-diesel-postgres
+language: Rust
+language_version: "1.92"
+framework: axum
+framework_version: "0.8.8"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+  orm: diesel
+database: postgres
+path: benchmarks/rust/axum-diesel-postgres
+
+---
+type: benchmark
+name: tonic
+language: Rust
+language_version: "1.92"
+framework: tonic
+framework_version: "0.14.2"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/rust/tonic
+

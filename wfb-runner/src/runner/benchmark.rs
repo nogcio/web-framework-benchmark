@@ -64,6 +64,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 BenchmarkTests::JsonAggregate => consts::SCRIPT_JSON,
                 BenchmarkTests::StaticFiles => consts::SCRIPT_STATIC,
                 BenchmarkTests::DbComplex => consts::SCRIPT_DB_COMPLEX,
+                BenchmarkTests::GrpcAggregate => consts::SCRIPT_GRPC_AGGREGATE,
             };
 
             pb.set_message(format!("Running test {:?} - {}", test, benchmark.name));
@@ -74,6 +75,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             let config = wrkr_core::WrkConfig {
                 script_content,
                 host_url: self.config.app_public_host_url.clone(),
+                http2: matches!(test, BenchmarkTests::GrpcAggregate),
             };
 
             pb.set_message(format!("Running test {:?} - {}", test, benchmark.name));
@@ -338,6 +340,10 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     consts::SCRIPT_DB_COMPLEX,
                     consts::BENCHMARK_STEP_CONNECTIONS_DB_COMPLEX,
                 ),
+                BenchmarkTests::GrpcAggregate => (
+                    consts::SCRIPT_GRPC_AGGREGATE,
+                    consts::BENCHMARK_STEP_CONNECTIONS_GRPC_AGGREGATE,
+                ),
             };
 
             // --- WARMUP PHASE ---
@@ -354,7 +360,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
                 let warmup_duration = format!("{}", consts::BENCHMARK_WARMUP_DURATION_SECS);
 
-                let cmd = self
+                let mut cmd = self
                     .wrkr_docker
                     .run_command(consts::WRKR_IMAGE, "wrkr-warmup")
                     .detach(false)
@@ -369,6 +375,10 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     .arg("8")
                     .arg("--output")
                     .arg("json");
+
+                if matches!(test, BenchmarkTests::GrpcAggregate) {
+                    cmd = cmd.arg("--http2");
+                }
 
                 let warmup_pb_clone = warmup_pb.clone();
                 let _ = self
@@ -435,7 +445,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 }
             });
 
-            let cmd = self
+            let mut cmd = self
                 .wrkr_docker
                 .run_command(consts::WRKR_IMAGE, "wrkr-runner")
                 .detach(false)
@@ -452,6 +462,10 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 .arg(&step_duration)
                 .arg("--output")
                 .arg("json");
+
+            if matches!(test, BenchmarkTests::GrpcAggregate) {
+                cmd = cmd.arg("--http2");
+            }
 
             let raw_data_collection = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
             let raw_data_collection_clone = raw_data_collection.clone();

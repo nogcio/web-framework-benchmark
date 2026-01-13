@@ -1,0 +1,8 @@
+language_version: '1.92'
+framework_version: 0.14.2
+tags:
+  runtime: native
+  arch: async
+  type: micro-framework
+database: null
+path: benchmarks/rust/tonic

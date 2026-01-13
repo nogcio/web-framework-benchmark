@@ -63,6 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         wrk: WrkConfig {
             script_content,
             host_url: args.url.clone(),
+            http2: args.http2,
         },
     };
 

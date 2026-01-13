@@ -1,0 +1,67 @@
+---
+type: benchmark
+name: fastapi
+language: Python
+language_version: "3.14"
+framework: fastapi
+framework_version: "0.127.0"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+tags:
+  type: micro-framework
+  runtime: python-asyncio
+  arch: async
+path: benchmarks/python/fastapi
+
+---
+type: benchmark
+name: fastapi-pg
+language: Python
+language_version: "3.14"
+framework: fastapi
+framework_version: "0.127.0"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: python-asyncio
+  arch: async
+database: postgres
+path: benchmarks/python/fastapi-pg
+
+---
+type: benchmark
+name: grpc-python
+language: Python
+language_version: "3.12"
+framework: grpc
+framework_version: "1.67.0"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: python-asyncio
+  arch: async
+path: benchmarks/python/grpc
+
+---
+type: benchmark
+name: django-pg
+language: Python
+language_version: "3.14"
+framework: django
+framework_version: "5.2"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+  - db_complex
+tags:
+  type: full-stack
+  runtime: python-wsgi
+  arch: sync
+database: postgres
+path: benchmarks/python/django-pg
+

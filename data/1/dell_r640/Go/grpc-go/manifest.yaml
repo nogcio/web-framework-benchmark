@@ -1,0 +1,8 @@
+language_version: '1.25'
+framework_version: 1.78.0
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: null
+path: benchmarks/go/grpc-go

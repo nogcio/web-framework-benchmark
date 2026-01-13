@@ -1,0 +1,33 @@
+---
+type: benchmark
+name: phoenix-ecto-postgres
+language: Elixir
+language_version: "1.18"
+framework: phoenix
+framework_version: "1.8.3"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+  - db_complex
+tags:
+  type: full-stack
+  runtime: beam
+  arch: actor-model
+database: postgres
+path: benchmarks/elixir/phoenix-ecto-postgres
+
+---
+type: benchmark
+name: grpc-elixir
+language: Elixir
+language_version: "1.16"
+framework: grpc
+framework_version: "0.9.0"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: beam
+  arch: actor-model
+path: benchmarks/elixir/grpc

@@ -1,0 +1,8 @@
+language_version: 1.9.22
+framework_version: 1.4.1
+tags:
+  arch: coroutine
+  type: micro-framework
+  runtime: jvm
+database: null
+path: benchmarks/kotlin/grpc

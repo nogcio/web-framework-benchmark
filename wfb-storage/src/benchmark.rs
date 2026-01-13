@@ -12,6 +12,7 @@ pub enum BenchmarkTests {
     JsonAggregate,
     StaticFiles,
     DbComplex,
+    GrpcAggregate,
 }
 
 impl fmt::Display for BenchmarkTests {
@@ -21,6 +22,7 @@ impl fmt::Display for BenchmarkTests {
             BenchmarkTests::JsonAggregate => write!(f, "json_aggregate"),
             BenchmarkTests::StaticFiles => write!(f, "static_files"),
             BenchmarkTests::DbComplex => write!(f, "db_complex"),
+            BenchmarkTests::GrpcAggregate => write!(f, "grpc_aggregate"),
         }
     }
 }

@@ -157,21 +157,45 @@ impl<E: Executor + Clone> Runner<E> {
         let mut retries = 0;
 
         loop {
-            let format = "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}";
+            let format = "{{if .State.Health}}{{.State.Health.Status}}|{{range .State.Health.Log}}[{{.ExitCode}}] {{.Output}}__SEP__{{end}}{{else}}none{{end}}";
             let output = docker.inspect(container_name, format).await?;
-            let status = output.trim();
+            let (status, health_log) = match output.split_once('|') {
+                Some((s, l)) => (s.trim(), l),
+                None => (output.trim(), ""),
+            };
+
+            let last_log = if !health_log.is_empty() {
+                health_log
+                    .split("__SEP__")
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .last()
+                    .unwrap_or("")
+            } else {
+                ""
+            };
 
             if status == "healthy" {
                 pb.set_message(format!("Container {} is healthy", container_name));
                 return Ok(());
             } else if status == "unhealthy" {
-                anyhow::bail!("Container {} is unhealthy", container_name);
+                anyhow::bail!(
+                    "Container {} is unhealthy. Last health check: {}",
+                    container_name,
+                    last_log
+                );
             }
 
-            pb.set_message(format!(
-                "Waiting for {} (Health: {})",
-                container_name, status
-            ));
+            let msg = if last_log.is_empty() {
+                format!("Waiting for {} (Health: {})", container_name, status)
+            } else {
+                let clean_log: String = last_log.replace('\n', " ").chars().take(100).collect();
+                format!(
+                    "Waiting for {} (Health: {}, Last: {})",
+                    container_name, status, clean_log
+                )
+            };
+            pb.set_message(msg);
 
             if retries >= max_retries {
                 if let Ok(logs) = docker.logs(container_name).await {

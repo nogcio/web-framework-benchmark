@@ -2,6 +2,7 @@ use std::time::Duration;
 
 mod error;
 mod lua_env;
+mod pb_utils;
 mod response;
 mod runner;
 mod stats;
@@ -13,6 +14,7 @@ pub use stats::StatsSnapshot;
 pub struct WrkConfig {
     pub script_content: String,
     pub host_url: String,
+    pub http2: bool,
 }
 
 #[derive(Debug, Clone)]

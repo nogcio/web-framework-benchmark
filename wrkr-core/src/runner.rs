@@ -23,11 +23,12 @@ enum ExecutionMode {
     Once,
 }
 
-fn build_client(timeout: Duration) -> Result<Client> {
-    Client::builder()
-        // One connection per VU: single idle slot and no cross-VU pooling
-        .pool_max_idle_per_host(2)
-        .http1_only()
+fn build_client(timeout: Duration, enable_http2: bool, max_pool_size: usize) -> Result<Client> {
+    let mut builder = Client::builder()
+        // Shared client: pool must assume keeping all VU connections alive if needed.
+        // For HTTP/1.1 -> max_pool_size connections.
+        // For HTTP/2 -> reqwest limits connections based on stream limits automatically.
+        .pool_max_idle_per_host(max_pool_size)
         .tcp_nodelay(true)
         .no_brotli()
         .no_deflate()
@@ -36,7 +37,15 @@ fn build_client(timeout: Duration) -> Result<Client> {
         .redirect(Policy::none())
         .timeout(timeout)
         .tcp_keepalive(Some(Duration::from_secs(120)))
-        .no_proxy()
+        .no_proxy();
+
+    if enable_http2 {
+        builder = builder.http2_prior_knowledge();
+    } else {
+        builder = builder.http1_only();
+    }
+
+    builder
         .build()
         .map_err(|e| Error::Other(format!("Failed to build HTTP client: {}", e)))
 }
@@ -82,10 +91,32 @@ where
     let mut prepared_vus = Vec::with_capacity(max_connections as usize);
     let timeout = config.timeout.unwrap_or(Duration::from_secs(10));
 
+    // HTTP/2 Strategy:
+    // Create multiple shared clients to force distinct TCP connections.
+    // 1 connection per ~64 VUs is a good rule of thumb for concurrency.
+    // Minimally 8 connections to saturate server cores.
+    let shared_clients = if config.wrk.http2 {
+        let num_clients = ((max_connections as f64 / 64.0).ceil() as usize).max(8);
+        let mut clients = Vec::with_capacity(num_clients);
+        // Each client has small pool as it serves subset of VUs multiplexed
+        let pool_size = (max_connections as usize / num_clients).max(1) + 2;
+        for _ in 0..num_clients {
+            clients.push(build_client(timeout, true, pool_size)?);
+        }
+        Some(clients)
+    } else {
+        None
+    };
+
     // println!("Pre-allocating {} Lua environments...", max_connections);
     let mut setup_set = JoinSet::new();
     for i in 0..max_connections {
-        let client = build_client(timeout)?;
+        let client = if let Some(clients) = &shared_clients {
+            // Round-robin distribution
+            clients[i as usize % clients.len()].clone()
+        } else {
+            build_client(timeout, false, 2)?
+        };
         let wrk_config = config.wrk.clone();
         let stats = stats.clone();
         setup_set.spawn(async move { prepare_vu_env(&wrk_config, stats, i + 1, client).await });
@@ -253,7 +284,7 @@ pub async fn run_once(config: WrkConfig) -> Result<StatsSnapshot> {
     let stats = Arc::new(Stats::new());
     let start = Instant::now();
 
-    let client = build_client(Duration::from_secs(10))?;
+    let client = build_client(Duration::from_secs(10), config.http2, 2)?;
 
     let prepared = prepare_vu_env(&config, stats.clone(), 1, client).await?;
     run_vu(prepared, ExecutionMode::Once).await?;

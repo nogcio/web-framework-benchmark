@@ -1,0 +1,16 @@
+---
+type: benchmark
+name: openresty
+language: Lua
+language_version: "5.1"
+framework: openresty
+framework_version: "1.27.1.2"
+tests:
+  - plain_text
+  - json_aggregate
+tags:
+  type: proxy
+  runtime: native
+  arch: event-loop
+path: benchmarks/lua/nginx
+

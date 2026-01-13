@@ -1,0 +1,8 @@
+language_version: '25'
+framework_version: 1.12.0
+tags:
+  type: micro-framework
+  runtime: nodejs
+  arch: event-loop
+database: null
+path: benchmarks/javascript/grpc-js

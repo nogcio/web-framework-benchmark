@@ -1,0 +1,14 @@
+{
+  "name": "grpc-js-benchmark",
+  "version": "1.0.0",
+  "description": "Node.js gRPC benchmark",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.0",
+    "@grpc/proto-loader": "^0.7.13",
+    "grpc-health-check": "^2.1.0"
+  }
+}

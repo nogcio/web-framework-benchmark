@@ -30,6 +30,12 @@ impl Response {
         })
     }
 
+    // Helper to get body as Bytes
+    #[allow(dead_code)]
+    pub fn get_body(&self) -> bytes::Bytes {
+        self.body.clone()
+    }
+
     pub fn status(&self) -> u16 {
         self.status
     }
@@ -42,7 +48,7 @@ impl Response {
 
 impl UserData for Response {
     fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("bytes", |_, this| Ok(this.body.to_vec()));
+        fields.add_field_method_get("bytes", |lua, this| lua.create_string(&this.body));
 
         fields.add_field_method_get("headers", |lua, this| {
             let t = lua.create_table()?;
@@ -94,5 +100,40 @@ impl UserData for Response {
                 Ok(this.body.as_ref() == &other.body[..len])
             },
         );
+
+        methods.add_method("grpc_scanner", |_, this, ()| {
+            let bytes = &this.body;
+            if bytes.len() < 5 {
+                return Ok(None);
+            }
+            let compressed = bytes[0] == 1;
+
+            let mut len_bytes = [0u8; 4];
+            len_bytes.copy_from_slice(&bytes[1..5]);
+            let len = u32::from_be_bytes(len_bytes) as usize;
+
+            if bytes.len() < 5 + len {
+                return Ok(None);
+            }
+
+            // Slice exact payload
+            let slice = this.body.slice(5..5 + len);
+
+            if compressed {
+                use flate2::read::GzDecoder;
+                use std::io::Read;
+
+                let mut decoder = GzDecoder::new(&slice[..]);
+                let mut decompressed = Vec::new();
+                if decoder.read_to_end(&mut decompressed).is_ok() {
+                    return Ok(Some(crate::pb_utils::PbScanner::new(decompressed)));
+                }
+                // If decompression fails, we return None or try parsing as is?
+                // Returning None is safer as it indicates invalid frame
+                return Ok(None);
+            }
+
+            Ok(Some(crate::pb_utils::PbScanner::new_from_bytes(slice, 0)))
+        });
     }
 }

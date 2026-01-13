@@ -1,0 +1,111 @@
+---
+type: benchmark
+name: fiber
+language: Go
+language_version: "1.25"
+framework: fiber
+framework_version: "2.52.10"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/go/fiber
+
+---
+type: benchmark
+name: gin
+language: Go
+language_version: "1.25"
+framework: gin
+framework_version: "1.11.0"
+tests:
+  - plain_text
+  - static_files
+  - json_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/go/gin
+
+---
+type: benchmark
+name: caddy
+language: Go
+language_version: "1.25"
+framework: caddy
+framework_version: "2.10.2"
+tests:
+  - plain_text
+  - static_files
+tags:
+  type: proxy
+  runtime: native
+  arch: async
+path: benchmarks/go/caddy
+
+---
+type: benchmark
+name: gin-pgx
+language: Go
+language_version: "1.25"
+framework: gin
+framework_version: "1.11.0"
+tests:
+  - db_complex
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+database: postgres
+path: benchmarks/go/gin-pgx
+
+---
+type: benchmark
+name: go-stdlib
+language: Go
+language_version: "1.24"
+framework: stdlib
+framework_version: "1.24"
+tests:
+  - plain_text
+tags:
+  type: standard-library
+  runtime: native
+  arch: event-loop
+path: benchmarks/go/stdlib
+
+---
+type: benchmark
+name: grpc-go
+language: Go
+language_version: "1.25"
+framework: grpc-go
+framework_version: "1.78.0"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/go/grpc-go
+
+---
+type: benchmark
+name: grpc-go-vtproto
+language: Go
+language_version: "1.25"
+framework: grpc-go
+framework_version: "1.78.0"
+tests:
+  - grpc_aggregate
+tags:
+  type: micro-framework
+  runtime: native
+  arch: async
+path: benchmarks/go/grpc-go-vtproto
+

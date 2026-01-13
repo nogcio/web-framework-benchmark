@@ -4,6 +4,7 @@ pub const BENCHMARK_STEP_CONNECTIONS_PLAINTEXT: &str = "32,64,128,256,512,1024";
 pub const BENCHMARK_STEP_CONNECTIONS_JSON: &str = "32,64,128,256,512";
 pub const BENCHMARK_STEP_CONNECTIONS_STATIC: &str = "16,32,64,128,256";
 pub const BENCHMARK_STEP_CONNECTIONS_DB_COMPLEX: &str = "32,64,128,256,512";
+pub const BENCHMARK_STEP_CONNECTIONS_GRPC_AGGREGATE: &str = "64,128,256,512,1024";
 pub const BENCHMARK_STEP_DURATION_SECS: u64 = 20;
 pub const WRKR_IMAGE: &str = "nogcio/wrkr";
 pub const BENCHMARK_DATA: &str = "benchmarks_data";
@@ -24,6 +25,7 @@ pub const SCRIPT_PLAINTEXT: &str = "scripts/wrkr_plaintext.lua";
 pub const SCRIPT_JSON: &str = "scripts/wrkr_json_aggregate.lua";
 pub const SCRIPT_STATIC: &str = "scripts/wrkr_static_files.lua";
 pub const SCRIPT_DB_COMPLEX: &str = "scripts/wrkr_db_complex.lua";
+pub const SCRIPT_GRPC_AGGREGATE: &str = "scripts/wrkr_grpc_aggregate.lua";
 
 pub const CONTAINER_HEALTH_RETRIES: u32 = 30;
 pub const CONTAINER_HEALTH_INTERVAL_SECS: u64 = 1;

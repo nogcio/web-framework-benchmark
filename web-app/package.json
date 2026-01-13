@@ -1,7 +1,7 @@
 {
   "name": "web-app",
   "private": true,
-  "version": "0.4.2",
+  "version": "0.5.0",
   "author": "Andrew Sumskoy <getansum@nogc.io>",
   "license": "MIT",
   "repository": {

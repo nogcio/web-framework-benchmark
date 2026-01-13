@@ -9,7 +9,7 @@ For a detailed step-by-step guide on adding new languages or frameworks, please 
 **Quick Summary:**
 1.  **Create Directory**: `benchmarks/<language>/<framework>/` with a `Dockerfile` (port 8080).
 2.  **Implement**: Follow specs in `docs/specs/*.md`.
-3.  **Config**: Register in `config/benchmarks.yaml`, `config/frameworks.yaml`, and `config/languages.yaml`.
+3.  **Config**: Register in `config/benchmarks/<language>.yaml`, `config/frameworks.yaml`, and `config/languages.yaml`.
 4.  **Verify**: Run locally with `cargo run --release --bin wfb-runner ...`.
 
 
@@ -32,7 +32,7 @@ For a detailed step-by-step guide on adding new languages or frameworks, please 
 
 - [ ] Benchmark builds and runs locally (`cargo run --release --bin wfb-runner -- run <id> --env local`).
 - [ ] Code is formatted and linters pass.
-- [ ] `config/benchmarks.yaml` is updated correctly.
+- [ ] `config/benchmarks/<language>.yaml` is updated correctly.
 
 ## 4. Communication & Security
 

@@ -133,33 +133,62 @@ func handleUserProfile(c *gin.Context, email string) {
 		return
 	}
 
-	// Query D: Update Last Login
-	var newLastLogin time.Time
-	err := db.QueryRow(ctx, "UPDATE users SET last_login = NOW() WHERE id = $1 RETURNING last_login", userRes.User.ID).Scan(&newLastLogin)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
+	// Phase 2: Parallel Update and Fetch Posts
+	type UpdateResult struct {
+		Err error
 	}
-	userRes.User.LastLogin = &newLastLogin
-
-	// Query C: User Posts
-	rows, err := db.Query(ctx, "SELECT id, title, content, views, created_at FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10", userRes.User.ID)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
+	type PostsResult struct {
+		Posts []Post
+		Err   error
 	}
-	defer rows.Close()
 
-	var userPosts []Post
-	for rows.Next() {
-		var p Post
-		if err := rows.Scan(&p.ID, &p.Title, &p.Content, &p.Views, &p.CreatedAt); err != nil {
-			c.Status(http.StatusInternalServerError)
+	chUpdate := make(chan UpdateResult, 1)
+	chPosts := make(chan PostsResult, 1)
+
+	// Task C: Update Last Login
+	go func() {
+		var newLastLogin time.Time
+		err := db.QueryRow(ctx, "UPDATE users SET last_login = NOW() WHERE id = $1 RETURNING last_login", userRes.User.ID).Scan(&newLastLogin)
+		if err == nil {
+			userRes.User.LastLogin = &newLastLogin
+		}
+		chUpdate <- UpdateResult{Err: err}
+	}()
+
+	// Task D: User Posts
+	go func() {
+		rows, err := db.Query(ctx, "SELECT id, title, content, views, created_at FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10", userRes.User.ID)
+		if err != nil {
+			chPosts <- PostsResult{Err: err}
 			return
 		}
-		userPosts = append(userPosts, p)
-	}
+		defer rows.Close()
 
+		var userPosts []Post
+		for rows.Next() {
+			var p Post
+			if err := rows.Scan(&p.ID, &p.Title, &p.Content, &p.Views, &p.CreatedAt); err != nil {
+				chPosts <- PostsResult{Err: err}
+				return
+			}
+			userPosts = append(userPosts, p)
+		}
+		chPosts <- PostsResult{Posts: userPosts, Err: nil}
+	}()
+
+	updateRes := <-chUpdate
+	postsRes := <-chPosts
+
+	if updateRes.Err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	if postsRes.Err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	
+	userPosts := postsRes.Posts
 	// Ensure empty slices are serialized as [] instead of null
 	if userPosts == nil {
 		userPosts = []Post{}

@@ -1,8 +1,8 @@
-language_version: '21'
+language_version: '25'
 framework_version: 3.17.6
 tags:
+  type: micro-framework
   runtime: jvm
   arch: reactive
-  type: micro-framework
 database: null
 path: benchmarks/java/quarkus-grpc

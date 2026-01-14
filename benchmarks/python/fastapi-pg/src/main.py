@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException, Depends
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, ORJSONResponse
 import asyncpg
 import os
 import asyncio
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     yield
     await pool.close()
 
-app = FastAPI(lifespan=lifespan, openapi_url=None, docs_url=None, redoc_url=None)
+app = FastAPI(lifespan=lifespan, default_response_class=ORJSONResponse, openapi_url=None, docs_url=None, redoc_url=None)
 
 @app.get("/health")
 async def health():
@@ -69,17 +69,22 @@ def map_post(row):
     }
 
 async def get_user_profile_logic(email: str):
-    async with pool.acquire() as conn:
-        # Sequential Execution: Query A and Query B
-        user_row = await fetch_user_by_email(conn, email)
-        trending_rows = await fetch_trending_posts(conn)
+    # Acquire two connections to enable parallelism (mimicking Node.js/Go behavior)
+    async with pool.acquire() as conn1, pool.acquire() as conn2:
+        # Parallel Execution: Query A (User) and Query B (Trending)
+        user_row, trending_rows = await asyncio.gather(
+            fetch_user_by_email(conn1, email),
+            fetch_trending_posts(conn2)
+        )
         
         if not user_row:
             raise HTTPException(status_code=404, detail="User not found")
             
-        # Query C & D
-        posts_rows = await fetch_user_posts(conn, user_row["id"])
-        last_login = await update_user_last_login(conn, user_row["id"])
+        # Parallel Execution: Query C (Posts) and Query D (Update User)
+        posts_rows, last_login = await asyncio.gather(
+            fetch_user_posts(conn1, user_row["id"]),
+            update_user_last_login(conn2, user_row["id"])
+        )
         
         # Handle settings (asyncpg might return str or dict depending on column type and codec)
         settings = user_row["settings"]

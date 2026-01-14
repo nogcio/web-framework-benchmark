@@ -1,0 +1,9 @@
+language_version: 2.3.0
+framework_version: 3.3.3
+tags:
+  orm: jdbc
+  arch: coroutine
+  type: micro-framework
+  runtime: jvm
+database: postgres
+path: benchmarks/kotlin/ktor-jdbc-postgres

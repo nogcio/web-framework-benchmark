@@ -2,12 +2,11 @@
 type: benchmark
 name: fastapi
 language: Python
-language_version: "3.14"
+language_version: "3.14.2"
 framework: fastapi
 framework_version: "0.127.0"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: micro-framework
@@ -19,7 +18,7 @@ path: benchmarks/python/fastapi
 type: benchmark
 name: fastapi-pg
 language: Python
-language_version: "3.14"
+language_version: "3.14.2"
 framework: fastapi
 framework_version: "0.127.0"
 tests:
@@ -35,7 +34,7 @@ path: benchmarks/python/fastapi-pg
 type: benchmark
 name: grpc-python
 language: Python
-language_version: "3.12"
+language_version: "3.13.11"
 framework: grpc
 framework_version: "1.67.0"
 tests:
@@ -50,12 +49,11 @@ path: benchmarks/python/grpc
 type: benchmark
 name: django-pg
 language: Python
-language_version: "3.14"
+language_version: "3.14.2"
 framework: django
 framework_version: "5.2"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
   - db_complex
 tags:

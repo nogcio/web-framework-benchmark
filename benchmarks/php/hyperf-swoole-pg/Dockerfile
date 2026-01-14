@@ -1,18 +1,21 @@
-FROM phpswoole/swoole:php8.2-alpine
+FROM phpswoole/swoole:php8.4-alpine
 
 WORKDIR /opt/www
 
-COPY . /opt/www
-
 # Install extensions and dependencies
+ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+
 RUN apk add --no-cache libpq-dev curl \
-    && docker-php-ext-install pdo pdo_pgsql pcntl
+    && install-php-extensions pdo pdo_pgsql pcntl
 
 # Install composer (phpswoole image might not have it)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-RUN composer install --no-dev -o \
+COPY composer.json .
+RUN composer install --no-dev -o --ignore-platform-reqs \
     && rm -rf runtime/container
+
+COPY . /opt/www
 
 # Copy benchmarks data
 COPY benchmarks_data /opt/www/benchmarks_data
@@ -23,6 +26,6 @@ ENV APP_ENV=prod
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 CMD curl --fail http://127.0.0.1:8080/health || exit 1
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 CMD curl --fail http://127.0.0.1:8080/health || exit 1
 
 ENTRYPOINT ["php", "/opt/www/bin/hyperf.php", "start"]

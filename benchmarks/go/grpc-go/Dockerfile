@@ -1,4 +1,4 @@
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.25.5-bookworm AS builder
 
 # Install protoc
 RUN apt-get update && apt-get install -y protobuf-compiler
@@ -41,6 +41,6 @@ ENV GOGC=1000
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 CMD ["/bin/grpc_health_probe", "-addr=127.0.0.1:8080"]
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 CMD ["/bin/grpc_health_probe", "-addr=127.0.0.1:8080"]
 
 CMD ["./wfb-go-grpc"]

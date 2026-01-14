@@ -1,9 +1,0 @@
-language_version: '10.0'
-framework_version: 9.0.0
-tags:
-  runtime: dotnet
-  arch: async
-  type: framework
-  orm: efcore
-database: mssql
-path: benchmarks/csharp/aspnetcore-efcore

@@ -55,7 +55,7 @@ if (process.env.BUN_WORKER_ID === undefined) {
 
   app.use('/files/*', serveStatic({
     root: dataDir,
-    rewriteRequestPath: (path) => path.replace(/^\/files/, '')
+    rewriteRequestPath: (path) => path.replace(/^\/files\//, '')
   }))
 
   // JSON Aggregation

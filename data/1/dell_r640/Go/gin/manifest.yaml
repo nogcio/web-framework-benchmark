@@ -1,8 +1,8 @@
-language_version: '1.25'
+language_version: 1.25.5
 framework_version: 1.11.0
 tags:
   runtime: native
-  type: micro-framework
   arch: async
+  type: micro-framework
 database: null
 path: benchmarks/go/gin

@@ -5,16 +5,16 @@ import com.zaxxer.hikari.HikariDataSource
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import java.sql.ResultSet
-import java.time.LocalDateTime
 
 fun main() {
     val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
@@ -44,15 +44,20 @@ fun Application.module() {
     val dataSource = HikariDataSource(config)
 
     install(ContentNegotiation) {
-        json()
+        json(Json { 
+            ignoreUnknownKeys = true 
+            encodeDefaults = true
+        })
     }
 
     routing {
         get("/health") {
             try {
-                dataSource.connection.use { conn ->
-                    conn.createStatement().use { stmt ->
-                        stmt.execute("SELECT 1")
+                withContext(Dispatchers.IO) {
+                    dataSource.connection.use { conn ->
+                        conn.createStatement().use { stmt ->
+                            stmt.execute("SELECT 1")
+                        }
                     }
                 }
                 call.respondText("OK")
@@ -61,84 +66,136 @@ fun Application.module() {
             }
         }
 
-        get("/db/read/one") {
-            val id = call.request.queryParameters["id"]?.toIntOrNull() ?: 1
-            dataSource.connection.use { conn ->
-                conn.prepareStatement("SELECT id, name, created_at, updated_at FROM hello_world WHERE id = ?").use { stmt ->
-                    stmt.setInt(1, id)
-                    stmt.executeQuery().use { rs ->
-                        if (rs.next()) {
-                            call.respond(rs.toHelloWorld())
-                        } else {
-                            call.respond(HttpStatusCode.NotFound)
-                        }
-                    }
-                }
+        get("/db/user-profile/{email}") {
+            val email = call.parameters["email"]
+            if (email == null) {
+                call.respond(HttpStatusCode.BadRequest)
+                return@get
             }
-        }
 
-        get("/db/read/many") {
-            val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
-            val list = ArrayList<HelloWorld>(limit)
-            dataSource.connection.use { conn ->
-                conn.prepareStatement("SELECT id, name, created_at, updated_at FROM hello_world ORDER BY id LIMIT ? OFFSET ?").use { stmt ->
-                    stmt.setInt(1, limit)
-                    stmt.setInt(2, offset)
-                    stmt.executeQuery().use { rs ->
-                        while (rs.next()) {
-                            list.add(rs.toHelloWorld())
+            try {
+                // Phase 1: Parallel Fetch
+                val (user, trending) = withContext(Dispatchers.IO) {
+                    val userDeferred = async {
+                        dataSource.connection.use { conn ->
+                            conn.prepareStatement("SELECT id, username, email, created_at, last_login, settings FROM users WHERE email = ?").use { stmt ->
+                                stmt.setString(1, email)
+                                stmt.executeQuery().use { rs ->
+                                    if (rs.next()) {
+                                        InnerUser(
+                                            id = rs.getInt("id"),
+                                            username = rs.getString("username"),
+                                            email = rs.getString("email"),
+                                            createdAt = rs.getTimestamp("created_at").toInstant().toString(),
+                                            lastLogin = rs.getTimestamp("last_login")?.toInstant()?.toString(),
+                                            settings = Json.parseToJsonElement(rs.getString("settings"))
+                                        )
+                                    } else null
+                                }
+                            }
+                        }
+                    }
+
+                    val trendingDeferred = async {
+                        dataSource.connection.use { conn ->
+                            conn.prepareStatement("SELECT id, title, content, views, created_at FROM posts ORDER BY views DESC LIMIT 5").use { stmt ->
+                                stmt.executeQuery().use { rs ->
+                                    val list = ArrayList<PostResponse>()
+                                    while (rs.next()) {
+                                        list.add(PostResponse(
+                                            id = rs.getInt("id"),
+                                            title = rs.getString("title"),
+                                            content = rs.getString("content"),
+                                            views = rs.getInt("views"),
+                                            createdAt = rs.getTimestamp("created_at").toInstant().toString()
+                                        ))
+                                    }
+                                    list
+                                }
+                            }
+                        }
+                    }
+
+                    userDeferred.await() to trendingDeferred.await()
+                }
+
+                if (user == null) {
+                    call.respond(HttpStatusCode.NotFound)
+                    return@get
+                }
+
+                // Phase 2: Update & Fetch Posts
+                val posts = withContext(Dispatchers.IO) {
+                    dataSource.connection.use { conn ->
+                        // Update
+                        conn.prepareStatement("UPDATE users SET last_login = NOW() WHERE id = ?").use { stmt ->
+                            stmt.setInt(1, user.id)
+                            stmt.executeUpdate()
+                        }
+
+                        // Fetch Posts
+                        conn.prepareStatement("SELECT id, title, content, views, created_at FROM posts WHERE user_id = ? ORDER BY created_at DESC LIMIT 10").use { stmt ->
+                            stmt.setInt(1, user.id)
+                            stmt.executeQuery().use { rs ->
+                                val list = ArrayList<PostResponse>()
+                                while (rs.next()) {
+                                    list.add(PostResponse(
+                                        id = rs.getInt("id"),
+                                        title = rs.getString("title"),
+                                        content = rs.getString("content"),
+                                        views = rs.getInt("views"),
+                                        createdAt = rs.getTimestamp("created_at").toInstant().toString()
+                                    ))
+                                }
+                                list
+                            }
                         }
                     }
                 }
-            }
-            call.respond(list)
-        }
 
-        post("/db/write/insert") {
-            val payload = call.receive<WritePayload>()
+                call.respond(UserProfile(
+                    username = user.username,
+                    email = user.email,
+                    createdAt = user.createdAt,
+                    lastLogin = java.time.Instant.now().toString(),
+                    settings = user.settings,
+                    posts = posts,
+                    trending = trending
+                ))
 
-            val now = java.time.LocalDateTime.now()
-            
-            dataSource.connection.use { conn ->
-                conn.prepareStatement("INSERT INTO hello_world (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id, name, created_at, updated_at").use { stmt ->
-                    stmt.setString(1, payload.name)
-                    stmt.setObject(2, now)
-                    stmt.setObject(3, now)
-                    stmt.executeQuery().use { rs ->
-                        if (rs.next()) {
-                            call.respond(HelloWorld(
-                                id = rs.getInt("id"),
-                                name = rs.getString("name"),
-                                createdAt = rs.getTimestamp("created_at").toInstant().toString(),
-                                updatedAt = rs.getTimestamp("updated_at").toInstant().toString()
-                            ))
-                        }
-                    }
-                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                call.respond(HttpStatusCode.InternalServerError, e.message ?: "Error")
             }
         }
     }
 }
 
-fun ResultSet.toHelloWorld() = HelloWorld(
-    id = getInt("id"),
-    name = getString("name"),
-    createdAt = getTimestamp("created_at").toInstant().toString(),
-    updatedAt = getTimestamp("updated_at").toInstant().toString()
+@Serializable
+data class UserProfile(
+    val username: String,
+    val email: String,
+    val createdAt: String,
+    val lastLogin: String?, 
+    val settings: JsonElement,
+    val posts: List<PostResponse>,
+    val trending: List<PostResponse>
 )
 
 @Serializable
-data class HelloWorld(val id: Int, val name: String, val createdAt: String, val updatedAt: String)
+data class PostResponse(
+    val id: Int,
+    val title: String,
+    val content: String,
+    val views: Int,
+    val createdAt: String
+)
 
-@Serializable
-data class WritePayload(val name: String)
-
-@Serializable
-data class AuthRequest(val username: String, val password: String)
-
-@Serializable
-data class Tweet(val id: Int, val username: String, val content: String, val createdAt: String, val likes: Int)
-
-@Serializable
-data class CreateTweetRequest(val content: String)
+data class InnerUser(
+    val id: Int,
+    val username: String,
+    val email: String,
+    val createdAt: String,
+    val lastLogin: String?,
+    val settings: JsonElement
+)

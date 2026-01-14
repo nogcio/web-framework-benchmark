@@ -24,10 +24,7 @@ impl AnalyticsService for HelperService {
     ) -> Result<Response<AggregateResult>, Status> {
         let client_id = match request.metadata().get("x-client-id") {
             Some(v) => v.to_str().unwrap_or("").to_string(),
-            None => {
-                // println!("Error: x-client-id header missing. Headers: {:?}", request.metadata());
-                "MISSING_HEADER".to_string()
-            }
+            None => "".to_string(),
         };
 
         let req = request.into_inner();

@@ -2,12 +2,11 @@
 type: benchmark
 name: express
 language: JavaScript
-language_version: "25"
+language_version: "25.2.1"
 framework: express
 framework_version: "5.2.1"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: micro-framework
@@ -19,12 +18,11 @@ path: benchmarks/javascript/express
 type: benchmark
 name: fastify
 language: JavaScript
-language_version: "25"
+language_version: "25.2.1"
 framework: fastify
 framework_version: "5.6.2"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: micro-framework
@@ -47,6 +45,22 @@ tags:
   runtime: bun
   arch: event-loop
 path: benchmarks/javascript/hono
+
+---
+type: benchmark
+name: hono-node
+language: JavaScript
+language_version: "25.2.1"
+framework: hono
+framework_version: "4.11.2"
+tests:
+  - plain_text
+  - json_aggregate
+tags:
+  type: micro-framework
+  runtime: nodejs
+  arch: event-loop
+path: benchmarks/javascript/hono-node
 
 ---
 type: benchmark
@@ -86,7 +100,7 @@ path: benchmarks/javascript/elysia-pg
 type: benchmark
 name: fastify-prisma
 language: JavaScript
-language_version: "22"
+language_version: "25.2.1"
 framework: fastify
 framework_version: "5.6.2"
 tests:
@@ -104,7 +118,7 @@ path: benchmarks/javascript/fastify-prisma
 type: benchmark
 name: grpc-js
 language: JavaScript
-language_version: "25"
+language_version: "25.2.1"
 framework: grpc
 framework_version: "1.12.0"
 tests:

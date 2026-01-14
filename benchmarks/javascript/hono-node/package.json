@@ -1,0 +1,9 @@
+{
+  "name": "hono-node-benchmark",
+  "type": "module",
+  "main": "src/index.js",
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "hono": "4.11.2"
+  }
+}

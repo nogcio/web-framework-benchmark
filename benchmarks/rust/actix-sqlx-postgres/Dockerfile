@@ -15,7 +15,7 @@ COPY --from=builder /app/target/release/wfb-rust-actix-sqlx-postgres .
 ENV PORT=8080
 
 # MANDATORY: Healthcheck
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 \
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 \
   CMD curl --fail http://localhost:8080/health || exit 1
 
 CMD ["./wfb-rust-actix-sqlx-postgres"]

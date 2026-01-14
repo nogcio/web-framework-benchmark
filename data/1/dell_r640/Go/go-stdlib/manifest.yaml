@@ -1,8 +1,8 @@
 language_version: '1.24'
 framework_version: '1.24'
 tags:
-  type: standard-library
   arch: event-loop
   runtime: native
+  type: standard-library
 database: null
 path: benchmarks/go/stdlib

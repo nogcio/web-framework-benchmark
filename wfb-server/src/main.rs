@@ -206,12 +206,6 @@ async fn get_tests() -> Json<Vec<TestInfo>> {
             icon: "database".to_string(),
             children: vec![],
         },
-        TestInfo {
-            id: Some(BenchmarkTests::StaticFiles.to_string()),
-            name: "Static Files".to_string(),
-            icon: "file".to_string(),
-            children: vec![],
-        },
     ];
     Json(tests)
 }

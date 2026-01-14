@@ -1,8 +1,8 @@
 language_version: C11
 framework_version: 2.8.4
 tags:
+  type: proxy
   runtime: native
   arch: event-loop
-  type: proxy
 database: null
 path: benchmarks/c/haproxy

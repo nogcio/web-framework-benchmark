@@ -7,7 +7,6 @@ framework: nginx
 framework_version: "1.29.4"
 tests:
   - plain_text
-  - static_files
 tags:
   type: proxy
   runtime: native

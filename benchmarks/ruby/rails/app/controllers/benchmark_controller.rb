@@ -98,17 +98,16 @@ class BenchmarkController < ActionController::API
     # 3. Dependent Queries (Query C & D)
     # Now that we have user.id, we can fire off the next batch
     
-    # Query D: Update login time
-    # We want to do this asynchronously/fire-and-forget or parallel with fetching posts.
-    # Update touches the DB. 'update_column' skips validations/callbacks which is faster and required here likely.
-    # But methods on model are synchronous.
-    # We can perform the update.
+    # Query C & D: Update login time and Fetch user posts parallely
+    # Start fetching posts (Query C) in background
+    user_posts_relation = Post.where(user_id: user.id).order(created_at: :desc).limit(10).load_async
+    
+    # Update login time (Query D) - Blocking on Main Thread
+    # update_column updates the attribute in the database and the in-memory object
     user.update_column(:last_login, Time.now)
     
-    # Query C: Fetch user posts
-    # Since we need to return the response, we fetch these now.
-    # If we had more independent work, we would async this too.
-    user_posts = Post.where(user_id: user.id).order(created_at: :desc).limit(10).to_a
+    # Resolve posts query
+    user_posts = user_posts_relation.to_a
     
     # Build response using the already resolved trending query
     trending = trending_query.to_a

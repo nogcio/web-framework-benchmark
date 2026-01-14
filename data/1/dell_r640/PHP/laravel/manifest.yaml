@@ -1,8 +1,8 @@
 language_version: '8.5'
 framework_version: 12.46.0
 tags:
+  arch: sync
   type: full-stack
   runtime: vm
-  arch: sync
 database: postgres
 path: benchmarks/php/laravel

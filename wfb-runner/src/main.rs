@@ -180,6 +180,7 @@ async fn main() -> Result<(), anyhow::Error> {
         cli::Commands::Verify {
             env,
             benchmark,
+            language,
             testcase,
         } => {
             let mut benchmarks = config
@@ -199,6 +200,17 @@ async fn main() -> Result<(), anyhow::Error> {
                 }
             }
 
+            // Filter by language if specified
+            if let Some(ref lang) = language {
+                benchmarks.retain(|b| b.language == *lang);
+                if benchmarks.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "No benchmarks found for language: {}",
+                        lang
+                    ));
+                }
+            }
+
             // Filter by test case if specified
             if let Some(ref tc) = testcase {
                 let tc = match tc.to_lowercase().as_str() {
@@ -206,6 +218,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     "json_aggregate" => wfb_storage::BenchmarkTests::JsonAggregate,
                     "static_files" => wfb_storage::BenchmarkTests::StaticFiles,
                     "db_complex" => wfb_storage::BenchmarkTests::DbComplex,
+                    "grpc_aggregate" => wfb_storage::BenchmarkTests::GrpcAggregate,
                     _ => {
                         eprintln!("Unknown testcase: {}", tc);
                         return Ok(());

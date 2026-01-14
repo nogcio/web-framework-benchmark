@@ -1,0 +1,8 @@
+language_version: 25.2.1
+framework_version: 4.11.2
+tags:
+  runtime: nodejs
+  type: micro-framework
+  arch: event-loop
+database: null
+path: benchmarks/javascript/hono-node

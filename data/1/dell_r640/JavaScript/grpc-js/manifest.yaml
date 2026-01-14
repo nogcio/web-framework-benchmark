@@ -1,8 +1,8 @@
-language_version: '25'
+language_version: 25.2.1
 framework_version: 1.12.0
 tags:
-  type: micro-framework
-  runtime: nodejs
   arch: event-loop
+  runtime: nodejs
+  type: micro-framework
 database: null
 path: benchmarks/javascript/grpc-js

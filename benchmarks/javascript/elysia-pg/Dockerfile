@@ -15,6 +15,6 @@ RUN chmod +x entrypoint.sh
 
 ENV PORT=8080
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 CMD wget -qO- http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 CMD wget -qO- http://localhost:8080/health || exit 1
 
 CMD ["./entrypoint.sh"]

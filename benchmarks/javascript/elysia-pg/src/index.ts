@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 import postgres from 'postgres'
 
 const PORT = parseInt(process.env.PORT || '8080')
@@ -59,16 +59,6 @@ const app = new Elysia()
       results,
       categoryStats
     }
-  }, {
-    body: t.Array(t.Object({
-      status: t.String(),
-      amount: t.Number(),
-      country: t.String(),
-      items: t.Array(t.Object({
-        quantity: t.Number(),
-        category: t.String()
-      }))
-    }))
   })
   
   // Database Complex

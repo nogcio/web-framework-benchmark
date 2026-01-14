@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using MySqlConnector;
@@ -99,65 +100,80 @@ app.MapGet("/health", async (BenchmarkContext db) =>
     return canConnect ? Results.Text("OK") : Results.Text("Service Unavailable", statusCode: 503);
 });
 
-async Task<IResult> GetUserProfile(string email, BenchmarkContext db, ILogger logger)
-{
-    // Sequential execution
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
-    if (user == null) return Results.NotFound();
-
-    // Update LastLogin
-    user.LastLogin = DateTime.UtcNow;
-    await db.SaveChangesAsync();
-
-    var trending = await db.Posts.AsNoTracking().OrderByDescending(p => p.Views).Take(5).ToListAsync();
-    var posts = await db.Posts.AsNoTracking().Where(p => p.UserId == user.Id).OrderByDescending(p => p.CreatedAt).Take(10).ToListAsync();
-
-    object settings;
-    try
-    {
-        settings = JsonSerializer.Deserialize<JsonElement>(user.Settings);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Failed to deserialize settings for user {Email}. Settings value: {Settings}", user.Email, user.Settings);
-        settings = user.Settings;
-    }
-
-    return Results.Ok(new
-    {
-        username = user.Username,
-        email = user.Email,
-        createdAt = user.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-        lastLogin = user.LastLogin?.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-        settings = settings,
-        posts = posts.Select(p => new
-        {
-            id = p.Id,
-            title = p.Title,
-            content = p.Content,
-            views = p.Views,
-            createdAt = p.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
-        }),
-        trending = trending.Select(p => new
-        {
-            id = p.Id,
-            title = p.Title,
-            content = p.Content,
-            views = p.Views,
-            createdAt = p.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
-        })
-    });
-}
-
-app.MapGet("/db/user-profile/{email}", async (string email, BenchmarkContext db, ILogger<Program> logger) =>
+app.MapGet("/db/user-profile/{email}", async (string email, IServiceProvider sp) =>
 {
     try
     {
-        return await GetUserProfile(email, db, logger);
+        // Parallel Phase 1
+        var userTask = Task.Run(async () =>
+        {
+            using var scope = sp.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<BenchmarkContext>();
+            return await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == email);
+        });
+
+        var trendingTask = Task.Run(async () =>
+        {
+            using var scope = sp.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<BenchmarkContext>();
+            return await db.Posts.AsNoTracking().OrderByDescending(p => p.Views).Take(5).ToListAsync();
+        });
+
+        await Task.WhenAll(userTask, trendingTask);
+        var user = await userTask;
+        var trending = await trendingTask;
+
+        if (user == null) return Results.NotFound();
+
+        // Parallel Phase 2
+        var updateTask = Task.Run(async () =>
+        {
+            using var scope = sp.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<BenchmarkContext>();
+            await db.Users.Where(u => u.Id == user.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.LastLogin, DateTime.UtcNow));
+        });
+
+        var postsTask = Task.Run(async () =>
+        {
+            using var scope = sp.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<BenchmarkContext>();
+            return await db.Posts.AsNoTracking().Where(p => p.UserId == user.Id).OrderByDescending(p => p.CreatedAt).Take(10).ToListAsync();
+        });
+
+        await Task.WhenAll(updateTask, postsTask);
+        var posts = await postsTask;
+
+        object settings;
+        try { settings = JsonSerializer.Deserialize<JsonElement>(user.Settings); } catch { settings = user.Settings; }
+
+        return Results.Ok(new
+        {
+            username = user.Username,
+            email = user.Email,
+            createdAt = user.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            lastLogin = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            settings = settings,
+            posts = posts.Select(p => new
+            {
+                id = p.Id,
+                title = p.Title,
+                content = p.Content,
+                views = p.Views,
+                createdAt = p.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            }),
+            trending = trending.Select(p => new
+            {
+                id = p.Id,
+                title = p.Title,
+                content = p.Content,
+                views = p.Views,
+                createdAt = p.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            })
+        });
     }
-    catch (Exception ex)
+    catch
     {
-        logger.LogError(ex, "Unhandled exception for {Email}", email);
         return Results.StatusCode(500);
     }
 });

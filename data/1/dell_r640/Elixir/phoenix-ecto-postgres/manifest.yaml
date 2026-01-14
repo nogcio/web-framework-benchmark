@@ -1,8 +1,8 @@
 language_version: '1.18'
 framework_version: 1.8.3
 tags:
-  arch: actor-model
   runtime: beam
   type: full-stack
+  arch: actor-model
 database: postgres
 path: benchmarks/elixir/phoenix-ecto-postgres

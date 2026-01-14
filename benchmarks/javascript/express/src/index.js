@@ -3,9 +3,9 @@ const os = require('os');
 const express = require('express');
 const path = require('path');
 
-if (cluster.isMaster) {
+if (cluster.isPrimary) {
   const numCPUs = os.cpus().length;
-  console.log(`Master ${process.pid} is running`);
+  console.log(`Primary ${process.pid} is running`);
   console.log(`Forking ${numCPUs} workers...`);
 
   for (let i = 0; i < numCPUs; i++) {

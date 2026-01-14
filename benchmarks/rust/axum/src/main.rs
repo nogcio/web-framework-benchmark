@@ -79,9 +79,9 @@ async fn json_aggregate(
             processed_orders += 1;
             *results.entry(order.country).or_insert(0) += order.amount;
             
-            if let Some(items) = &order.items {
+            if let Some(items) = order.items {
                 for item in items {
-                    *category_stats.entry(item.category.clone()).or_insert(0) += item.quantity;
+                    *category_stats.entry(item.category).or_insert(0) += item.quantity;
                 }
             }
         }

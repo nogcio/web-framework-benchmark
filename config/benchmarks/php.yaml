@@ -7,7 +7,6 @@ framework: laravel
 framework_version: "12.46.0"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
   - db_complex
 tags:
@@ -21,7 +20,7 @@ path: benchmarks/php/laravel
 type: benchmark
 name: hyperf-swoole-pg
 language: PHP
-language_version: "8.2"
+language_version: "8.4"
 framework: hyperf
 framework_version: "3.1.0"
 tests:

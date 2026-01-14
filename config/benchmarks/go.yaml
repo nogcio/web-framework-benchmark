@@ -2,12 +2,11 @@
 type: benchmark
 name: fiber
 language: Go
-language_version: "1.25"
+language_version: "1.25.5"
 framework: fiber
 framework_version: "2.52.10"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: micro-framework
@@ -19,12 +18,11 @@ path: benchmarks/go/fiber
 type: benchmark
 name: gin
 language: Go
-language_version: "1.25"
+language_version: "1.25.5"
 framework: gin
 framework_version: "1.11.0"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: micro-framework
@@ -36,12 +34,11 @@ path: benchmarks/go/gin
 type: benchmark
 name: caddy
 language: Go
-language_version: "1.25"
+language_version: "1.25.5"
 framework: caddy
 framework_version: "2.10.2"
 tests:
   - plain_text
-  - static_files
 tags:
   type: proxy
   runtime: native
@@ -52,7 +49,7 @@ path: benchmarks/go/caddy
 type: benchmark
 name: gin-pgx
 language: Go
-language_version: "1.25"
+language_version: "1.25.5"
 framework: gin
 framework_version: "1.11.0"
 tests:
@@ -83,7 +80,7 @@ path: benchmarks/go/stdlib
 type: benchmark
 name: grpc-go
 language: Go
-language_version: "1.25"
+language_version: "1.25.5"
 framework: grpc-go
 framework_version: "1.78.0"
 tests:
@@ -98,7 +95,7 @@ path: benchmarks/go/grpc-go
 type: benchmark
 name: grpc-go-vtproto
 language: Go
-language_version: "1.25"
+language_version: "1.25.5"
 framework: grpc-go
 framework_version: "1.78.0"
 tests:

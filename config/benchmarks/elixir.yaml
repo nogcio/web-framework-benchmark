@@ -7,7 +7,6 @@ framework: phoenix
 framework_version: "1.8.3"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
   - db_complex
 tags:
@@ -21,7 +20,7 @@ path: benchmarks/elixir/phoenix-ecto-postgres
 type: benchmark
 name: grpc-elixir
 language: Elixir
-language_version: "1.16"
+language_version: "1.18"
 framework: grpc
 framework_version: "0.9.0"
 tests:

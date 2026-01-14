@@ -7,7 +7,6 @@ framework: aspnetcore
 framework_version: "10.0"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: framework
@@ -53,6 +52,7 @@ path: benchmarks/csharp/aspnetcore-efcore
 ---
 type: benchmark
 name: aspnetcore-efcore-mssql
+disabled: true
 language: C#
 language_version: "10.0"
 framework: aspnetcore
@@ -70,6 +70,7 @@ path: benchmarks/csharp/aspnetcore-efcore
 ---
 type: benchmark
 name: aspnetcore-mongodb
+disabled: true
 language: C#
 language_version: "10.0"
 framework: aspnetcore
@@ -119,6 +120,7 @@ path: benchmarks/csharp/aspnetcore-mysql
 ---
 type: benchmark
 name: aspnetcore-mssql
+disabled: true
 language: C#
 language_version: "10.0"
 framework: aspnetcore
@@ -135,6 +137,7 @@ path: benchmarks/csharp/aspnetcore-mssql
 ---
 type: benchmark
 name: aspnetcore-mariadb
+disabled: true
 language: C#
 language_version: "10.0"
 framework: aspnetcore
@@ -151,6 +154,7 @@ path: benchmarks/csharp/aspnetcore-mysql
 ---
 type: benchmark
 name: aspnetcore-efcore-mariadb
+disabled: true
 language: C#
 language_version: "10.0"
 framework: aspnetcore

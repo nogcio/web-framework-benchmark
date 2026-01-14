@@ -30,7 +30,7 @@ ENV SECRET_KEY_BASE=1801202e03212871321782317823e23213213203210332857410321
 RUN mkdir -p tmp/pids
 
 # HEALTHCHECK
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 \
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 \
   CMD curl --fail http://localhost:8080/health || exit 1
 
 # Start the server

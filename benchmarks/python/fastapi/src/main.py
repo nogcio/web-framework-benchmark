@@ -1,11 +1,10 @@
 from typing import List, Dict, Optional, Any
 from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 import os
 
-app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
+app = FastAPI(default_response_class=ORJSONResponse, openapi_url=None, docs_url=None, redoc_url=None)
 
 # Static files
 data_dir = os.getenv("DATA_DIR", "benchmarks_data")
@@ -24,41 +23,40 @@ async def hello_world():
 async def plaintext():
     return PlainTextResponse("Hello, World!")
 
-class OrderItem(BaseModel):
-    quantity: int
-    category: str
+@app.post("/json/aggregate")
+async def json_aggregate(request: Request):
+    # Parse JSON manually to avoid Pydantic overhead
+    # This matches the behavior of Django, Rails, Express, etc.
+    try:
+        orders = await request.json()
+    except Exception:
+        return PlainTextResponse("Invalid JSON", status_code=400)
 
-class Order(BaseModel):
-    status: str
-    amount: int
-    country: str
-    items: Optional[List[OrderItem]] = None
-
-class AggregateResponse(BaseModel):
-    processedOrders: int
-    results: Dict[str, int]
-    categoryStats: Dict[str, int]
-
-@app.post("/json/aggregate", response_model=AggregateResponse)
-async def json_aggregate(orders: List[Order]):
     processed_orders = 0
     results: Dict[str, int] = {}
     category_stats: Dict[str, int] = {}
 
     for order in orders:
-        if order.status == "completed":
+        if order.get("status") == "completed":
             processed_orders += 1
             
             # results: country -> amount
-            results[order.country] = results.get(order.country, 0) + order.amount
+            country = order.get("country")
+            amount = order.get("amount", 0)
+            if country:
+                 results[country] = results.get(country, 0) + amount
             
             # category_stats: category -> quantity
-            if order.items:
-                for item in order.items:
-                    category_stats[item.category] = category_stats.get(item.category, 0) + item.quantity
+            items = order.get("items")
+            if items:
+                for item in items:
+                    category = item.get("category")
+                    quantity = item.get("quantity", 0)
+                    if category:
+                        category_stats[category] = category_stats.get(category, 0) + quantity
 
-    return AggregateResponse(
-        processedOrders=processed_orders,
-        results=results,
-        categoryStats=category_stats
-    )
+    return {
+        "processedOrders": processed_orders,
+        "results": results,
+        "categoryStats": category_stats
+    }

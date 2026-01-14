@@ -1,4 +1,4 @@
-language_version: '25'
+language_version: 25.2.1
 framework_version: 5.2.1
 tags:
   arch: event-loop

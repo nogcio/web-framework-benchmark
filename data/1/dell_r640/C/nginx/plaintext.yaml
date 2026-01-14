@@ -1,33 +1,33 @@
-requests_per_sec: 152484.90400700187
-bytes_per_sec: 22347164
-total_requests: 33381082
-total_bytes: 5340972410
+requests_per_sec: 147960.20000247844
+bytes_per_sec: 22000720
+total_requests: 32863581
+total_bytes: 5258172245
 total_errors: 0
-latency_mean: 379.75592313204874
-latency_stdev: 259.99387726165236
-latency_max: 210943
-latency_p50: 341
-latency_p75: 474
-latency_p90: 597
-latency_p99: 955
-latency_stdev_pct: 68.46341595342209
+latency_mean: 405.807323385364
+latency_stdev: 287.70764021438447
+latency_max: 33247
+latency_p50: 316
+latency_p75: 497
+latency_p90: 739
+latency_p99: 1281
+latency_stdev_pct: 70.89759687288114
 latency_distribution:
 - - 10
-  - 182
+  - 180
 - - 25
-  - 232
+  - 227
 - - 50
-  - 341
+  - 316
 - - 75
-  - 474
+  - 497
 - - 90
-  - 597
+  - 739
 - - 99
-  - 955
+  - 1281
 errors: {}
-memory_usage_bytes: 44522536
-cpu_usage_percent: 395.56
-req_per_sec_avg: 139570.9199613622
-req_per_sec_stdev: 7751.722032087651
-req_per_sec_max: 163328.4562856916
-req_per_sec_stdev_pct: 5.553966423832114
+memory_usage_bytes: 45025853
+cpu_usage_percent: 395.2
+req_per_sec_avg: 137419.41826090752
+req_per_sec_stdev: 8192.477654578095
+req_per_sec_max: 151441.82676844395
+req_per_sec_stdev_pct: 5.961659391559698

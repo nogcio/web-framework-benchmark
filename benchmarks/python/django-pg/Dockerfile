@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.14.2-slim
 
 WORKDIR /app
 
@@ -17,8 +17,8 @@ ENV PYTHONUNBUFFERED=1
 ENV DJANGO_SETTINGS_MODULE=wfb.settings
 
 # Run gunicorn
-# 4 workers, 4 threads is a reasonable default for containerized python apps
-CMD ["gunicorn", "wfb.wsgi:application", "--bind", "0.0.0.0:8080", "--workers", "4", "--threads", "4"]
+# Use nproc to determine workers count, similar to other Python frameworks
+CMD ["sh", "-c", "export WORKERS=$(nproc); gunicorn wfb.wsgi:application --bind 0.0.0.0:8080 --workers $WORKERS --threads 4"]
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 \
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 \
   CMD curl --fail http://localhost:8080/health || exit 1

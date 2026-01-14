@@ -7,7 +7,6 @@ framework: axum
 framework_version: "0.8.8"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: micro-framework
@@ -24,7 +23,6 @@ framework: actix-web
 framework_version: "4.12.1"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
 tags:
   type: micro-framework

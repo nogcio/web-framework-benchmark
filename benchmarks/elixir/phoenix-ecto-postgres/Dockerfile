@@ -58,7 +58,7 @@ ENV PORT=8080
 ENV MIX_ENV=prod
 
 # Healthcheck
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 \
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 \
   CMD curl --fail http://localhost:8080/health || exit 1
 
 CMD ["bin/wfb_phoenix", "start"]

@@ -2,13 +2,12 @@
 type: benchmark
 name: spring-boot-jpa-postgres
 language: Java
-language_version: "23"
+language_version: "25"
 framework: spring-boot
 framework_version: "4.0.1"
 database: postgres
 tests:
   - plain_text
-  - static_files
   - json_aggregate
   - db_complex
 tags:
@@ -22,7 +21,7 @@ path: benchmarks/java/spring-boot-jpa-postgres
 type: benchmark
 name: quarkus-reactive
 language: Java
-language_version: "21"
+language_version: "25"
 framework: quarkus
 framework_version: "3.17.6"
 tests:
@@ -39,7 +38,7 @@ path: benchmarks/java/quarkus-reactive
 type: benchmark
 name: quarkus-grpc
 language: Java
-language_version: "21"
+language_version: "25"
 framework: quarkus
 framework_version: "3.17.6"
 tests:

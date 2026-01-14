@@ -7,7 +7,6 @@ framework: rails
 framework_version: "8.0"
 tests:
   - plain_text
-  - static_files
   - json_aggregate
   - db_complex
 tags:

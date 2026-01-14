@@ -65,85 +65,107 @@ app.MapGet("/health", async (HttpContext ctx, NpgsqlDataSource db) =>
 
 app.MapGet("/db/user-profile/{email}", async (string email, HttpContext ctx, NpgsqlDataSource db) =>
 {
-    // Step 1: Get User + Trending Posts (Batch)
-    await using var cmd1 = db.CreateCommand(@"
-        SELECT id, username, email, created_at, last_login, settings FROM users WHERE email = @email;
-        SELECT id, title, content, views, created_at FROM posts ORDER BY views DESC LIMIT 5;
-    ");
-    cmd1.Parameters.Add(new NpgsqlParameter<string>("email", NpgsqlDbType.Text) { TypedValue = email });
+    // Parallel Phase 1: Get User & Trending
+    var userTask = GetUserAsync(db, email, ctx.RequestAborted);
+    var trendingTask = GetTrendingAsync(db, ctx.RequestAborted);
 
-    int userId = 0;
-    string username = "";
-    DateTime createdAt = default;
-    string settingsJson = "";
-    var trending = new List<object>();
+    await Task.WhenAll(userTask, trendingTask);
 
-    await using (var reader = await cmd1.ExecuteReaderAsync(ctx.RequestAborted))
-    {
-        if (await reader.ReadAsync(ctx.RequestAborted))
-        {
-            userId = reader.GetInt32(0);
-            username = reader.GetString(1);
-            createdAt = reader.GetDateTime(3);
-            // last_login (4) ignored
-            settingsJson = reader.GetString(5);
-        }
-        else
-        {
-            return Results.NotFound();
-        }
+    var user = await userTask;
+    var trending = await trendingTask;
 
-        await reader.NextResultAsync(ctx.RequestAborted);
+    if (user == null) return Results.NotFound();
 
-        while (await reader.ReadAsync(ctx.RequestAborted))
-        {
-            trending.Add(new
-            {
-                id = reader.GetInt32(0),
-                title = reader.GetString(1),
-                content = reader.GetString(2),
-                views = reader.GetInt32(3),
-                createdAt = reader.GetDateTime(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
-            });
-        }
-    }
+    var now = DateTime.UtcNow;
 
-    // Step 2: Update Last Login + Get User Posts
-    await using var cmd2 = db.CreateCommand(@"
-        UPDATE users SET last_login = NOW() WHERE id = @id;
-        SELECT id, title, content, views, created_at FROM posts WHERE user_id = @id ORDER BY created_at DESC LIMIT 10;
-    ");
-    cmd2.Parameters.Add(new NpgsqlParameter<int>("id", NpgsqlDbType.Integer) { TypedValue = userId });
+    // Parallel Phase 2: Update Last Login & Get Posts
+    var updateTask = UpdateLastLoginAsync(db, user.Id, now, ctx.RequestAborted);
+    var postsTask = GetPostsAsync(db, user.Id, ctx.RequestAborted);
 
-    var posts = new List<object>();
-    await using (var reader = await cmd2.ExecuteReaderAsync(ctx.RequestAborted))
-    {
-        while (await reader.ReadAsync(ctx.RequestAborted))
-        {
-            posts.Add(new
-            {
-                id = reader.GetInt32(0),
-                title = reader.GetString(1),
-                content = reader.GetString(2),
-                views = reader.GetInt32(3),
-                createdAt = reader.GetDateTime(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
-            });
-        }
-    }
-
-    object settingsObj;
-    try { settingsObj = JsonSerializer.Deserialize<JsonElement>(settingsJson); } catch { settingsObj = settingsJson; }
+    await Task.WhenAll(updateTask, postsTask);
+    
+    var posts = await postsTask;
 
     return Results.Ok(new
     {
-        username,
-        email,
-        createdAt = createdAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-        lastLogin = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-        settings = settingsObj,
+        username = user.Username,
+        email = user.Email,
+        createdAt = user.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        lastLogin = now.ToString("yyyy-MM-ddTHH:mm:ssZ"), 
+        settings = JsonSerializer.Deserialize<JsonElement>(user.SettingsJson),
         posts,
         trending
     });
 });
 
+async Task<User?> GetUserAsync(NpgsqlDataSource db, string email, CancellationToken ct)
+{
+    await using var cmd = db.CreateCommand("SELECT id, username, email, created_at, last_login, settings FROM users WHERE email = @email");
+    cmd.Parameters.Add(new NpgsqlParameter<string>("email", NpgsqlDbType.Text) { TypedValue = email });
+
+    await using var reader = await cmd.ExecuteReaderAsync(ct);
+    if (await reader.ReadAsync(ct))
+    {
+        return new User(
+            reader.GetInt32(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetDateTime(3),
+            reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+            reader.GetString(5)
+        );
+    }
+    return null;
+}
+
+async Task<List<object>> GetTrendingAsync(NpgsqlDataSource db, CancellationToken ct)
+{
+    await using var cmd = db.CreateCommand("SELECT id, title, content, views, created_at FROM posts ORDER BY views DESC LIMIT 5");
+    var list = new List<object>();
+    await using var reader = await cmd.ExecuteReaderAsync(ct);
+    while (await reader.ReadAsync(ct))
+    {
+        list.Add(new
+        {
+            id = reader.GetInt32(0),
+            title = reader.GetString(1),
+            content = reader.GetString(2),
+            views = reader.GetInt32(3),
+            createdAt = reader.GetDateTime(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        });
+    }
+    return list;
+}
+
+async Task UpdateLastLoginAsync(NpgsqlDataSource db, int userId, DateTime timestamp, CancellationToken ct)
+{
+    await using var cmd = db.CreateCommand("UPDATE users SET last_login = @timestamp WHERE id = @id");
+    cmd.Parameters.Add(new NpgsqlParameter<int>("id", NpgsqlDbType.Integer) { TypedValue = userId });
+    cmd.Parameters.Add(new NpgsqlParameter<DateTime>("timestamp", NpgsqlDbType.TimestampTz) { TypedValue = timestamp });
+    await cmd.ExecuteNonQueryAsync(ct);
+}
+
+async Task<List<object>> GetPostsAsync(NpgsqlDataSource db, int userId, CancellationToken ct)
+{
+    await using var cmd = db.CreateCommand("SELECT id, title, content, views, created_at FROM posts WHERE user_id = @id ORDER BY created_at DESC LIMIT 10");
+    cmd.Parameters.Add(new NpgsqlParameter<int>("id", NpgsqlDbType.Integer) { TypedValue = userId });
+
+    var list = new List<object>();
+    await using var reader = await cmd.ExecuteReaderAsync(ct);
+    while (await reader.ReadAsync(ct))
+    {
+        list.Add(new
+        {
+            id = reader.GetInt32(0),
+            title = reader.GetString(1),
+            content = reader.GetString(2),
+            views = reader.GetInt32(3),
+            createdAt = reader.GetDateTime(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        });
+    }
+    return list;
+}
+
 app.Run($"http://0.0.0.0:{port}");
+
+record User(int Id, string Username, string Email, DateTime CreatedAt, DateTime? LastLogin, string SettingsJson);

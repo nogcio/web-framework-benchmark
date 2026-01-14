@@ -1,4 +1,4 @@
-language_version: '1.25'
+language_version: 1.25.5
 framework_version: 2.52.10
 tags:
   runtime: native

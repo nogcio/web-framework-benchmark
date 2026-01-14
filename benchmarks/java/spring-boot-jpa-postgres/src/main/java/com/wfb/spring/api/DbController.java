@@ -53,12 +53,18 @@ public class DbController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
         }
 
-        user.setLastLogin(Instant.now());
-        userRepository.save(user);
+        CompletableFuture<Void> updateFuture = CompletableFuture.runAsync(() -> {
+            user.setLastLogin(Instant.now());
+            userRepository.save(user);
+        }, VT_EXECUTOR);
 
-        List<PostEntity> posts = postRepository.findTop10ByUserIdOrderByCreatedAtDesc(user.getId());
+        CompletableFuture<List<PostEntity>> postsFuture = CompletableFuture.supplyAsync(() -> 
+            postRepository.findTop10ByUserIdOrderByCreatedAtDesc(user.getId()), VT_EXECUTOR
+        );
 
-        return mapToDto(user, posts, trendingFuture.join());
+        CompletableFuture.allOf(updateFuture, postsFuture).join();
+
+        return mapToDto(user, postsFuture.join(), trendingFuture.join());
     }
 
     private UserProfileDto mapToDto(UserEntity user, List<PostEntity> posts, List<PostEntity> trending) {

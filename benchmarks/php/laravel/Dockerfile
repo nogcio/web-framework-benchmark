@@ -49,7 +49,7 @@ ENV SESSION_DRIVER=array
 ENV LOG_CHANNEL=stderr
 ENV APP_KEY=base64:yS9jE6O6eeTcRrZ73Oa3mKxa4V+P9cyT2GI0XX2Lg8M=
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 --start-period=5s \
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 \
   CMD curl --fail http://127.0.0.1:8080/health || exit 1
 
 CMD ["sh", "-c", "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan octane:start --server=frankenphp --host=0.0.0.0 --port=8080 --workers=auto"]

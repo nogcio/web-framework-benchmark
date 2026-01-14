@@ -16,30 +16,8 @@ class DbController
         try {
             // Hyperf doesn't support async DB queries perfectly within the same coroutine easily for simple usage,
             // but we can use coroutines or parallel execution if needed.
-            // For simplicity and typical usage in Hyperf which is coroutine-based blocking style (synchronous code, async execution):
             
-            // 1. Get User
-            $user = Db::table('users')->where('email', $email)->select(['id', 'username', 'email', 'created_at as createdAt', 'last_login as lastLogin', 'settings'])->first();
-
-            if (!$user) {
-                return $response->withStatus(404)->json(['error' => 'User not found']);
-            }
-            
-            // Decode settings from JSON string if Db returns it as string (depends on driver/config)
-            // Hyperf/PDO usually returns JSON columns as strings.
-            if (is_string($user->settings)) {
-                $user->settings = json_decode($user->settings);
-            }
-
-            // 2. Get Trending Posts (Global)
-            // Ideally we could run these in parallel with Co::batch or wait group.
-            // Let's optimize with Co::batch later if needed, but sequential is standard for "simple" implementations. 
-            // However, spec recommends parallel. Hyperf makes parallel easy.
-            
-            // Let's rewrite with parallel() for User + Trending
-            // But wait, we need User ID for the next step. So we can only parallelize User + Trending.
-            
-            // Re-fetching User and Trending in Parallel
+            // Phase 1: Get User and Trending Posts in Parallel
              [$user, $trending] = parallel([
                 function () use ($email) {
                     return Db::table('users')->where('email', $email)->select(['id', 'username', 'email', 'created_at as createdAt', 'last_login as lastLogin', 'settings'])->first();

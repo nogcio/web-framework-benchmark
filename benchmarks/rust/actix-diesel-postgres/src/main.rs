@@ -42,11 +42,11 @@ async fn db_user_profile(
     data: web::Data<AppState>,
     email: web::Path<String>,
 ) -> impl Responder {
-    let pool_trending = data.pool.clone();
-    let pool_user = data.pool.clone();
+    let pool = data.pool.clone();
     let email_str = email.into_inner();
 
-    // Task 1: Fetch Trending posts
+    // Task 1: Fetch Trending posts (Parallel Phase 1)
+    let pool_trending = pool.clone();
     let trending_task = web::block(move || {
         let mut conn = pool_trending.get().map_err(|_| "Pool error")?;
         posts::table
@@ -57,51 +57,67 @@ async fn db_user_profile(
             .map_err(|_| "Query error")
     });
 
-    // Task 2: Fetch User, Update Login, Fetch User Posts
+    // Task 2: Fetch User (Parallel Phase 1)
+    let pool_user = pool.clone();
+    let email_clone = email_str.clone();
     let user_task = web::block(move || {
         let mut conn = pool_user.get().map_err(|_| "Pool error")?;
-
-        // 1. Fetch User by email
-        let user: User = users::table
-            .filter(users::email.eq(&email_str))
+        users::table
+            .filter(users::email.eq(&email_clone))
             .select(User::as_select())
-            .first(&mut conn)
+            .first::<User>(&mut conn)
             .optional()
-            .map_err(|_| "Query error")?
-            .ok_or_else(|| "User not found")?;
-
-        // 2. Update User last_login
-        let last_login = diesel::update(users::table.find(user.id))
-            .set(users::last_login.eq(diesel::dsl::now))
-            .returning(users::last_login)
-            .get_result::<Option<NaiveDateTime>>(&mut conn)
-            .map_err(|_| "Update error")?;
-
-        // 3. Fetch User Posts
-        let user_posts: Vec<Post> = posts::table
-            .filter(posts::user_id.eq(user.id))
-            .order(posts::created_at.desc())
-            .limit(10)
-            .select(Post::as_select())
-            .load(&mut conn)
-            .map_err(|_| "Query error")?;
-
-        Ok::<_, &'static str>((user, last_login, user_posts))
+            .map_err(|_| "Query error")
     });
 
     let (trending_res, user_res) = tokio::join!(trending_task, user_task);
 
     let trending = match trending_res {
         Ok(Ok(t)) => t,
-        Ok(Err(_e)) => return HttpResponse::InternalServerError().finish(), // App error
-        Err(_) => return HttpResponse::InternalServerError().finish(), // Blocking error
+        _ => return HttpResponse::InternalServerError().finish(),
     };
 
-    let (user, last_login, user_posts) = match user_res {
-        Ok(Ok(u)) => u,
-        Ok(Err("User not found")) => return HttpResponse::NotFound().finish(),
-        Ok(Err(_e)) => return HttpResponse::InternalServerError().finish(), // App error (Internal)
-        Err(_) => return HttpResponse::InternalServerError().finish(), // Blocking error
+    let user = match user_res {
+        Ok(Ok(Some(u))) => u,
+        Ok(Ok(None)) => return HttpResponse::NotFound().finish(),
+        _ => return HttpResponse::InternalServerError().finish(),
+    };
+
+    // Task 3: Update Last Login (Parallel Phase 2)
+    let pool_update = pool.clone();
+    let user_id = user.id;
+    let update_task = web::block(move || {
+        let mut conn = pool_update.get().map_err(|_| "Pool error")?;
+        diesel::update(users::table.find(user_id))
+            .set(users::last_login.eq(diesel::dsl::now))
+            .returning(users::last_login)
+            .get_result::<Option<NaiveDateTime>>(&mut conn)
+            .map_err(|_| "Update error")
+    });
+
+    // Task 4: Fetch User Posts (Parallel Phase 2)
+    let pool_posts = pool.clone();
+    let posts_task = web::block(move || {
+        let mut conn = pool_posts.get().map_err(|_| "Pool error")?;
+        posts::table
+            .filter(posts::user_id.eq(user_id))
+            .order(posts::created_at.desc())
+            .limit(10)
+            .select(Post::as_select())
+            .load::<Post>(&mut conn)
+            .map_err(|_| "Query error")
+    });
+
+    let (update_res, posts_res) = tokio::join!(update_task, posts_task);
+    
+    let last_login = match update_res {
+        Ok(Ok(l)) => l,
+        _ => return HttpResponse::InternalServerError().finish(),
+    };
+    
+    let user_posts = match posts_res {
+        Ok(Ok(p)) => p,
+        _ => return HttpResponse::InternalServerError().finish(),
     };
 
     HttpResponse::Ok().json(UserProfile {

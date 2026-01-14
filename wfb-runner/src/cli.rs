@@ -40,6 +40,10 @@ pub enum Commands {
         #[arg(short, long)]
         benchmark: Option<String>,
 
+        /// Filter by specific language
+        #[arg(short, long)]
+        language: Option<String>,
+
         /// Filter by specific test case (plaintext, json_aggregate, static_files)
         #[arg(short, long)]
         testcase: Option<String>,

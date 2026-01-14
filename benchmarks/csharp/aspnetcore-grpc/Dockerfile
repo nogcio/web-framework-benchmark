@@ -15,6 +15,6 @@ COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.24 /ko-app/grpc-health
 
 ENV ASPNETCORE_URLS=http://+:8080
 
-HEALTHCHECK --interval=5s --timeout=3s --retries=3 CMD ["/bin/grpc_health_probe", "-addr=127.0.0.1:8080"]
+HEALTHCHECK --interval=1s --timeout=3s --retries=30 CMD ["/bin/grpc_health_probe", "-addr=127.0.0.1:8080"]
 
 CMD ["dotnet", "wfb-aspnetcore-grpc.dll"]

@@ -1,9 +1,9 @@
 const cluster = require('cluster');
 const os = require('os');
 
-if (cluster.isMaster) {
+if (cluster.isPrimary) {
   const numCPUs = os.cpus().length;
-  console.log(`Master ${process.pid} is running`);
+  console.log(`Primary ${process.pid} is running`);
   console.log(`Forking ${numCPUs} workers...`);
 
   for (let i = 0; i < numCPUs; i++) {
@@ -41,8 +41,50 @@ if (cluster.isMaster) {
     return 'Hello, World!';
   });
 
+  // JSON Aggregation schema
+  const jsonAggregateSchema = {
+    body: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+          amount: { type: 'integer' },
+          country: { type: 'string' },
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                quantity: { type: 'integer' },
+                category: { type: 'string' }
+              }
+            }
+          }
+        },
+        required: ['status'] // minimal requirement for logic
+      }
+    },
+    response: {
+      200: {
+        type: 'object',
+        properties: {
+          processedOrders: { type: 'integer' },
+          results: {
+            type: 'object',
+            additionalProperties: { type: 'integer' }
+          },
+          categoryStats: {
+            type: 'object',
+            additionalProperties: { type: 'integer' }
+          }
+        }
+      }
+    }
+  };
+
   // JSON Aggregation
-  fastify.post('/json/aggregate', async (request, reply) => {
+  fastify.post('/json/aggregate', { schema: jsonAggregateSchema }, async (request, reply) => {
     const orders = request.body;
     let processedOrders = 0;
     const results = {};

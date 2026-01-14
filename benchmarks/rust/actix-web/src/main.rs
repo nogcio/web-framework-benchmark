@@ -52,13 +52,13 @@ async fn json_aggregate(orders: web::Json<Vec<Order>>) -> impl Responder {
     let mut results = HashMap::new();
     let mut category_stats = HashMap::new();
 
-    for order in orders.iter() {
+    for order in orders.into_inner() {
         if order.status == "completed" {
             processed_orders += 1;
-            *results.entry(order.country.clone()).or_insert(0) += order.amount;
+            *results.entry(order.country).or_insert(0) += order.amount;
             
-            for item in &order.items {
-                *category_stats.entry(item.category.clone()).or_insert(0) += item.quantity as i64;
+            for item in order.items {
+                *category_stats.entry(item.category).or_insert(0) += item.quantity as i64;
             }
         }
     }

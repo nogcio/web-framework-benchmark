@@ -1,9 +1,9 @@
 const cluster = require('cluster');
 const os = require('os');
 
-if (cluster.isMaster) {
+if (cluster.isPrimary) {
   const numCPUs = os.cpus().length;
-  console.log(`Master ${process.pid} is running`);
+  console.log(`Primary ${process.pid} is running`);
   console.log(`Forking ${numCPUs} workers...`);
   const poolSize = Math.max(1, Math.floor(256 / numCPUs));
 

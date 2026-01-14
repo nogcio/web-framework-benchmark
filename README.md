@@ -38,6 +38,7 @@ It combines a high-performance **Rust** runner and load generator with a modern 
   - **[JSON Analytics](docs/specs/json_aggregate_spec.md)**: Request parsing, in-memory aggregation, and response serialization.
   - **[Static Files](docs/specs/static_files_spec.md)**: Serving static binary files with correct HTTP semantics.
   - **[Database Complex](docs/specs/db_complex_spec.md)**: Realistic "Master-Detail" operation, mixing reads and writes (Interactive User Profile).
+  - **[gRPC Aggregate](docs/specs/grpc_aggregate_spec.md)**: gRPC implementation of the aggregation logic (comparable to JSON Analytics).
 - **⚡ High-Performance Benchmarking**: Powered by `wrkr`, a custom-built Rust load generator.
 - **📈 Modern Dashboard**: Interactive visualizations built with React, TypeScript, and Tailwind CSS.
 - **🐳 Docker Integration**: Fully containerized environments for consistent, reproducible results.

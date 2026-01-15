@@ -65,3 +65,5 @@ benchmarks_data/*.bin
 
 # Ignore secret environment settings
 /config/environments/*.secret.yaml
+
+wfb-server/assets/dist/

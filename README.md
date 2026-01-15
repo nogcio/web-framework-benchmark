@@ -1,14 +1,10 @@
 <div align="center">
 
-  <img src="web-app/public/logo.svg" alt="Web Framework Benchmark Logo" width="120" height="120" />
-
   # Web Framework Benchmark
 
   **The ultimate tool for comparing web framework performance across languages.**
   
   [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg?logo=rust)](https://www.rust-lang.org/)
-  [![React](https://img.shields.io/badge/frontend-React-61DAFB.svg?logo=react)](https://reactjs.org/)
-  [![TypeScript](https://img.shields.io/badge/language-TypeScript-3178C6.svg?logo=typescript)](https://www.typescriptlang.org/)
   [![Docker](https://img.shields.io/badge/container-Docker-2496ED.svg?logo=docker)](https://www.docker.com/)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -18,17 +14,11 @@
 
 <br />
 
-<div align="center">
-  <img src="assets/preview.png" alt="Dashboard Preview" width="100%" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-</div>
-
-<br />
-
 ## 🚀 Overview
 
 **Web Framework Benchmark (WFB)** is a comprehensive, automated benchmarking infrastructure designed to compare the throughput, latency, and resource usage of web frameworks across different programming languages.
 
-It combines a high-performance **Rust** runner and load generator with a modern **React** dashboard to visualize results, making it easy to spot performance bottlenecks and compare implementations side-by-side.
+It combines a high-performance **Rust** runner and load generator with a robust **API server** to collect and expose results, making it easy to spot performance bottlenecks and compare implementations side-by-side.
 
 ## ✨ Features
 
@@ -40,26 +30,23 @@ It combines a high-performance **Rust** runner and load generator with a modern 
   - **[Database Complex](docs/specs/db_complex_spec.md)**: Realistic "Master-Detail" operation, mixing reads and writes (Interactive User Profile).
   - **[gRPC Aggregate](docs/specs/grpc_aggregate_spec.md)**: gRPC implementation of the aggregation logic (comparable to JSON Analytics).
 - **⚡ High-Performance Benchmarking**: Powered by `wrkr`, a custom-built Rust load generator.
-- **📈 Modern Dashboard**: Interactive visualizations built with React, TypeScript, and Tailwind CSS.
 - **🐳 Docker Integration**: Fully containerized environments for consistent, reproducible results.
 - **🔧 Flexible Config**: YAML-based configuration for environments, languages, and test scenarios.
 
 ## 🏗 Architecture
 
-The project is organized as a Rust workspace with a separate frontend:
+The project is organized as a Rust workspace:
 
 1.  **wfb-runner**: The CLI tool that orchestrates Docker containers and runs benchmarks.
-2.  **wfb-server**: The API server that provides data to the dashboard.
+2.  **wfb-server**: The API server that provides access to benchmark data.
 3.  **wfb-storage**: Shared library for configuration, storage logic, and data models.
 4.  **wrkr**: Custom high-performance, asynchronous load generator.
-5.  **web-app**: A polished React frontend to view and analyze benchmark runs.
 
 ## 🏁 Quick Start
 
 ### Prerequisites
 
 - **Rust** (2024 edition)
-- **Node.js** (18+)
 - **Docker** (Running)
 
 ### 1. Build the Components
@@ -82,23 +69,13 @@ cargo run --release --bin wfb-runner -- run 1 --env local
 cargo run --release --bin wfb-runner -- dev <benchmark_name> --env local
 ```
 
-### 3. Launch the Dashboard
+### 3. Launch the API Server
 
-Start the API server and the frontend to view results.
+Start the API server to access benchmark results.
 
-**Terminal 1 (API Server):**
 ```bash
 cargo run --release --bin wfb-server
 ```
-
-**Terminal 2 (Frontend):**
-```bash
-cd web-app
-npm install
-npm run dev
-```
-
-Visit `http://localhost:5173` to see your results!
 
 ## 🤝 Contributing
 
@@ -109,7 +86,7 @@ If you want to add your favorite framework:
 2.  Implement the benchmark following the specs.
 3.  Submit a PR!
 
-Whether it's adding a new framework, improving the dashboard, or fixing bugs, we appreciate your help. Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for general guidelines.
+Whether it's adding a new framework or fixing bugs, we appreciate your help. Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for general guidelines.
 
 ## 📄 License
 

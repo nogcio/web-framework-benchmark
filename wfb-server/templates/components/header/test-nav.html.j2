@@ -1,0 +1,18 @@
+{% if page.tests.len() > 0 %}
+<nav class="hidden md:flex items-center space-x-1 ml-4" id="test-nav">
+  {% for test in page.tests %}
+    <a href="/?run={{ page.active_run_id }}&env={{ page.active_env }}&test={{ test.id }}"
+       class="px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ease-in-out
+              {% if test.id == page.active_test %}
+                bg-accent text-accent-foreground
+              {% else %}
+                text-muted-foreground hover:text-foreground hover:bg-accent/50
+              {% endif %}
+              flex items-center space-x-2"
+       hx-boost="true">
+      {{ test.icon|icon("h-4 w-4")|safe }}
+      <span>{{ test.name }}</span>
+    </a>
+  {% endfor %}
+</nav>
+{% endif %}

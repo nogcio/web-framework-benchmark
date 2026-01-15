@@ -1,0 +1,69 @@
+<div class="border-b border-border/50 bg-background/80 wfb-only-mobile" data-wfb-component="toolbar">
+	<div class="px-4 md:px-6 py-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+		<div class="relative" x-data="{ open: false }">
+			<button type="button"
+				class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+				@click="open = !open">
+				{{ "activity"|icon("h-4 w-4 text-muted-foreground")|safe }}
+				<span>Run {{ page.active_run_id }}</span>
+				{{ "chevron-down"|icon("h-3.5 w-3.5 text-muted-foreground")|safe }}
+			</button>
+			<div x-show="open" x-transition @click.outside="open = false" x-cloak
+				class="absolute left-0 mt-2 w-44 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 z-50">
+				<div class="p-1 max-h-64 overflow-y-auto">
+					{% for run in page.runs %}
+					<a href="/?run={{ run.id }}&env={{ page.active_env }}&test={{ page.active_test }}"
+						class="flex items-center justify-between gap-2 rounded-md px-3 py-2 text-xs font-medium transition {% if page.active_run_id.as_str() == run.id.as_str() %}bg-accent text-accent-foreground{% else %}hover:bg-muted/70 text-muted-foreground hover:text-foreground{% endif %}">
+						<span>Run {{ run.id }}</span>
+						<span class="text-[9px] text-muted-foreground/80">{{ run.created_at_fmt }}</span>
+					</a>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+
+		<div class="relative" x-data="{ open: false }">
+			<button type="button"
+				class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+				@click="open = !open">
+				{{ "monitor"|icon("h-4 w-4 text-muted-foreground")|safe }}
+				<span>{{ page.active_env|env_title(page.environments) }}</span>
+				{{ "chevron-down"|icon("h-3.5 w-3.5 text-muted-foreground")|safe }}
+			</button>
+			<div x-show="open" x-transition @click.outside="open = false" x-cloak
+				class="absolute left-0 mt-2 w-52 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 z-50">
+				<div class="p-1">
+					{% for env in page.environments %}
+					<a href="/?run={{ page.active_run_id }}&env={{ env.name }}&test={{ page.active_test }}"
+						class="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition {% if page.active_env.as_str() == env.name.as_str() %}bg-accent text-accent-foreground{% else %}hover:bg-muted/70 text-muted-foreground hover:text-foreground{% endif %}">
+						{{ env.icon|icon("h-4 w-4")|safe }}
+						<span class="truncate">{{ env.title }}</span>
+					</a>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+
+		<div class="relative" x-data="{ open: false }">
+			<button type="button"
+				class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+				@click="open = !open">
+				{{ page.active_test|test_icon(page.tests)|icon("h-4 w-4 text-muted-foreground")|safe }}
+				<span>{{ page.active_test|test_name(page.tests) }}</span>
+				{{ "chevron-down"|icon("h-3.5 w-3.5 text-muted-foreground")|safe }}
+			</button>
+			<div x-show="open" x-transition @click.outside="open = false" x-cloak
+				class="absolute left-0 mt-2 w-44 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 z-50">
+				<div class="p-1">
+					{% for test in page.tests %}
+					<a href="/?run={{ page.active_run_id }}&env={{ page.active_env }}&test={{ test.id }}"
+						class="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition {% if page.active_test.as_str() == test.id.as_str() %}bg-accent text-accent-foreground{% else %}hover:bg-muted/70 text-muted-foreground hover:text-foreground{% endif %}">
+						{{ test.icon|icon("h-4 w-4")|safe }}
+						<span>{{ test.name }}</span>
+					</a>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

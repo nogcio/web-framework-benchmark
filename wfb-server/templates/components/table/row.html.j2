@@ -1,0 +1,50 @@
+<tr data-wfb-component="table-row"
+    class="group border-b border-border/70 transition-colors bg-[linear-gradient(to_right,var(--row-color)_var(--row-progress),transparent_var(--row-progress))] cursor-pointer hover:bg-muted/40"
+    style="--row-progress: {{ bench.rps_percent }}%; --row-color: {{ bench.language_color|soften_color }};"
+    onclick="window.location.href='/bench?run={{ page.active_run_id }}&env={{ page.active_env }}&test={{ page.active_test }}&framework={{ bench.framework }}'"
+    title="Open benchmark details">
+    <td class="px-2.5 py-1.5 align-middle text-[11px] text-muted-foreground font-mono wfb-only-desktop-table">{{ loop.index }}</td>
+    <td class="px-2.5 py-1.5 align-middle md:w-[30%]">
+        <div class="flex items-center justify-between w-full gap-2">
+            <div class="flex items-center min-w-0 gap-2.5 w-full">
+                <span class="inline-flex w-3 h-3 rounded-sm shrink-0" style="background-color: {{ bench.language_color }}"></span>
+                <div class="font-medium flex items-center min-w-0 w-full">
+                    <div class="flex items-center min-w-0 whitespace-nowrap flex-1">
+                        <span>{{ bench.language }}</span>
+                        <span class="mx-0.5 text-muted-foreground">/</span>
+                        <span class="group-hover:text-primary">{{ bench.framework }}</span>
+                        <span class="ml-2 inline-flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 transition group-hover:opacity-100">
+                            <span>Details</span>
+                            {{ "chevron-right"|icon("h-3 w-3")|safe }}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">                        
+                        {% if let Some(database) = bench.database %}
+                        <span class="inline-flex items-center rounded border border-border/70 px-1 py-0 text-[8px] leading-none font-semibold text-muted-foreground uppercase tracking-wide">
+                            {{ database }}
+                        </span>
+                        {% endif %}
+                        <span class="text-[10px] text-muted-foreground lowercase leading-none">v{{ bench.framework_version }}</span>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </td>
+    <td class="px-2.5 py-1.5 align-middle text-right md:w-[38%]">
+        <div class="flex items-center gap-2">
+            <div class="w-16 text-right font-mono text-xs shrink-0">{{ bench.rps|format_number }}</div>
+            <div class="flex-1 wfb-only-desktop-block min-w-[140px]">
+                <div class="h-2 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full rounded-full" style="width: {{ bench.rps_percent }}%; background-color: {{ bench.language_color }}"></div>
+                </div>
+            </div>
+            <div class="w-10 text-[9px] text-muted-foreground font-mono wfb-only-desktop-block">{{ bench.rps_percent|format_percent0 }}%</div>
+        </div>
+    </td>
+    <td class="px-2 py-1.5 align-middle text-right font-mono text-muted-foreground whitespace-nowrap w-[110px] text-[10px] truncate wfb-only-desktop-table">
+        {{ bench.tps|format_throughput }}
+    </td>
+    <td class="px-2 py-1.5 align-middle text-right font-mono text-muted-foreground whitespace-nowrap w-[96px] text-[10px] wfb-only-desktop-table">{{ bench.latency_p99|format_latency_ms }}</td>
+    <td class="px-2 py-1.5 align-middle text-right font-mono text-[10px] {% if bench.errors > 0 %}text-destructive{% else %}text-muted-foreground{% endif %} w-[60px] wfb-only-desktop-table">{{ bench.errors }}</td>
+</tr>

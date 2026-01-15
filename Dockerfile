@@ -18,17 +18,7 @@ COPY wrkr-core ./wrkr-core
 # Build wfb targets
 RUN RUSTFLAGS="-C link-arg=-lgcc" cargo build --release -p wfb-runner -p wfb-server
 
-# Stage 2: Build Frontend
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app
-
-COPY web-app/package.json web-app/package-lock.json ./
-RUN npm ci
-
-COPY web-app ./
-RUN npm run build
-
-# Stage 3: Final Image
+# Stage 2: Final Image
 FROM alpine:3.23
 WORKDIR /app
 
@@ -38,9 +28,6 @@ RUN apk add --no-cache ca-certificates libgcc libssh2 openssl luajit
 # Copy the binaries to /usr/local/bin so they are in PATH
 COPY --from=backend-builder /app/target/release/wfb-runner /usr/local/bin/wfb-runner
 COPY --from=backend-builder /app/target/release/wfb-server /usr/local/bin/wfb-server
-
-# Copy the frontend build to static
-COPY --from=frontend-builder /app/dist ./static
 
 # Copy configuration and other assets
 COPY config ./config

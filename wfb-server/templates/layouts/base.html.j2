@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-background antialiased dark">
+<head>
+    {% include "partials/meta.html.j2" %}
+    <title>{% block title %}Web Framework Benchmark{% endblock %}</title>
+    {% include "partials/head-assets.html.j2" %}
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full flex flex-col" hx-boost="true" hx-indicator=".global-progress" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML">
+    <!-- Global Loading Indicator -->
+    <div class="global-progress htmx-indicator fixed top-0 left-0 w-full h-1 z-[100]">
+        <div class="h-full bg-primary animate-indeterminate"></div>
+    </div>
+
+    <div id="main-content" class="flex-1 flex flex-col w-full">
+        {% block content %}{% endblock %}
+        {% block scripts %}{% endblock %}
+    </div>
+</body>
+</html>

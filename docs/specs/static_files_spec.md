@@ -13,7 +13,8 @@ The service must expose the following files under `/files`:
 
 - `/files/15kb.bin` (exactly 15 * 1024 bytes)
 - `/files/1mb.bin` (exactly 1024 * 1024 bytes)
-- `/files/10mb.bin` (exactly 10 * 1024 * 1024 bytes)
+
+> Note: A larger file (e.g. 10MB) may be added in a future revision of this test.
 
 The file contents must be stable across requests within a run (serving a changing blob is not considered a valid static file).
 
@@ -80,7 +81,7 @@ If the server provides neither `ETag` nor `Last-Modified`, the conditional secti
 ## Verification Logic
 The reference test runner performs these checks:
 
-1. For each of the 3 files:
+1. For each of the files:
    - `GET` once, validate status, `Content-Length`, `Content-Type`, and body size.
    - `GET` again and assert the bytes are identical to the first response.
 2. For `/files/1mb.bin`:

@@ -56,11 +56,11 @@ service AnalyticsService {
 ```
 
 ### Request Load Profile (matches JSON Analytics)
-- Message count: identical to the JSON Analytics test (runner uses the same generator and size).
+- Message count: same order of magnitude as the JSON Analytics test.
 - Countries: `US, DE, FR, JP` (same distribution as JSON Analytics).
 - Categories: `Electronics, Books, Clothing, Home`.
 - Status: ~70% `completed`, the rest are ignored in aggregation (same ratio as JSON Analytics).
-- Items: runner deterministically generates `price_cents` and `quantity` per order item.
+- Items: the runner generates `price_cents` and `quantity` per order item and validates the aggregates per request.
 - Synthetic data only; no external dependencies (no DB required).
 
 ### Processing Logic (mirrors JSON Analytics)
@@ -79,7 +79,7 @@ service AnalyticsService {
 
 ## Verification (runner)
 1. Sets metadata `x-client-id=<uuid>`, deadline 10s.
-2. Sends a single `AnalyticsRequest` containing 1,000 deterministic `Order` messages.
+2. Sends a single `AnalyticsRequest` containing 100 generated `Order` messages.
 3. Receives the single response and checks:
    - gRPC status `OK`.
    - `echoed_client_id` matches the sent value.

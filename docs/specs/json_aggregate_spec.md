@@ -22,6 +22,7 @@ The request body must be a JSON array of orders.
 
 #### OrderItem
 - `quantity` (integer)
+- `price` (integer, cents)
 - `category` (string)
 
 Notes:

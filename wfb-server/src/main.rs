@@ -100,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(web::index_handler))
+        .route("/methodology", get(web::methodology_handler))
         .route("/bench", get(web::bench_handler))
         .route("/api/tags", get(api::get_tags))
         .route("/api/environments", get(api::get_environments))

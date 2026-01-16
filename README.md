@@ -4,13 +4,13 @@
 
   # Web Framework Benchmark
 
-  **The ultimate tool for comparing web framework performance across languages.**
+  **An open, reproducible benchmark suite for comparing web framework performance across languages.**
   
   [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg?logo=rust)](https://www.rust-lang.org/)
   [![Docker](https://img.shields.io/badge/container-Docker-2496ED.svg?logo=docker)](https://www.docker.com/)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-  [Features](#features) • [Architecture](#architecture) • [Quick Start](#quick-start) • [Adding Benchmarks](docs/GUIDE_ADDING_BENCHMARKS.md) • [Contributing](#contributing)
+  [Features](#features) • [Methodology](docs/METHODOLOGY.md) • [FAQ](docs/FAQ.md) • [Architecture](#architecture) • [Quick Start](#quick-start) • [Adding Benchmarks](docs/GUIDE_ADDING_BENCHMARKS.md) • [Contributing](#contributing)
 
   <br />
 

@@ -10,6 +10,7 @@
 
             <div class="flex items-center gap-3 ml-auto">
                 {% include "components/header/env-switcher.html.j2" %}
+                {% include "components/header/methodology-link.html.j2" %}
                 {% include "components/header/github-link.html.j2" %}
             </div>
             {% else %}
@@ -19,6 +20,7 @@
                     {{ "arrow-left"|icon("h-4 w-4")|safe }}
                     Back to results
                 </a>
+                {% include "components/header/methodology-link.html.j2" %}
                 {% include "components/header/github-link.html.j2" %}
             </div>
             {% endif %}

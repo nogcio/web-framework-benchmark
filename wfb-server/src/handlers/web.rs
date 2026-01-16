@@ -122,6 +122,12 @@ struct IndexTemplate {
     page: PageContext,
 }
 
+#[derive(Template)]
+#[template(path = "pages/methodology.html.j2")]
+struct MethodologyTemplate {
+    page: PageContext,
+}
+
 struct PageContext {
     runs: Vec<RunView>,
     active_run_id: String,
@@ -178,6 +184,57 @@ pub struct IndexQuery {
     run: Option<String>,
     env: Option<String>,
     test: Option<String>,
+}
+
+pub async fn methodology_handler(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<IndexQuery>,
+) -> impl IntoResponse {
+    let render_started = Instant::now();
+    let data = state.storage.data.read().unwrap();
+    let runs_manifests = state.storage.runs.read().unwrap();
+
+    let runs = get_runs(&data, &runs_manifests);
+
+    // If there are no runs yet, still render the page.
+    let active_run_id = query
+        .run
+        .or_else(|| runs.first().map(|r| r.id.clone()))
+        .unwrap_or_default();
+
+    let config = state.config.read().unwrap();
+    let environments = if !active_run_id.is_empty() {
+        get_environment_views(&active_run_id, &data, &config)
+    } else {
+        vec![]
+    };
+
+    let active_env = query.env.unwrap_or_else(|| {
+        environments
+            .first()
+            .map(|e| e.name.clone())
+            .unwrap_or_default()
+    });
+
+    let tests = get_available_tests();
+    let active_test = query
+        .test
+        .unwrap_or_else(|| tests.first().map(|t| t.id.clone()).unwrap_or_default());
+
+    HtmlTemplate(MethodologyTemplate {
+        page: PageContext {
+            runs,
+            active_run_id,
+            environments,
+            active_env,
+            tests,
+            active_test,
+            benchmarks: vec![],
+            backend_version: BACKEND_VERSION,
+            render_duration: RenderDuration::new(render_started),
+            show_header_controls: false,
+        },
+    })
 }
 
 pub async fn index_handler(

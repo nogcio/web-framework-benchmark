@@ -32,6 +32,20 @@ pub fn env_icon(
 }
 
 #[askama::filter_fn]
+pub fn env_spec(
+    active_env: impl std::fmt::Display,
+    _env: &dyn Values,
+    environments: &[EnvironmentView],
+) -> AskamaResult<String> {
+    let active_env = active_env.to_string();
+    Ok(environments
+        .iter()
+        .find(|env| env.name == active_env)
+        .and_then(|env| env.spec.clone())
+        .unwrap_or_default())
+}
+
+#[askama::filter_fn]
 pub fn format_number(value: impl Borrow<f64>, _env: &dyn Values) -> AskamaResult<String> {
     let value = *value.borrow();
     Ok(format_number_inner(value))
@@ -99,6 +113,21 @@ pub fn test_icon(
         .find(|test| test.id == active_test)
         .map(|test| test.icon.clone())
         .unwrap_or_else(|| "flask-conical".to_string()))
+}
+
+#[askama::filter_fn]
+pub fn asset(url: &str, _env: &dyn Values, version: &str) -> AskamaResult<String> {
+    Ok(asset_inner(url, version))
+}
+
+fn asset_inner(url: &str, version: &str) -> String {
+    if version.trim().is_empty() {
+        return url.to_string();
+    }
+
+    // If URL already has query params, append with '&', otherwise start with '?'.
+    let separator = if url.contains('?') { '&' } else { '?' };
+    format!("{url}{separator}q={version}")
 }
 
 fn format_number_inner(value: f64) -> String {
@@ -208,7 +237,8 @@ pub fn icon(name: impl std::fmt::Display, _env: &dyn Values, class: &str) -> Ask
         return Ok(String::new());
     }
     // Use CSS mask to allow coloring via currentColor (bg-current)
-    let url = format!("/images/icons/{}.svg", name);
+    let base_url = format!("/images/icons/{}.svg", name);
+    let url = asset_inner(&base_url, env!("CARGO_PKG_VERSION"));
     Ok(format!(
         r#"<span class="inline-block {}" style="background-color: currentColor; -webkit-mask-image: url('{}'); mask-image: url('{}'); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; -webkit-mask-size: contain; mask-size: contain;" aria-hidden="true"></span>"#,
         class, url, url

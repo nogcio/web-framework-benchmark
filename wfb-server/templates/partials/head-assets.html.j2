@@ -1,7 +1,7 @@
 <!-- HTMX -->
-<script src="/js/htmx.js"></script>
+<script src="{{ "/js/htmx.js"|asset(page.backend_version) }}"></script>
 <!-- Alpine.js -->
-<script defer src="/js/alpine.js"></script>
+<script defer src="{{ "/js/alpine.js"|asset(page.backend_version) }}"></script>
 
-<link rel="stylesheet" href="/css/app.css">
-<script src="/js/icons.js"></script>
+<link rel="stylesheet" href="{{ "/css/app.css"|asset(page.backend_version) }}">
+<script src="{{ "/js/icons.js"|asset(page.backend_version) }}"></script>

@@ -5,6 +5,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLockReadGuard};
 use std::time::Instant;
@@ -58,6 +59,32 @@ impl fmt::Display for RenderDuration {
     }
 }
 
+fn select_important_table_tags(tags: &HashMap<String, String>) -> Vec<(String, String)> {
+    let mut selected = Vec::new();
+
+    if let Some(v) = tags.get("type") {
+        selected.push(("type".to_string(), v.clone()));
+    }
+    if let Some(v) = tags.get("runtime") {
+        selected.push(("runtime".to_string(), v.clone()));
+    }
+
+    // Variant C: arch is usually too noisy, so show only when it's not a common baseline.
+    if let Some(v) = tags.get("arch") {
+        let baseline = matches!(v.as_str(), "async" | "event-loop" | "coroutine");
+        if !baseline {
+            selected.push(("arch".to_string(), v.clone()));
+        }
+    }
+
+    // ORM only matters for DB-ish implementations.
+    if let Some(v) = tags.get("orm") {
+        selected.push(("orm".to_string(), v.clone()));
+    }
+
+    selected
+}
+
 fn benchmark_repo_url(path: &str) -> Option<String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
@@ -101,6 +128,7 @@ fn get_environment_views(
             name: e.name,
             title: e.display_name,
             icon: e.icon,
+            spec: e.spec,
         })
         .collect()
 }
@@ -177,6 +205,7 @@ struct BenchmarkView {
     latency_p99: u64,
     errors: u64,
     database: Option<String>,
+    tags: Vec<(String, String)>,
 }
 
 #[derive(Deserialize)]
@@ -331,6 +360,7 @@ pub async fn index_handler(
                         latency_p99: test_summary.latency_p99,
                         errors: test_summary.total_errors,
                         database,
+                        tags: select_important_table_tags(&manifest.tags),
                     });
                 }
             }

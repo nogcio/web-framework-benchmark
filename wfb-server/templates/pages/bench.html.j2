@@ -3,11 +3,11 @@
 {% block title %}Benchmark Details{% endblock %}
 
 {% block content %}
-<div class="h-screen flex flex-col overflow-hidden">
+<div class="h-full flex flex-col overflow-hidden">
     {% include "components/header.html.j2" %}
 
     <div class="flex-1 flex overflow-hidden">
-        <main class="flex-1 overflow-auto" data-wfb-component="bench-page">
+        <main class="flex-1 min-h-0 overflow-auto" data-wfb-component="bench-page">
             <div class="px-4 md:px-6 py-6 space-y-6">
                 <div id="bench-data" class="hidden"
                     data-runs="{{ page.runs|json }}"
@@ -49,6 +49,6 @@
 
 {% block scripts %}
     {% include "partials/scripts.html.j2" %}
-    <script src="/js/chart.js"></script>
-    <script src="/js/bench.js" defer></script>
+    <script src="{{ "/js/chart.js"|asset(page.backend_version) }}"></script>
+    <script src="{{ "/js/bench.js"|asset(page.backend_version) }}" defer></script>
 {% endblock %}

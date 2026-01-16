@@ -18,4 +18,5 @@ pub struct EnvironmentView {
     pub name: String,
     pub title: String,
     pub icon: String,
+    pub spec: Option<String>,
 }

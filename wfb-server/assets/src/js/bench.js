@@ -26,6 +26,7 @@
         value: env.name,
         label: env.title,
         icon: env.icon,
+        spec: env.spec || '',
     }));
 
     const testsData = testsRaw.map((test) => ({
@@ -39,6 +40,41 @@
     const elTest = document.getElementById('compare-test');
     const elFramework = document.getElementById('compare-framework');
     const elBtn = document.getElementById('compare-btn');
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatSpecHtml(spec) {
+        const raw = String(spec || '').trim();
+        if (!raw) {
+            return '<div class="text-xs text-muted-foreground">No spec provided.</div>';
+        }
+
+        const lines = raw
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0);
+
+        const rows = lines
+            .map((line) => {
+                const idx = line.indexOf(':');
+                if (idx > 0) {
+                    const key = escapeHtml(line.slice(0, idx).trim());
+                    const val = escapeHtml(line.slice(idx + 1).trim());
+                    return `<div class="flex items-start justify-between gap-4"><span class="text-muted-foreground">${key}</span><span class="text-foreground/90 text-right">${val}</span></div>`;
+                }
+                return `<div class="text-foreground/90">${escapeHtml(line)}</div>`;
+            })
+            .join('');
+
+        return `<div class="space-y-1">${rows}</div>`;
+    }
 
     const crosshairPlugin = {
         id: 'crosshairLine',
@@ -307,19 +343,24 @@
             </button>
         `).join('');
 
+        const extraHtml = typeof root._renderExtra === 'function' ? root._renderExtra(selected) : '';
+        const wrapperClass = extraHtml ? 'group relative w-full' : 'relative w-full';
         root.innerHTML = `
-            <details class="relative w-full">
-                <summary class="list-none h-9 w-full rounded-md border border-input bg-background px-3 text-xs font-semibold text-foreground shadow-sm flex items-center justify-between cursor-pointer">
-                    <span class="inline-flex items-center gap-2">
-                        ${summaryIcon}
-                        ${summaryLabel}
-                    </span>
-                    ${typeof getIcon === 'function' ? getIcon("chevron-down", "h-4 w-4 text-muted-foreground") : `<i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>`}
-                </summary>
-                <div class="absolute left-0 right-0 mt-2 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 z-20 max-h-64 overflow-y-auto p-1">
-                    ${optionsHtml}
-                </div>
-            </details>
+            <div class="${wrapperClass}">
+                <details class="relative w-full">
+                    <summary class="list-none h-9 w-full rounded-md border border-input bg-background px-3 text-xs font-semibold text-foreground shadow-sm flex items-center justify-between cursor-pointer">
+                        <span class="inline-flex items-center gap-2">
+                            ${summaryIcon}
+                            ${summaryLabel}
+                        </span>
+                        ${typeof getIcon === 'function' ? getIcon("chevron-down", "h-4 w-4 text-muted-foreground") : `<i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>`}
+                    </summary>
+                    <div class="absolute left-0 right-0 mt-2 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 z-20 max-h-64 overflow-y-auto p-1">
+                        ${optionsHtml}
+                    </div>
+                </details>
+                ${extraHtml}
+            </div>
         `;
 
         root._handler = (event) => {
@@ -338,6 +379,19 @@
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
+    }
+
+    if (elEnv) {
+        elEnv._renderExtra = (selected) => {
+            const title = escapeHtml(selected?.label || elEnv.dataset.label || 'Environment');
+            const specHtml = formatSpecHtml(selected?.spec || '');
+            return `
+                <div class="pointer-events-none absolute left-0 top-full mt-2 w-80 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 p-3 hidden group-hover:block z-30">
+                    <div class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">${title}</div>
+                    <div class="mt-2 text-xs">${specHtml}</div>
+                </div>
+            `;
+        };
     }
 
     async function fetchRaw(selection) {

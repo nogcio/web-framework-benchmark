@@ -10,4 +10,29 @@
             })
             .catch(function () { });
     })();
+
+    (function () {
+        function updateLayoutOffsets() {
+            const header = document.getElementById('wfb-header');
+            const footer = document.getElementById('wfb-footer');
+            const headerH = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
+            const footerH = footer ? Math.ceil(footer.getBoundingClientRect().height) : 0;
+
+            document.documentElement.style.setProperty('--wfb-header-height', headerH + 'px');
+            document.documentElement.style.setProperty('--wfb-footer-height', footerH + 'px');
+        }
+
+        // Initial
+        updateLayoutOffsets();
+
+        // Keep in sync on resize
+        window.addEventListener('resize', updateLayoutOffsets);
+
+        // Recompute after htmx swaps (main-content is replaced)
+        document.body.addEventListener('htmx:afterSwap', updateLayoutOffsets);
+        document.body.addEventListener('htmx:afterSettle', updateLayoutOffsets);
+
+        // Fonts/images can change final height after first paint
+        window.addEventListener('load', updateLayoutOffsets);
+    })();
 </script>

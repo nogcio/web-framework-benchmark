@@ -6,7 +6,14 @@
     {% include "partials/head-assets.html.j2" %}
     {% block head %}{% endblock %}
 </head>
-<body class="h-full flex flex-col" hx-boost="true" hx-indicator=".global-progress" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML">
+<body
+    class="h-full flex flex-col"
+    style="padding-top: var(--wfb-header-height, 0px); padding-bottom: var(--wfb-footer-height, 0px);"
+    hx-boost="true"
+    hx-indicator=".global-progress"
+    hx-target="#main-content"
+    hx-select="#main-content"
+    hx-swap="outerHTML">
     <!-- Global Loading Indicator -->
     <div class="global-progress htmx-indicator fixed top-0 left-0 w-full h-1 z-[100]">
         <div class="h-full bg-primary animate-indeterminate"></div>

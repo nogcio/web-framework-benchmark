@@ -17,14 +17,16 @@
 
     {% set spec = page.active_env|env_spec(page.environments) %}
     {% if spec.trim() != "" %}
-    <div class="pointer-events-none absolute right-0 top-full mt-2 w-[28rem] rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 p-3 hidden group-hover:block z-50">
+    <div
+        class="pointer-events-none absolute right-0 top-full mt-2 w-[28rem] rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 p-3 hidden group-hover:block z-40"
+        :class="{ '!hidden': open }">
         <div class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Environment spec</div>
         <pre class="mt-2 whitespace-pre-wrap text-xs leading-5 text-foreground/90">{{ spec }}</pre>
     </div>
     {% endif %}
 
     <div x-show="open" x-transition @click.outside="open = false" x-cloak
-        class="absolute right-0 mt-2 w-60 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5">
+        class="absolute right-0 mt-2 w-60 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5 z-50">
         <div class="p-1">
             {% for env in page.environments %}
             <a href="/?run={{ page.active_run_id }}&env={{ env.name }}&test={{ page.active_test }}"

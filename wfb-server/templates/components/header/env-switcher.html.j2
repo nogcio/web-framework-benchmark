@@ -1,0 +1,29 @@
+<div class="hidden md:block relative" x-data="{ open: false }">
+    <button type="button"
+        class="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-3 text-sm font-semibold text-foreground shadow-sm transition-all hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        @click="open = !open">
+        <span class="inline-flex items-center gap-2">
+            {{ page.active_env|env_icon(page.environments)|icon("h-4 w-4 text-muted-foreground")|safe }}
+            <span class="hidden 2xl:inline">{{ page.active_env|env_title(page.environments) }}</span>
+            <span class="2xl:hidden">{{ page.active_env|env_title(page.environments) }}</span>
+        </span>
+        <svg class="h-4 w-4 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor"
+            aria-hidden="true" :class="open ? &quot;rotate-180 text-foreground&quot; : &quot;&quot;">
+            <path fill-rule="evenodd"
+                d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.104l3.71-3.874a.75.75 0 1 1 1.08 1.04l-4.24 4.43a.75.75 0 0 1-1.08 0l-4.24-4.43a.75.75 0 0 1 .02-1.06z"
+                clip-rule="evenodd" />
+        </svg>
+    </button>
+    <div x-show="open" x-transition @click.outside="open = false" x-cloak
+        class="absolute right-0 mt-2 w-60 rounded-md border border-border bg-popover text-popover-foreground shadow-xl ring-1 ring-black/5">
+        <div class="p-1">
+            {% for env in page.environments %}
+            <a href="/?run={{ page.active_run_id }}&env={{ env.name }}&test={{ page.active_test }}"
+                class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition {% if page.active_env.as_str() == env.name.as_str() %}bg-accent text-accent-foreground{% else %}hover:bg-muted/70 text-muted-foreground hover:text-foreground{% endif %}">
+                {{ env.icon|icon("h-4 w-4")|safe }}
+                <span class="truncate">{{ env.title }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>

@@ -1,0 +1,54 @@
+{% extends "layouts/base.html.j2" %}
+
+{% block title %}Benchmark Details{% endblock %}
+
+{% block content %}
+<div class="h-screen flex flex-col overflow-hidden">
+    {% include "components/header.html.j2" %}
+
+    <div class="flex-1 flex overflow-hidden">
+        <main class="flex-1 overflow-auto" data-wfb-component="bench-page">
+            <div class="px-4 md:px-6 py-6 space-y-6">
+                <div id="bench-data" class="hidden"
+                    data-runs="{{ page.runs|json }}"
+                    data-envs="{{ page.environments|json }}"
+                    data-tests="{{ page.tests|json }}">
+                </div>
+
+
+                {% if bench.is_none() %}
+                {% include "components/bench/empty.html.j2" %}
+                {% else %}
+                {% set b = bench.as_ref().unwrap() %}
+                <div id="bench-detail"
+                    data-run="{{ b.run_id }}"
+                    data-env="{{ b.env }}"
+                    data-test="{{ b.test }}"
+                    data-framework="{{ b.framework }}"
+                    data-primary-label="{{ b.language }} / {{ b.framework }}"
+                    class="space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 items-stretch">
+                        <div class="h-full">
+                            {% include "components/bench/detail-card.html.j2" %}
+                        </div>
+                        <div class="h-full">
+                            {% include "components/bench/compare.html.j2" %}
+                        </div>
+                    </div>
+
+                    {% include "components/bench/charts.html.j2" %}
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    {% include "components/footer.html.j2" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+    {% include "partials/scripts.html.j2" %}
+    <script src="/js/chart.js"></script>
+    <script src="/js/bench.js" defer></script>
+{% endblock %}

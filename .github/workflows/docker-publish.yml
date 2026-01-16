@@ -44,25 +44,6 @@ jobs:
       - name: Build project
         run: cargo build --verbose
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: web-app/package-lock.json
-
-      - name: Install Node dependencies
-        working-directory: web-app
-        run: npm ci
-
-      - name: Lint Frontend
-        working-directory: web-app
-        run: npm run lint
-
-      - name: Build Frontend
-        working-directory: web-app
-        run: npm run build
-
   build:
     needs: check
     if: startsWith(github.ref, 'refs/tags/v')

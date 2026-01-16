@@ -1,0 +1,21 @@
+<div class="flex-1 min-h-0" data-wfb-component="table-list">
+    <div class="relative w-full h-full overflow-auto">
+        <table class="w-full text-xs text-left border-separate border-spacing-0" data-wfb-component="table-element">
+        <thead class="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+            <tr class="border-b-2 border-primary/60 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <th class="h-8 px-2.5 font-medium w-12 wfb-only-desktop-table">#</th>
+                <th class="h-8 px-2.5 font-medium md:w-[30%]">Framework</th>
+                <th class="h-8 px-2.5 font-medium md:w-[70%] text-left">Requests/sec</th>
+                <th class="h-8 px-2 font-medium text-right whitespace-nowrap wfb-only-desktop-table">TPS</th>
+                <th class="h-8 px-2 font-medium text-right whitespace-nowrap wfb-only-desktop-table">Latency P99</th>
+                <th class="h-8 px-2 font-medium text-right wfb-only-desktop-table">Errors</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bench in page.benchmarks %}
+                {% include "components/table/row.html.j2" %}
+            {% endfor %}
+        </tbody>
+        </table>
+    </div>
+</div>

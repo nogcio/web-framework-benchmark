@@ -21,7 +21,6 @@ For a detailed step-by-step guide on adding new languages or frameworks, please 
 
 2.  **Code Style & Checks**:
     - **Rust Runner**: `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings`.
-    - **Frontend**: In `web-app`, run `npm install` and `npm run lint`.
     - **Testing**: Run `cargo test` to verify changes to the runner/server.
 
 3.  **Commits & Pull Requests**:

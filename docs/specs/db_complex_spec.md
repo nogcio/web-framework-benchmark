@@ -2,6 +2,8 @@
 
 This test case verifies the framework's ability to perform a realistic "Master-Detail" database operation, mixing reads and writes. It maps multiple database rows (including a JSON column and a one-to-many relationship) to a nested JSON response and updates the user's login timestamp.
 
+**Real-world analogy:** a user dashboard that loads profile data, recent activity, and “trending” content while updating last-login.
+
 ## Requirements
 
 ### Endpoint

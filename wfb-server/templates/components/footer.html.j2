@@ -1,0 +1,18 @@
+<footer class="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" data-wfb-component="footer">
+    <div class="w-full px-4 md:px-6 py-2 flex flex-wrap items-center justify-end gap-4 text-[10px] uppercase tracking-[0.2em] font-semibold text-muted-foreground">
+        <span>v{{ page.backend_version }}</span>
+        <span class="flex items-center gap-1.5 text-[10px]">
+            {{ "timer"|icon("h-3 w-3")|safe }}
+            <span>{{ page.render_duration }}ms</span>
+        </span>
+        <a href="mailto:getansum@nogc.io" class="flex items-center gap-1.5 hover:text-foreground transition-colors">
+            {{ "mail"|icon("h-3 w-3")|safe }}
+            <span class="wfb-only-desktop-inline">getansum@nogc.io</span>
+        </a>
+        <a href="https://github.com/nogcio/web-framework-benchmark" target="_blank" rel="noreferrer"
+            class="flex items-center gap-1.5 hover:text-foreground transition-colors">
+            {{ "github"|icon("h-3 w-3")|safe }}
+            <span class="wfb-only-desktop-inline">GitHub</span>
+        </a>
+    </div>
+</footer>

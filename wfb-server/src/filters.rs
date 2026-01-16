@@ -1,4 +1,4 @@
-use askama::{Error as AskamaError, Result as AskamaResult, Values};
+use askama::{Result as AskamaResult, Values};
 use std::borrow::Borrow;
 
 use crate::view_models::{EnvironmentView, TestView};
@@ -145,7 +145,11 @@ fn format_throughput_inner(bytes_per_sec: u64) -> String {
     }
     let unit = UNITS[unit_idx];
     if unit_idx == 0 {
-        format!("{} {}", format_integer_string(&bytes_per_sec.to_string()), unit)
+        format!(
+            "{} {}",
+            format_integer_string(&bytes_per_sec.to_string()),
+            unit
+        )
     } else if value >= 100.0 {
         format!("{:.0} {}", value, unit)
     } else if value >= 10.0 {
@@ -155,6 +159,7 @@ fn format_throughput_inner(bytes_per_sec: u64) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn format_bytes_inner(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
     if bytes == 0 {
@@ -197,11 +202,7 @@ fn soften_color_inner(color: &str) -> String {
 }
 
 #[askama::filter_fn]
-pub fn icon(
-    name: impl std::fmt::Display,
-    _env: &dyn Values,
-    class: &str,
-) -> AskamaResult<String> {
+pub fn icon(name: impl std::fmt::Display, _env: &dyn Values, class: &str) -> AskamaResult<String> {
     let name = name.to_string();
     if name.is_empty() {
         return Ok(String::new());

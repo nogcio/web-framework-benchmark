@@ -114,10 +114,6 @@ async fn main() -> anyhow::Result<()> {
             get(api::get_run_results),
         )
         .route(
-            "/api/runs/{run_id}/environments/{env}/tests/{test}/frameworks/{framework}/transcript",
-            get(api::get_run_transcript),
-        )
-        .route(
             "/api/runs/{run_id}/environments/{env}/tests/{test}/frameworks/{framework}/raw",
             get(api::get_run_raw_data),
         )

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background: Dark rounded square -->
+  <rect x="0" y="0" width="512" height="512" rx="128" fill="#0f172a" />
+  
+  <!-- Chart Bars -->
+  <!-- Bar 1 -->
+  <rect x="100" y="280" width="80" height="132" rx="12" fill="url(#grad)" />
+  <!-- Bar 2 -->
+  <rect x="216" y="200" width="80" height="212" rx="12" fill="url(#grad)" />
+  <!-- Bar 3 -->
+  <rect x="332" y="100" width="80" height="312" rx="12" fill="url(#grad)" />
+  
+  <!-- Speed/Lightning Bolt overlay (Subtle) -->
+  <path d="M300 50 L340 50 L280 180 L320 180 L240 320 L260 200 L220 200 Z" fill="#22d3ee" opacity="0" />
+  
+</svg>

@@ -1,5 +1,7 @@
 <div align="center">
 
+  <img src="assets/logo.svg" alt="Web Framework Benchmark Logo" width="120" />
+
   # Web Framework Benchmark
 
   **The ultimate tool for comparing web framework performance across languages.**
@@ -10,28 +12,56 @@
 
   [Features](#features) • [Architecture](#architecture) • [Quick Start](#quick-start) • [Adding Benchmarks](docs/GUIDE_ADDING_BENCHMARKS.md) • [Contributing](#contributing)
 
+  <br />
+
+  <img src="assets/preview.png" alt="Web Framework Benchmark Preview" width="100%" />
+
 </div>
 
 <br />
 
-## 🚀 Overview
+## 🚀 Philosophy: Benchmarking Reality
 
-**Web Framework Benchmark (WFB)** is a comprehensive, automated benchmarking infrastructure designed to compare the throughput, latency, and resource usage of web frameworks across different programming languages.
+Most web benchmarks focus on synthetic "Hello World" cases that measure raw socket performance but ignore application logic. **Web Framework Benchmark (WFB)** takes a different approach.
 
-It combines a high-performance **Rust** runner and load generator with a robust **API server** to collect and expose results, making it easy to spot performance bottlenecks and compare implementations side-by-side.
+We measure how frameworks handle **real-world production scenarios**, prioritizing application complexity, strict correctness, and modern protocol comparisons over simple echo tests.
 
-## ✨ Features
+## 🏆 Key Differentiators
 
-- **📊 Multi-language Support**: Benchmarks for **C**, **C++**, **C#**, **Go**, **Java**, **JavaScript**, **Kotlin**, **Lua**, **Python**, and **Rust**.
-- **🧪 Comprehensive Test Suite**:
-  - **[Plaintext](docs/specs/plaintext_spec.md)**: Baseline throughput (Hello World).
-  - **[JSON Analytics](docs/specs/json_aggregate_spec.md)**: Request parsing, in-memory aggregation, and response serialization.
-  - **[Static Files](docs/specs/static_files_spec.md)**: Serving static binary files with correct HTTP semantics.
-  - **[Database Complex](docs/specs/db_complex_spec.md)**: Realistic "Master-Detail" operation, mixing reads and writes (Interactive User Profile).
-  - **[gRPC Aggregate](docs/specs/grpc_aggregate_spec.md)**: gRPC implementation of the aggregation logic (comparable to JSON Analytics).
-- **⚡ High-Performance Benchmarking**: Powered by `wrkr`, a custom-built Rust load generator.
-- **🐳 Docker Integration**: Fully containerized environments for consistent, reproducible results.
-- **🔧 Flexible Config**: YAML-based configuration for environments, languages, and test scenarios.
+### 1. 🧠 Heavy Business Logic
+We don't just dump bytes to a socket.
+- **JSON Analytics**: Simulates a microservice analyzing e-commerce orders. It tests parsing efficiency, in-memory aggregation, and allocation-heavy workloads.
+- **Database Complex**: A full "User Profile" endpoint mixing reads, writes, and parallel queries to build complex nested responses.
+
+### 2. ⚔️ HTTP vs. gRPC
+Modern architectures often choose between REST and gRPC. WFB offers mirrored specifications (e.g., `JSON Aggregate` vs `gRPC Aggregate`) to provide a definitive answer on overhead and performance differences for the exact same logic.
+
+### 3. 🛡️ Strict Validation
+Speed is meaningless if the data is wrong.
+Our custom load generator `wrkr` validates every single response. If a framework returns an incorrect sum in an analytics report or misses a field in a JSON object, the test fails. No caching shortcuts allowed.
+
+### 4. 🛠️ Developer Experience
+Running benchmarks shouldn't require complex ops.
+WFB is a self-contained **Rust** workspace. The single CLI tool manages Docker composition, database lifecycles, and reporting.
+
+## 🔬 Methodology & Fairness
+
+We believe benchmarks should be transparent and reproducible.
+
+- **Warmup Phase**: Every test includes a **30-second warmup** to allow JIT compilers (Java, C#, JS, Lua) to optimize hot paths before measurement begins.
+- **Connection Stepping**: We test multiple concurrency levels (e.g., 64, 128, 256, 512 connections) to show how frameworks scale under load, rather than picking a single "magic number".
+- **Realistic Client**: The `wrkr` load generator implementation uses production-grade async Rust networking (Tokio/Hyper/Reqwest) to ensure HTTP/2 and HTTP/1.1 compliance. We do not use "pipeline-optimized" synthetic clients that break spec.
+- **Latency Distribution**: We capture high-resolution latency histograms (p50, p90, p99, max) to identify "hiccups" caused by GC pauses or improper async blocking.
+
+## 🧪 Test Suite
+
+| Test Suite | Focus | Real-World Analogy |
+|------------|-------|--------------------|
+| **[Plaintext](docs/specs/plaintext_spec.md)** | Baseline Throughput | Load Balancers, Gateways |
+| **[JSON Analytics](docs/specs/json_aggregate_spec.md)** | CPU & Memory efficiency | Data Processing Microservices |
+| **[Database Complex](docs/specs/db_complex_spec.md)** | ORM overhead, Async flows | User Dashboards, CMS |
+| **[gRPC Aggregate](docs/specs/grpc_aggregate_spec.md)** | Protocol Efficiency | Inter-service Communication |
+| **[Static Files](docs/specs/static_files_spec.md)** | Network I / O, Sendfile | CDNs, Asset Servers |
 
 ## 🏗 Architecture
 
@@ -69,12 +99,13 @@ cargo run --release --bin wfb-runner -- run 1 --env local
 cargo run --release --bin wfb-runner -- dev <benchmark_name> --env local
 ```
 
-### 3. Launch the API Server
+### 3. Launch the Dashboard
 
-Start the API server to access benchmark results.
+Start the API server to browse results in an interactive dashboard.
 
 ```bash
 cargo run --release --bin wfb-server
+# Open http://localhost:8080 in your browser
 ```
 
 ## 🤝 Contributing

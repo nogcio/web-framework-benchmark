@@ -2,6 +2,8 @@
 
 This test exercises gRPC calls with production-relevant aspects: binary protocol, deadlines, metadata, compression (optional), and in-memory aggregation without a database dependency. The data shape and aggregation logic mirror the JSON Analytics test case (`json_aggregate_spec.md`) to make results comparable across HTTP/1.1 JSON and gRPC.
 
+**Quick summary:** same workload as JSON Analytics, but over gRPC to measure protocol overhead and metadata handling.
+
 ## Requirements
 
 ### Service and Method

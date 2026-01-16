@@ -2,6 +2,8 @@
 
 This test case verifies the implementation of the simplest possible HTTP response.
 
+**Why this matters:** it establishes a baseline for raw HTTP handling before adding JSON, DB, or file I/O overhead.
+
 ## Requirements
 
 ### Endpoint

@@ -2,6 +2,8 @@
 
 This test case verifies that a framework serves static binary files correctly **and** behaves like a production-ready static file handler with respect to caching and partial content.
 
+**Why this matters:** real-world static serving depends on cache validators and range requests, not just returning bytes.
+
 It is intentionally stricter than a “200 + correct length” check: returning a buffer from memory can pass that, while still being a poor/incorrect static implementation in real deployments.
 
 ## Requirements

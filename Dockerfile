@@ -2,7 +2,7 @@
 FROM rust:1.92-alpine AS backend-builder
 WORKDIR /app
 # Install build dependencies
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev libssh2-dev luajit-dev openssl-libs-static zlib-static libssh2-static build-base
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev libssh2-dev luajit-dev openssl-libs-static zlib-static libssh2-static build-base nodejs npm
 
 # Copy workspace configuration
 COPY Cargo.toml Cargo.lock ./
@@ -34,6 +34,9 @@ COPY config ./config
 COPY benchmarks ./benchmarks
 COPY benchmarks_db ./benchmarks_db
 COPY scripts ./scripts
+
+# Copy built web assets from wfb-server build
+COPY --from=backend-builder /app/wfb-server/assets/dist ./assets
 
 # Default to running the server
 CMD ["wfb-server"]

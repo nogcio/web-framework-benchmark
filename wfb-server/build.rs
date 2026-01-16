@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR missing"));
+    let manifest_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR missing"));
     let assets_src = manifest_dir.join("assets/src");
     let assets_dist = manifest_dir.join("assets/dist");
     fs::create_dir_all(&assets_dist).ok();
@@ -101,11 +102,12 @@ fn print_rerun_if_changed(path: &Path) {
     if path.is_file() {
         println!("cargo:rerun-if-changed={}", path.display());
     } else if path.is_dir()
-        && let Ok(entries) = fs::read_dir(path) {
-            for entry in entries.flatten() {
-                print_rerun_if_changed(&entry.path());
-            }
+        && let Ok(entries) = fs::read_dir(path)
+    {
+        for entry in entries.flatten() {
+            print_rerun_if_changed(&entry.path());
         }
+    }
 }
 
 fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {

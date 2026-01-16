@@ -1,6 +1,14 @@
 # How to Add a New Benchmark
 
+**TL;DR:** Add a folder with a `Dockerfile`, implement the required endpoints, register the benchmark in `config/`, then run `verify`.
+
 This guide provides a step-by-step walkthrough for adding a new language or framework to the Web Framework Benchmark (WFB).
+
+## ✅ Minimal Checklist (30–60 minutes)
+1. Create `benchmarks/<language>/<framework>` with a `Dockerfile`.
+2. Implement `/health`, `/plaintext`, plus any tests you claim in config.
+3. Register language/framework/benchmark in `config/`.
+4. Run `wfb-runner verify` for your benchmark.
 
 ## 1. Directory Structure
 

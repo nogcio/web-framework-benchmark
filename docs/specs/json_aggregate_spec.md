@@ -2,6 +2,8 @@
 
 This test case verifies JSON request parsing, in-memory aggregation, and JSON response serialization.
 
+**Real-world analogy:** an e-commerce analytics microservice that aggregates order data by country and category.
+
 ## Requirements
 
 ### Endpoint

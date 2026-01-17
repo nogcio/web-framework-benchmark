@@ -78,6 +78,7 @@ The project is organized as a Rust workspace:
 
 - **Rust** (2024 edition)
 - **Docker** (Running)
+- **Node.js** (required to build `wfb-server` UI assets via `npx` Tailwind/esbuild; optional if you provide `TAILWINDCSS_BIN`/`ESBUILD_BIN` or have `tailwindcss`/`esbuild` available on `PATH`)
 
 ### 1. Build the Components
 
@@ -107,6 +108,28 @@ Start the API server to browse results in an interactive dashboard.
 cargo run --release --bin wfb-server
 # Open http://localhost:8080 in your browser
 ```
+
+## 🌐 Public Deployment (Security)
+
+If you run WFB as a public website, enable the production security headers and configure CORS explicitly.
+
+- Enable strict browser headers (recommended for public):
+  - `WFB_PUBLIC=1`
+  - Adds `Content-Security-Policy` (nonce-based), `Strict-Transport-Security` (HSTS), and `Cross-Origin-Resource-Policy`.
+- Roll out CSP safely first:
+  - `WFB_CSP_REPORT_ONLY=1` (uses `Content-Security-Policy-Report-Only`)
+  - Remove it once you are confident.
+- Configure API CORS only if you actually need cross-origin API usage:
+  - `WFB_CORS_ALLOW_ORIGINS="https://your-domain.example,https://other.example"`
+  - `WFB_CORS_ALLOW_ORIGINS="*"` is supported but not recommended for a public production site.
+
+Notes:
+
+- `WFB_PUBLIC=1` is intended for HTTPS deployments (it enables `upgrade-insecure-requests`).
+- HSTS only has effect when served over HTTPS (typically behind a reverse proxy). If you run behind a proxy, either:
+  - configure HSTS at the proxy, or
+  - ensure it forwards `X-Forwarded-Proto: https` (or `Forwarded: proto=https`) so the app can safely emit HSTS.
+- If you add new inline `<script>` tags in templates, they must be nonce-gated to satisfy CSP.
 
 ## 🤝 Contributing
 

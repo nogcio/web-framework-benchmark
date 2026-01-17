@@ -7,7 +7,7 @@ use axum_extra::routing::TypedPath;
 use serde::Deserialize;
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::ServeDir;
 
 use crate::handlers::{api, web};
@@ -89,7 +89,6 @@ macro_rules! define_routes {
 define_routes! {
     // --- Web routes ---
     pub IndexRoot => "/";
-    pub Methodology => "/methodology" [tpl methodology_url];
 
     pub GithubStarsPartials => "/partials/github/stars" [tpl github_stars_url];
 
@@ -147,6 +146,7 @@ define_routes! {
 ///
 /// Centralizes route registration to keep URL patterns and reverse routing consistent.
 pub fn build_app(state: Arc<AppState>, assets_dir: PathBuf) -> Router {
+    let cors_layer = cors_layer_from_env();
     let app = Router::new()
         // Web
         .route(IndexRoot::PATH, get(web::root_handler))
@@ -155,7 +155,6 @@ pub fn build_app(state: Arc<AppState>, assets_dir: PathBuf) -> Router {
             IndexPartialsViewPath::PATH,
             get(web::index_update_path_handler),
         )
-        .route(Methodology::PATH, get(web::methodology_handler))
         .route(
             GithubStarsPartials::PATH,
             get(web::github_stars_partials_handler),
@@ -181,7 +180,7 @@ pub fn build_app(state: Arc<AppState>, assets_dir: PathBuf) -> Router {
             ServiceBuilder::new()
                 .layer(axum::middleware::from_fn(middleware::security_headers))
                 .layer(CompressionLayer::new())
-                .layer(CorsLayer::permissive()),
+                .layer(cors_layer),
         );
 
     let static_service = ServiceBuilder::new()
@@ -191,4 +190,41 @@ pub fn build_app(state: Arc<AppState>, assets_dir: PathBuf) -> Router {
         .service(ServeDir::new(assets_dir).append_index_html_on_directories(false));
 
     app.fallback_service(static_service)
+}
+
+fn cors_layer_from_env() -> CorsLayer {
+    // For a public site, permissive CORS is typically not desired.
+    //
+    // Configure explicitly via:
+    // - WFB_CORS_ALLOW_ORIGINS="https://example.com,https://other.com"
+    // - WFB_CORS_ALLOW_ORIGINS="*" (not recommended for public prod)
+    let raw = std::env::var("WFB_CORS_ALLOW_ORIGINS").unwrap_or_default();
+    let raw = raw.trim();
+    if raw.is_empty() {
+        // Default: do not emit CORS headers.
+        return CorsLayer::new();
+    }
+
+    if raw == "*" {
+        return CorsLayer::new().allow_origin(Any);
+    }
+
+    {
+        let mut origins: Vec<axum::http::HeaderValue> = Vec::new();
+        for part in raw.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            if let Ok(hv) = axum::http::HeaderValue::from_str(part) {
+                origins.push(hv);
+            }
+        }
+
+        if origins.is_empty() {
+            return CorsLayer::new();
+        }
+
+        CorsLayer::new().allow_origin(AllowOrigin::list(origins))
+    }
 }

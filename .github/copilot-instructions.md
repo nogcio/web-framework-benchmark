@@ -39,6 +39,11 @@ Non-Rust runtime assets:
   - Don’t duplicate logic; extract helpers/modules when there are 2+ call sites or the logic is non-trivial.
   - Don’t cram everything into one file; keep responsibilities separated and follow the existing folder/module structure.
   - Keep names explicit; optimize for clarity first, performance only when it matters.
+
+### Performance is a priority
+
+- Treat performance as a first-class requirement: avoid introducing latency/allocations in hot paths (request handlers, middleware, rendering, critical loops).
+- If a change adds work per request (parsing, env/config reads, extra I/O, heavy allocations), refactor to do it once at startup or cache it (e.g. in app state or via `std::sync::OnceLock`).
 - Respect user edits and reversions:
   - If the user manually changes files or undoes/reverts changes during the session, treat the current workspace state as the source of truth.
   - Do NOT re-apply the same changes again just because they were previously suggested or attempted.
@@ -47,6 +52,11 @@ Non-Rust runtime assets:
   - Don’t ship TODO-only changes, stubs, or placeholder implementations.
   - Don’t “make it pass” by weakening correctness/validation or bypassing existing contracts.
   - Prefer completing the change end-to-end in one coherent PR (code + callers/usages + minimal verification).
+
+### Performance rule: avoid per-request env reads
+
+- Do **not** call `std::env::var` (or parse env/config) inside per-request hot paths such as Axum handlers, middleware, or template rendering.
+- Read/parse env once at startup and store it in application state, or cache it via `std::sync::OnceLock` if it truly must be global.
 - Backward compatibility is **not required** unless explicitly requested.
   - If a change breaks CLI flags, config schema, or specs, call it out clearly in the summary.
 - Preserve existing naming conventions:
@@ -110,7 +120,13 @@ If you add a new benchmark:
 - When working on frontend changes, don’t start/restart or “rebuild” `wfb-server` unless explicitly asked.
   - Assume the server is already running with watch/auto-rebuild enabled; focus on code/template changes without disrupting the running dev session.
 - Follow existing template/component patterns; keep HTML structure and CSS class conventions consistent.
-- On the frontend, all external links MUST be marked with an external-link icon (as already implemented today); preserve this convention and apply it to any newly added external links.
+- On the frontend, external links are marked with an external-link indicator via CSS (currently implemented as a `::after` mask on `a[target="_blank"]`, excluding `.wfb-btn`).
+  - Do not add or require a dedicated SVG icon file for this indicator unless explicitly requested.
+  - When reviewing templates, verify the current rule in `wfb-server/assets/src/css/app.css` before flagging “missing external-link icon”.
+- Do **not** hardcode repository host URLs (e.g. `github.com`) in templates or handlers.
+  - Using `wfb-server/src/handlers/web/types.rs` (`REPOSITORY_URL`) / `chrome.repository_url` is the intended single source of truth.
+  - In Askama templates, build repo/doc links via the `url_join` filter instead of embedding `https://...`.
+  - Some links may still assume the default branch/path shape (e.g. `blob/main/...`, `tree/main/...`); don’t treat that as a “hardcoded GitHub URL” unless the user asks to remove the assumption.
 - Prefer server-side rendering patterns already present; avoid introducing new frontend frameworks unless requested.
 - For UI work, follow `docs/UI_GUIDE.md` (Askama contexts, macros, HTMX contracts, assets).
 

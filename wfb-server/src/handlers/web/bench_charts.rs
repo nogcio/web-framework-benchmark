@@ -1,12 +1,14 @@
 use super::render::HtmlTemplate;
 use askama::Template;
 use axum::extract::State;
+use axum::extract::Extension;
 use axum::response::IntoResponse;
 use serde::Serialize;
 use std::sync::Arc;
 
 use crate::routes;
 use crate::state::AppState;
+use crate::middleware::CspNonce;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct BenchChartClientData {
@@ -20,10 +22,12 @@ pub struct BenchChartClientData {
 #[template(path = "partials/bench/charts.rs.j2")]
 struct BenchChartsPartialTemplate {
     chart_data: BenchChartClientData,
+    csp_nonce: String,
 }
 
 pub async fn bench_charts_partials_path_handler(
     State(state): State<Arc<AppState>>,
+    Extension(CspNonce(csp_nonce)): Extension<CspNonce>,
     params: routes::BenchChartsPartialsViewPath,
 ) -> impl IntoResponse {
     let lang = find_language_for_framework(
@@ -49,6 +53,7 @@ pub async fn bench_charts_partials_path_handler(
 
     HtmlTemplate(BenchChartsPartialTemplate {
         chart_data: build_chart_data(&raw, 240),
+        csp_nonce,
     })
 }
 

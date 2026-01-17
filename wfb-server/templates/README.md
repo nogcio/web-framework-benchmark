@@ -11,6 +11,10 @@ Templates should avoid a single giant page object. Prefer small, explicit variab
 - `benchmarks`: list for the results table (index page)
 - `bench`: optional benchmark detail (bench page)
 
+When running as a public site with CSP enabled (`WFB_PUBLIC=1`), some partials may also receive:
+
+- `csp_nonce`: per-request nonce string for safe inline `<script>` tags.
+
 This keeps components honest: they only read what they need.
 
 ## Structure

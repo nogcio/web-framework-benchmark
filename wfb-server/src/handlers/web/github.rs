@@ -24,9 +24,22 @@ struct StarsCache {
 }
 
 static STARS_CACHE: OnceLock<RwLock<StarsCache>> = OnceLock::new();
+static GITHUB_TOKEN: OnceLock<Option<String>> = OnceLock::new();
 
 fn stars_cache() -> &'static RwLock<StarsCache> {
     STARS_CACHE.get_or_init(|| RwLock::new(StarsCache::default()))
+}
+
+fn github_token() -> Option<&'static str> {
+    GITHUB_TOKEN
+        .get_or_init(|| {
+            let token = std::env::var("WFB_GITHUB_TOKEN")
+                .or_else(|_| std::env::var("GITHUB_TOKEN"))
+                .ok()?;
+            let token = token.trim().to_string();
+            if token.is_empty() { None } else { Some(token) }
+        })
+        .as_deref()
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,9 +113,7 @@ async fn fetch_github_stars() -> anyhow::Result<Option<u64>> {
         .header(USER_AGENT, "wfb-server")
         .header(ACCEPT, "application/vnd.github+json");
 
-    if let Ok(token) = std::env::var("WFB_GITHUB_TOKEN").or_else(|_| std::env::var("GITHUB_TOKEN"))
-        && !token.trim().is_empty()
-    {
+    if let Some(token) = github_token() {
         req = req.bearer_auth(token);
     }
 

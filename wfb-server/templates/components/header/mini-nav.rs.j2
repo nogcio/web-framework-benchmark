@@ -3,12 +3,13 @@
 
   Props (implicit via context):
   - routes: Routes
+  - chrome: ChromeContext
 #}
 
 <nav class="hidden sm:flex items-center gap-2 text-[9px] uppercase tracking-[0.18em] font-semibold text-muted-foreground">
-  <a href="{{ routes.methodology_url() }}" class="hover:text-foreground transition-colors">Methodology</a>
+  <a class="hover:text-foreground transition-colors" href="{{ chrome.repository_url|url_join("blob/main/docs/METHODOLOGY.md") }}" target="_blank" rel="noreferrer" hx-boost="false">Methodology</a>
   <span class="opacity-40">/</span>
-  <a class="hover:text-foreground transition-colors" href="https://github.com/nogcio/web-framework-benchmark/blob/main/docs/FAQ.md" target="_blank" rel="noreferrer" hx-boost="false">FAQ</a>
+  <a class="hover:text-foreground transition-colors" href="{{ chrome.repository_url|url_join("blob/main/docs/FAQ.md") }}" target="_blank" rel="noreferrer" hx-boost="false">FAQ</a>
   <span class="opacity-40">/</span>
-  <a class="hover:text-foreground transition-colors" href="https://github.com/nogcio/web-framework-benchmark/blob/main/docs/specs" target="_blank" rel="noreferrer" hx-boost="false">Specs</a>
+  <a class="hover:text-foreground transition-colors" href="{{ chrome.repository_url|url_join("blob/main/docs/specs") }}" target="_blank" rel="noreferrer" hx-boost="false">Specs</a>
 </nav>

@@ -2633,7 +2633,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-runner"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2653,7 +2653,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-server"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "askama",
@@ -2664,6 +2664,7 @@ dependencies = [
  "clap",
  "mime_guess",
  "notify",
+ "rand 0.8.5",
  "reqwest",
  "serde",
  "serde_json",
@@ -2680,7 +2681,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-storage"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "chrono",
  "serde",
@@ -3012,7 +3013,7 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
 name = "wrkr"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "clap",
  "hdrhistogram",
@@ -3030,14 +3031,14 @@ dependencies = [
 
 [[package]]
 name = "wrkr-api"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "wrkr-core"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "bytes",
  "csv",

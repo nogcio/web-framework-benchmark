@@ -137,6 +137,19 @@ pub fn asset_path(url: &str, _env: &dyn Values) -> AskamaResult<String> {
     })))
 }
 
+#[askama::filter_fn]
+pub fn url_join(base: &str, _env: &dyn Values, path: &str) -> AskamaResult<String> {
+    let base = base.trim().trim_end_matches('/');
+    let path = path.trim().trim_start_matches('/');
+    if base.is_empty() {
+        return Ok(path.to_string());
+    }
+    if path.is_empty() {
+        return Ok(base.to_string());
+    }
+    Ok(format!("{}/{}", base, path))
+}
+
 fn asset_path_inner(url: &str) -> String {
     let trimmed = url.trim();
     let key = trimmed.trim_start_matches('/');

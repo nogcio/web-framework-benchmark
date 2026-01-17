@@ -1,11 +1,20 @@
 use axum::http::header::HeaderName;
 use axum::http::{HeaderValue, Request, Uri, header};
 use axum::middleware::Next;
+use rand::RngCore;
+use std::sync::OnceLock;
+
+#[derive(Debug, Clone)]
+pub struct CspNonce(pub String);
 
 pub async fn security_headers(
-    req: Request<axum::body::Body>,
+    mut req: Request<axum::body::Body>,
     next: Next,
 ) -> axum::response::Response {
+    let is_https = request_is_https(&req);
+    let nonce = generate_nonce_hex_16();
+    req.extensions_mut().insert(CspNonce(nonce.clone()));
+
     let mut resp = next.run(req).await;
 
     // Set a baseline of safe headers. (Avoid CSP/HSTS here; those need deployment-specific tuning.)
@@ -34,7 +43,116 @@ pub async fn security_headers(
         HeaderValue::from_static("same-origin"),
     );
 
+    // For public deployments, enable stricter web security. Keep this opt-in to avoid breaking local
+    // development workflows.
+    //
+    // Env flags:
+    // - WFB_PUBLIC=1: enable CSP (enforced), HSTS, and CORP
+    // - WFB_CSP_REPORT_ONLY=1: use Content-Security-Policy-Report-Only instead of enforcement
+    let mode = security_mode();
+    if mode.public {
+        let report_only = mode.csp_report_only;
+
+        let upgrade_insecure = if is_https {
+            "; upgrade-insecure-requests"
+        } else {
+            ""
+        };
+
+        // NOTE: We intentionally allow inline styles because templates rely on style attributes
+        // (e.g. chart masks, table row gradients). Script inline is nonce-gated.
+        let csp = format!(
+            "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; script-src 'self' 'nonce-{}'; style-src 'self' 'unsafe-inline'{}",
+            nonce, upgrade_insecure
+        );
+
+        let csp_header = if report_only {
+            HeaderName::from_static("content-security-policy-report-only")
+        } else {
+            HeaderName::from_static("content-security-policy")
+        };
+        if let Ok(value) = HeaderValue::from_str(&csp) {
+            headers.insert(csp_header, value);
+        }
+
+        // Only meaningful behind HTTPS. When running behind a reverse proxy, this will be set
+        // if it forwards `X-Forwarded-Proto: https` or `Forwarded: proto=https`.
+        if is_https {
+            headers.insert(
+                HeaderName::from_static("strict-transport-security"),
+                HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+            );
+        }
+
+        // Prevent other origins from embedding our resources.
+        headers.insert(
+            HeaderName::from_static("cross-origin-resource-policy"),
+            HeaderValue::from_static("same-origin"),
+        );
+    }
+
     resp
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SecurityMode {
+    public: bool,
+    csp_report_only: bool,
+}
+
+impl SecurityMode {
+    fn from_env() -> Self {
+        Self {
+            public: std::env::var("WFB_PUBLIC").as_deref() == Ok("1"),
+            csp_report_only: std::env::var("WFB_CSP_REPORT_ONLY").as_deref() == Ok("1"),
+        }
+    }
+}
+
+fn security_mode() -> &'static SecurityMode {
+    static MODE: OnceLock<SecurityMode> = OnceLock::new();
+    MODE.get_or_init(SecurityMode::from_env)
+}
+
+fn generate_nonce_hex_16() -> String {
+    let mut bytes = [0u8; 16];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    let mut out = String::with_capacity(32);
+    for b in bytes {
+        use std::fmt::Write;
+        let _ = write!(&mut out, "{:02x}", b);
+    }
+    out
+}
+
+fn request_is_https<B>(req: &Request<B>) -> bool {
+    if req.uri().scheme_str() == Some("https") {
+        return true;
+    }
+
+    // Common reverse proxy header.
+    if let Some(v) = req.headers().get("x-forwarded-proto") {
+        if let Ok(s) = v.to_str() {
+            // Can be a comma-separated list (client, proxy1, proxy2).
+            if s.split(',').any(|p| p.trim().eq_ignore_ascii_case("https")) {
+                return true;
+            }
+        }
+    }
+
+    // RFC 7239 Forwarded: for=...;proto=https;host=...
+    if let Some(v) = req.headers().get("forwarded") {
+        if let Ok(s) = v.to_str() {
+            if s.split(';')
+                .map(|part| part.trim())
+                .any(|part| part.eq_ignore_ascii_case("proto=https"))
+            {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 pub async fn static_cache_control(

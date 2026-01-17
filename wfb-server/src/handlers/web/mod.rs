@@ -7,7 +7,6 @@ mod context;
 mod github;
 mod helpers;
 mod index;
-mod methodology;
 mod render;
 mod types;
 
@@ -17,4 +16,3 @@ pub use github::github_stars_partials_handler;
 pub use index::index_path_handler;
 pub use index::index_update_path_handler;
 pub use index::root_handler;
-pub use methodology::methodology_handler;

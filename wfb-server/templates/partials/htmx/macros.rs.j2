@@ -1,0 +1,48 @@
+{# Askama macros for HTMX wiring. Prefer these over string filters / |safe. #}
+
+{% macro wfb_results_root_attrs() %}id="wfb-results"{% endmacro %}
+{% macro bench_charts_root_attrs() %}id="bench-charts"{% endmacro %}
+
+{% macro wfb_results_link_attrs(partials_url, push_url) %}
+ hx-get="{{ partials_url }}"
+ hx-target="#wfb-results"
+ hx-select="#wfb-results"
+ hx-swap="outerHTML"
+ hx-push-url="{{ push_url }}"
+{% endmacro %}
+
+{#
+	High-level helper for index/results navigation.
+	Keeps href / hx-get / hx-push-url consistent (no accidental mismatch).
+#}
+{% macro wfb_results_anchor_attrs(run_id, env, test) %}
+ href="{{ routes.index_url(run_id, env, test) }}"
+ hx-get="{{ routes.index_partials_url(run_id, env, test) }}"
+ hx-target="#wfb-results"
+ hx-select="#wfb-results"
+ hx-swap="outerHTML"
+ hx-push-url="{{ routes.index_url(run_id, env, test) }}"
+{% endmacro %}
+
+{#
+	Lazy-load bench charts into the #bench-charts container.
+	The response renders a container with the same id.
+#}
+{% macro bench_charts_lazy_attrs(run_id, env, test, framework) %}
+ id="bench-charts"
+ hx-get="{{ routes.bench_charts_partials_url(run_id, env, test, framework) }}"
+ hx-trigger="revealed"
+ hx-target="this"
+ hx-select="#bench-charts"
+ hx-swap="outerHTML"
+{% endmacro %}
+
+{% macro oob_chrome() %}
+{#
+	HTMX OOB chrome updates.
+	Contract: any partial response may include these; they will be swapped OOB.
+#}
+{% include "components/header.rs.j2" %}
+{% include "components/sidebar.rs.j2" %}
+{% include "components/footer.rs.j2" %}
+{% endmacro %}

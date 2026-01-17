@@ -1,0 +1,60 @@
+{% extends "layouts/base.rs.j2" %}
+
+{% block title %}Methodology{% endblock %}
+
+{% block content %}
+<main class="flex-1 min-h-0 overflow-auto">
+    <div class="max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-8">
+        <div class="space-y-2">
+            <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Methodology</h1>
+            <p class="text-sm md:text-base text-muted-foreground">
+                How WFB runs benchmarks, what is validated, and how to interpret the charts.
+            </p>
+        </div>
+
+        <div class="wfb-card wfb-card-body space-y-4">
+            <h2 class="text-lg font-semibold">What WFB Optimizes For</h2>
+            <ul class="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                <li>Production-like workloads (JSON parsing/aggregation, DB access, static file semantics, gRPC).</li>
+                <li>Correctness under load: scenarios validate responses on every request.</li>
+                <li>Transparent, reproducible runs with versioned configs and Docker images.</li>
+            </ul>
+        </div>
+
+        <div class="wfb-card wfb-card-body space-y-4">
+            <h2 class="text-lg font-semibold">Key Parameters (Current Defaults)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div class="wfb-surface">
+                    <div class="text-muted-foreground">Warmup</div>
+                    <div class="font-semibold">30s @ 8 connections</div>
+                </div>
+                <div class="wfb-surface">
+                    <div class="text-muted-foreground">Measurement</div>
+                    <div class="font-semibold">240s per test case</div>
+                </div>
+                <div class="wfb-surface">
+                    <div class="text-muted-foreground">Load Shape</div>
+                    <div class="font-semibold">Step load (20s per step)</div>
+                </div>
+                <div class="wfb-surface">
+                    <div class="text-muted-foreground">Latency</div>
+                    <div class="font-semibold">HDRHistogram percentiles (us)</div>
+                </div>
+            </div>
+            <p class="text-xs text-muted-foreground">
+                For the authoritative definitions, scripts, and up-to-date constants, see the repository docs.
+            </p>
+        </div>
+
+        <div class="wfb-card wfb-card-body space-y-3">
+            <h2 class="text-lg font-semibold">Links</h2>
+            <div class="flex flex-col gap-2 text-sm">
+                <a class="text-primary hover:underline" href="https://github.com/nogcio/web-framework-benchmark/blob/main/docs/METHODOLOGY.md" target="_blank" rel="noreferrer">docs/METHODOLOGY.md</a>
+                <a class="text-primary hover:underline" href="https://github.com/nogcio/web-framework-benchmark/blob/main/docs/FAQ.md" target="_blank" rel="noreferrer">docs/FAQ.md</a>
+                <a class="text-primary hover:underline" href="https://github.com/nogcio/web-framework-benchmark/blob/main/docs/specs" target="_blank" rel="noreferrer">docs/specs</a>
+                <a class="text-primary hover:underline" href="https://github.com/nogcio/web-framework-benchmark/blob/main/scripts" target="_blank" rel="noreferrer">scripts (load validation)</a>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

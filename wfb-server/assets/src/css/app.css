@@ -119,6 +119,350 @@
     .wfb-only-lg-flex {
         @apply hidden lg:flex;
     }
+
+    /*
+      Component primitives
+      Keep these minimal + reusable; utilities can still override specifics.
+    */
+
+    .wfb-card {
+        @apply rounded-lg border border-border bg-card;
+    }
+
+    .wfb-card-body {
+        @apply p-5;
+    }
+
+    .wfb-surface {
+        @apply rounded-md border border-border bg-background p-4;
+    }
+
+    .wfb-stat {
+        @apply rounded-lg border border-border bg-background px-3 py-2;
+    }
+
+    .wfb-chrome {
+        @apply sticky z-50 backdrop-blur bg-background;
+    }
+
+    .wfb-chrome-header {
+        @apply top-0 border-b border-border;
+    }
+
+    .wfb-chrome-footer {
+        @apply bottom-0 border-t border-border;
+    }
+
+    .wfb-popover {
+        @apply rounded-md border border-border bg-background backdrop-blur px-3 py-2 text-xs shadow-lg space-y-2;
+    }
+
+    .wfb-empty {
+        @apply flex-1 flex items-center justify-center px-6 py-12 text-sm text-muted-foreground
+        border border-dashed border-border rounded-xl mx-6 my-8;
+    }
+
+    .wfb-nav-item {
+        @apply relative flex flex-col items-start w-full rounded-lg border px-3 py-2 text-left transition-all;
+    }
+
+    .wfb-nav-item-active {
+        @apply border-primary bg-accent text-foreground;
+    }
+
+    .wfb-nav-item-inactive {
+        @apply border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+    }
+
+    .wfb-nav-dot {
+        @apply inline-flex h-2 w-2 rounded-full;
+    }
+
+    .wfb-nav-dot-active {
+        @apply bg-primary;
+    }
+
+    .wfb-nav-dot-inactive {
+        @apply bg-muted-foreground group-hover:bg-foreground;
+    }
+
+    .wfb-nav-meta {
+        @apply text-[10px] text-muted-foreground mt-1;
+    }
+
+    .wfb-tag {
+        @apply inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[9px] leading-none
+        font-semibold text-muted-foreground;
+    }
+
+    .wfb-tag-uppercase {
+        @apply uppercase tracking-wide;
+    }
+
+    /*
+      uPlot
+      Keep styling minimal and theme-aligned.
+    */
+
+    [data-wfb-bench-chart] .uplot {
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
+        color: var(--foreground);
+        max-width: 100%;
+        width: 100% !important;
+    }
+
+    /* uPlot's base layout CSS (trimmed from upstream dist) */
+    [data-wfb-bench-chart] .uplot,
+    [data-wfb-bench-chart] .uplot *,
+    [data-wfb-bench-chart] .uplot *::before,
+    [data-wfb-bench-chart] .uplot *::after {
+        box-sizing: border-box;
+    }
+
+    [data-wfb-bench-chart] .u-wrap {
+        position: relative;
+        user-select: none;
+    }
+
+    [data-wfb-bench-chart] .u-over,
+    [data-wfb-bench-chart] .u-under {
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+
+    [data-wfb-bench-chart] .u-under {
+        overflow: hidden;
+    }
+
+    [data-wfb-bench-chart] .uplot canvas {
+        display: block;
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    [data-wfb-bench-chart] .u-axis {
+        position: absolute;
+        pointer-events: none;
+    }
+
+    [data-wfb-bench-chart] .u-select {
+        background: color-mix(in oklab, var(--foreground) 7%, transparent);
+        position: absolute;
+        pointer-events: none;
+    }
+
+    [data-wfb-bench-chart] .u-cursor-x,
+    [data-wfb-bench-chart] .u-cursor-y {
+        position: absolute;
+        left: 0;
+        top: 0;
+        pointer-events: none;
+        will-change: transform;
+        z-index: 100;
+    }
+
+    [data-wfb-bench-chart] .u-axis.u-off,
+    [data-wfb-bench-chart] .u-select.u-off,
+    [data-wfb-bench-chart] .u-cursor-x.u-off,
+    [data-wfb-bench-chart] .u-cursor-y.u-off,
+    [data-wfb-bench-chart] .u-cursor-pt.u-off {
+        display: none;
+    }
+
+    [data-wfb-bench-chart] .u-title {
+        color: var(--foreground);
+    }
+
+    [data-wfb-bench-chart] .u-axis,
+    [data-wfb-bench-chart] .u-select {
+        color: var(--muted-foreground);
+    }
+
+    [data-wfb-bench-chart] .u-cursor-x,
+    [data-wfb-bench-chart] .u-cursor-y {
+        background: color-mix(in oklab, var(--muted-foreground) 35%, transparent) !important;
+    }
+
+    /* Cursor point markers (highlight nearest point under cursor) */
+    [data-wfb-bench-chart] .u-cursor-pt {
+        border-radius: 9999px;
+        opacity: 0.95;
+    }
+
+    .wfb-chart-tooltip {
+        position: absolute;
+        z-index: 200;
+        pointer-events: none;
+        min-width: 140px;
+        max-width: 240px;
+        padding: 8px 10px;
+
+        /* Tailwind ("twinland") glass style: needs translucency + blur */
+        @apply rounded-md border text-xs shadow-lg backdrop-blur-md
+        bg-white/70 border-white/25
+        dark:bg-black/40 dark:border-white/10;
+
+        /* Keep text theme-aligned even on white/black glass */
+        color: var(--foreground);
+    }
+
+    .wfb-chart-tooltip-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--foreground);
+        margin-bottom: 6px;
+    }
+
+    .wfb-chart-tooltip-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--muted-foreground);
+        line-height: 1.2;
+        margin: 3px 0;
+    }
+
+    .wfb-chart-tooltip-swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 9999px;
+        border: 1px solid var(--border);
+        flex: 0 0 auto;
+    }
+
+    .wfb-chart-tooltip-label {
+        flex: 0 0 auto;
+    }
+
+    .wfb-chart-tooltip-value {
+        color: var(--foreground);
+        font-weight: 600;
+        margin-left: auto;
+        text-align: right;
+        white-space: nowrap;
+    }
+
+
+    .wfb-tab {
+        @apply px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ease-in-out
+        flex items-center space-x-2;
+    }
+
+    .wfb-tab-active {
+        @apply bg-accent text-accent-foreground;
+    }
+
+    .wfb-tab-inactive {
+        @apply text-muted-foreground hover:text-foreground hover:bg-accent;
+    }
+
+    .wfb-btn {
+        @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-background
+        font-semibold text-foreground shadow-sm transition-all
+        hover:bg-accent hover:text-accent-foreground
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    }
+
+    .wfb-btn-md {
+        @apply h-9 px-3 text-sm;
+    }
+
+    .wfb-btn-sm {
+        @apply h-8 px-3 text-sm;
+    }
+
+    .wfb-btn-xs {
+        @apply px-2.5 py-1 text-xs;
+    }
+
+    .wfb-btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground
+        font-semibold shadow-sm transition hover:opacity-90;
+    }
+
+    .wfb-summary {
+        @apply list-none cursor-pointer [&::-webkit-details-marker]:hidden;
+    }
+
+    .wfb-menu-panel {
+        @apply absolute mt-2 rounded-md border border-border bg-popover text-popover-foreground
+        shadow-xl ring-1 ring-black/5 z-50;
+    }
+
+    .wfb-menu-list {
+        @apply p-1;
+    }
+
+    .wfb-menu-item {
+        @apply flex items-center rounded-md px-3 py-2 font-medium transition;
+    }
+
+    .wfb-menu-item-active {
+        @apply bg-accent text-accent-foreground;
+    }
+
+    .wfb-menu-item-inactive {
+        @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+    }
+
+    .wfb-tooltip-panel {
+        @apply pointer-events-auto absolute top-full mt-2 rounded-md border border-border bg-popover text-popover-foreground
+        shadow-xl ring-1 ring-black/5 hidden z-40;
+    }
+
+    .group:hover .wfb-tooltip-panel {
+        @apply block;
+    }
+
+    details[open] .wfb-tooltip-panel {
+        display: none;
+    }
+
+    /* External link indicator (site-wide)
+       Applies to normal links that open a new tab.
+       Excludes button-styled links.
+    */
+    a[target="_blank"]:not(.wfb-btn)::after {
+        content: "";
+        display: inline-block;
+        width: 0.9em;
+        height: 0.9em;
+        margin-left: 0.15em;
+        vertical-align: -0.1em;
+        background-color: currentColor;
+        -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20fill='black'%20d='M14%203h7v7h-2V6.41l-9.29%209.3-1.42-1.42%209.3-9.29H14V3z'/%3E%3Cpath%20fill='black'%20d='M5%205h6v2H7v10h10v-4h2v6H5V5z'/%3E%3C/svg%3E");
+        mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20fill='black'%20d='M14%203h7v7h-2V6.41l-9.29%209.3-1.42-1.42%209.3-9.29H14V3z'/%3E%3Cpath%20fill='black'%20d='M5%205h6v2H7v10h10v-4h2v6H5V5z'/%3E%3C/svg%3E");
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        opacity: 0.8;
+    }
+
+    .wfb-badge {
+        @apply inline-flex items-center rounded-full border border-border px-2 py-1 text-[10px] font-semibold text-muted-foreground;
+    }
+
+    .wfb-table {
+        @apply w-full text-xs text-left border-separate border-spacing-0;
+    }
+
+    .wfb-table-head {
+        @apply sticky top-0 z-20 bg-background backdrop-blur supports-[backdrop-filter]:bg-background;
+    }
+
+    .wfb-table-head-row {
+        @apply border-b-2 border-primary text-[10px] uppercase tracking-wide text-muted-foreground;
+    }
+
+    .wfb-table-th {
+        @apply h-8 font-medium;
+    }
 }
 
 /* HTMX Indicator */

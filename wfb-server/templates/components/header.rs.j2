@@ -1,0 +1,29 @@
+{% import "partials/ui/macros.rs.j2" as ui %}
+
+<header id="wfb-header" hx-swap-oob="true" class="wfb-chrome wfb-chrome-header" data-wfb-component="header">
+    <div class="px-4 md:px-6 py-3 flex flex-col gap-3">
+        <div class="flex items-center gap-4">
+            {% include "components/header/brand.rs.j2" %}
+
+            {% if chrome.show_header_controls %}
+            <div class="hidden md:flex flex-1 justify-center">
+                {% include "components/header/test-nav.rs.j2" %}
+            </div>
+
+            <div class="flex items-center gap-3 ml-auto">
+                {% include "components/header/env-switcher.rs.j2" %}
+                {% include "components/header/github-link.rs.j2" %}
+            </div>
+            {% else %}
+            <div class="flex items-center gap-3 ml-auto">
+                <a href="{{ routes.index_url(selection.active_run_id, selection.active_env, selection.active_test) }}"
+                    class="wfb-btn px-3 py-2 text-xs">
+                    {{ ui::icon("arrow-left", "h-4 w-4") }}
+                    Back to results
+                </a>
+                {% include "components/header/github-link.rs.j2" %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</header>

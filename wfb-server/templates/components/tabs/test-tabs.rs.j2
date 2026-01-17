@@ -1,0 +1,26 @@
+{% import "partials/ui/macros.rs.j2" as ui %}
+{% import "partials/htmx/macros.rs.j2" as htmx %}
+
+{#
+  Props (implicit via context):
+  - selection: SelectionContext
+  - variant: "header" (optional; default header)
+
+  Notes:
+  - This is a desktop-only component (wfb-tab classes assume the header layout).
+#}
+
+{% set v = variant|default("header") %}
+
+{% if v == "header" && selection.tests.len() > 0 %}
+<nav class="hidden md:flex items-center space-x-1 ml-4" id="test-nav" data-wfb-component="test-tabs">
+  {% for test in selection.tests %}
+    <a {{ htmx::wfb_results_anchor_attrs(selection.active_run_id, selection.active_env, test.id) }}
+       class="wfb-tab {% if test.id == selection.active_test %}wfb-tab-active{% else %}wfb-tab-inactive{% endif %}"
+       hx-boost="false">
+      {{ ui::icon(test.icon, "h-4 w-4") }}
+      <span>{{ test.name }}</span>
+    </a>
+  {% endfor %}
+</nav>
+{% endif %}

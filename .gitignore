@@ -10,7 +10,6 @@ Session.vim
 .cproject
 .idea
 *.iml
-.vscode
 .project
 .vim/
 .helix/
@@ -67,3 +66,10 @@ benchmarks_data/*.bin
 /config/environments/*.secret.yaml
 
 wfb-server/assets/dist/
+
+## VS Code (workspace-shared)
+# We commit curated workspace settings/tasks/extensions.
+# Keep local/private overrides out of git.
+.vscode/*.local.json
+.vscode/*.local
+.vscode/.ropeproject

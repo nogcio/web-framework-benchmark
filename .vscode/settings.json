@@ -1,0 +1,41 @@
+{
+    // Rust
+    "rust-analyzer.checkOnSave": true,
+    "rust-analyzer.check.command": "clippy",
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "editor.formatOnSave": true
+    },
+    "[toml]": {
+        "editor.formatOnSave": true
+    },
+
+    // Keep search/indexing fast in this repo
+    "files.watcherExclude": {
+        "**/target/**": true,
+        "**/data/**": true,
+        "**/benchmarks_data/**": true,
+        "**/wfb-server/assets/dist/**": true
+    },
+    "search.exclude": {
+        "**/target/**": true,
+        "**/data/**": true,
+        "**/benchmarks_data/**": true,
+        "**/wfb-server/assets/dist/**": true
+    },
+
+    "tailwindCSS.experimental.configFile": "wfb-server/tailwind.config.js",
+    "tailwindCSS.includeLanguages": {
+        "jinja-rust": "html"
+    },
+    "tailwindCSS.emmetCompletions": true,
+    "editor.quickSuggestions": {
+        "strings": true
+    },
+    "files.associations": {
+        "app.css": "postcss"
+    },
+    "css.lint.unknownAtRules": "ignore",
+    "scss.lint.unknownAtRules": "ignore",
+    "less.lint.unknownAtRules": "ignore"
+}

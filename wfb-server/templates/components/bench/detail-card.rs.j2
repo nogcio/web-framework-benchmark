@@ -1,0 +1,57 @@
+{% import "partials/ui/macros.rs.j2" as ui %}
+
+{% set active_env = selection.active_env|env(selection.environments) %}
+{% set active_test = selection.active_test|test(selection.tests) %}
+
+<div class="h-full wfb-card rounded-2xl p-5">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="space-y-3">
+            <div class="text-xs uppercase tracking-[0.35em] text-muted-foreground">Benchmark Details</div>
+            <p class="text-xs text-muted-foreground">Run {{ selection.active_run_id }} · {{ active_env.title }} · {{ active_test.name }}</p>
+            <div class="text-xl font-semibold">
+                {{ b.language }} / {{ b.framework }}
+                <span class="text-xs text-muted-foreground">v{{ b.framework_version }}</span>
+            </div>
+            <div class="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                <span>Language v{{ b.language_version }}</span>
+                <span class="text-muted-foreground opacity-60">•</span>
+                <span>Database: <span class="text-foreground">{% if let Some(db) = b.database %}{{ db }}{% else %}none{% endif %}</span></span>
+            </div>
+            <div class="text-xs text-muted-foreground">Path: <span class="text-foreground">{{ b.path }}</span></div>
+            {% if b.tags.len() > 0 %}
+            <div class="pt-1 flex flex-wrap gap-2">
+                {% for tag in b.tags %}
+                <span class="wfb-badge">
+                    {{ tag.0 }}: {{ tag.1 }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% if b.repo_url.is_some() %}
+        <a href="{{ b.repo_url.as_ref().unwrap() }}" target="_blank" rel="noreferrer"
+            class="wfb-btn px-3 py-2 text-xs">
+            {{ ui::icon("github", "h-4 w-4") }}
+            View code
+        </a>
+        {% endif %}
+    </div>
+    <div class="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div class="wfb-stat">
+            <div class="text-muted-foreground">RPS</div>
+            <div class="font-semibold text-foreground">{{ b.rps|format_number }}</div>
+        </div>
+        <div class="wfb-stat">
+            <div class="text-muted-foreground">TPS</div>
+            <div class="font-semibold text-foreground">{{ b.tps|format_throughput }}</div>
+        </div>
+        <div class="wfb-stat">
+            <div class="text-muted-foreground">Latency P99</div>
+            <div class="font-semibold text-foreground">{{ b.latency_p99|format_latency_ms }}</div>
+        </div>
+        <div class="wfb-stat">
+            <div class="text-muted-foreground">Errors</div>
+            <div class="font-semibold text-foreground">{{ b.errors }}</div>
+        </div>
+    </div>
+</div>

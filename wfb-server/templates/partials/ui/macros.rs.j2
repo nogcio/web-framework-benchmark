@@ -1,0 +1,93 @@
+{#
+  Small UI primitives for Askama templates.
+  These macros are intentionally small and are meant to normalize markup.
+  Prefer the call-block (slot) variants below.
+#}
+
+{# --- Call-block ("slot") versions --- #}
+
+{% macro details(component, classes) %}
+<details class="{{ classes }}" data-wfb-component="{{ component }}">
+  {{ caller() }}
+</details>
+{% endmacro %}
+
+{% macro summary(classes) %}
+<summary class="{{ classes }}">{{ caller() }}</summary>
+{% endmacro %}
+
+{% macro menu_panel(side, width, list_classes) %}
+<div class="wfb-menu-panel {{ side }} {{ width }}">
+  <div class="wfb-menu-list {{ list_classes }}">
+    {{ caller() }}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro icon(name, classes) %}{{ name|icon(classes)|safe }}{% endmacro %}
+
+{#
+  Dropdown component.
+
+  Usage:
+  {% call(item) ui::dropdown(
+        component="test-menu",
+        items=selection.tests,
+        active_icon=active_test.icon,
+        active_title=active_test.name,
+        summary_classes="...",
+        panel_side="left-0",
+        panel_width="w-44",
+        list_classes=""
+  ) %}
+      ... render a single menu item using `item` ...
+  {% endcall %}
+#}
+{% macro dropdown(
+    component,
+    items,
+    active_icon,
+    active_title,
+    summary_classes,
+    details_classes="relative",
+    panel_side="left-0",
+    panel_width="w-44",
+    list_classes="",
+    active_icon_classes="h-4 w-4 text-muted-foreground",
+    chevron_classes="h-3.5 w-3.5 text-muted-foreground"
+) %}
+{% set outer_caller = caller %}
+{% call details(component, details_classes) %}
+  {% call summary(summary_classes) %}
+    {{ icon(active_icon, active_icon_classes) }}
+    <span>{{ active_title }}</span>
+    {{ icon("chevron-down", chevron_classes) }}
+  {% endcall %}
+
+  {% call menu_panel(panel_side, panel_width, list_classes) %}
+    {% for item in items %}
+      {{ outer_caller(item) }}
+    {% endfor %}
+  {% endcall %}
+{% endcall %}
+{% endmacro %}
+
+{# --- Small, reusable fragments --- #}
+
+{#
+  GitHub stars counter.
+
+  Notes:
+  - Must return a selectable element because the page root uses hx-select="#wfb-page".
+  - We use hx-target="this" to avoid inheriting global targets.
+#}
+{% macro github_stars_counter(value, trigger, hx_get) %}
+<span
+  id="wfb-github-stars"
+  class="inline-flex justify-end tabular-nums tracking-tight min-w-[1.5ch]"
+  hx-get="{{ hx_get }}"
+  hx-trigger="{{ trigger }}"
+  hx-target="this"
+  hx-select="#wfb-github-stars"
+  hx-swap="outerHTML">{{ value }}</span>
+{% endmacro %}

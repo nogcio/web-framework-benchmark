@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::StatusCode,
     response::Json,
 };
@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use crate::api_models::*;
 use crate::handlers::common;
+use crate::routes;
 use crate::state::AppState;
 
 pub async fn get_version() -> Json<VersionInfo> {
@@ -120,8 +121,9 @@ pub async fn get_runs(State(state): State<Arc<AppState>>) -> Json<Vec<RunSummary
 
 pub async fn get_run_results(
     State(state): State<Arc<AppState>>,
-    Path((run_id, env, test)): Path<(String, String, String)>,
+    params: routes::ApiRunResultsPath,
 ) -> Json<Vec<RunResult>> {
+    let routes::ApiRunResultsPath { run_id, env, test } = params;
     let data = state.storage.data.read().unwrap();
     let mut results = Vec::new();
     if let Some(env_data) = data.get(&run_id).and_then(|run_data| run_data.get(&env)) {
@@ -176,10 +178,16 @@ pub async fn get_run_results(
 
 pub async fn get_run_raw_data(
     State(state): State<Arc<AppState>>,
-    Path((run_id, env, test, framework)): Path<(String, String, String, String)>,
-    Query(params): Query<TranscriptParams>,
+    params: routes::ApiRunRawPath,
+    Query(query_params): Query<TranscriptParams>,
 ) -> Result<Json<Vec<TestCaseRawApi>>, StatusCode> {
-    let lang = if let Some(l) = params.lang {
+    let routes::ApiRunRawPath {
+        run_id,
+        env,
+        test,
+        framework,
+    } = params;
+    let lang = if let Some(l) = query_params.lang {
         l
     } else {
         // Try to find language

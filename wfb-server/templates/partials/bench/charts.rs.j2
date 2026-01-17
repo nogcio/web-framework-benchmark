@@ -1,0 +1,6 @@
+{#
+  Bench charts are loaded lazily via HTMX.
+  This partial embeds downsampled data as JSON; the client renders the chart via uPlot.
+#}
+
+{% include "components/bench/charts.rs.j2" %}

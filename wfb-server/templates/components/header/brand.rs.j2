@@ -1,0 +1,13 @@
+<div class="flex items-center gap-3">
+    <a href="/" aria-label="Go to results index" class="shrink-0">
+        <img src="{{ "/images/logo.svg"|asset_path }}" alt="WFB Logo" class="h-8 w-8 md:h-10 md:w-10 rounded-xl shadow-sm" />
+    </a>
+    <div class="flex flex-col gap-0.5">
+        <h1 class="text-lg md:text-xl font-bold tracking-tight">
+            <a href="/" class="hover:opacity-90 transition-opacity" aria-label="Go to results index">
+                <span>WF</span><span class="text-primary">B</span>
+            </a>
+        </h1>
+        {% include "components/header/mini-nav.rs.j2" %}
+    </div>
+</div>

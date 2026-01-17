@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-background antialiased dark">
+<head>
+    {% include "partials/meta.rs.j2" %}
+    <title>{% block title %}Web Framework Benchmark{% endblock %}</title>
+    {% include "partials/head-assets.rs.j2" %}
+    {% block head %}{% endblock %}
+</head>
+<body
+    class="h-full flex flex-col"
+    hx-boost="true"
+    hx-indicator=".global-progress"
+    hx-target="#wfb-page"
+    hx-select="#wfb-page"
+    hx-swap="outerHTML">
+    <!-- Global Loading Indicator -->
+    <div class="global-progress htmx-indicator fixed top-0 left-0 w-full h-1 z-[100]">
+        <div class="h-full bg-primary animate-indeterminate"></div>
+    </div>
+
+    {% include "components/header.rs.j2" %}
+
+    {% include "components/env-spec-panel.rs.j2" %}
+
+    <div class="flex-1 min-h-0 flex overflow-hidden w-full">
+        {% include "components/sidebar.rs.j2" %}
+
+        <div id="wfb-page" class="flex-1 min-h-0 flex flex-col w-full">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    {% include "components/footer.rs.j2" %}
+</body>
+</html>

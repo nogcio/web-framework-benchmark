@@ -1,24 +1,25 @@
 use anyhow::bail;
-use axum::{Router, routing::get};
+use axum::Router;
 use clap::Parser;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tower_http::cors::CorsLayer;
-use tower_http::services::ServeDir;
 use tracing::info;
 
 use wfb_storage::{Config, Storage};
 
 mod api_models;
+mod assets_manifest;
 mod file_watcher;
 mod filters;
 mod handlers;
+mod middleware;
+mod routes;
 mod state;
 mod view_models;
 
 use file_watcher::{FileChangeEvent, FileWatcherService};
-use handlers::{api, web};
+use routes::build_app;
 use state::AppState;
 
 #[derive(Parser, Debug)]
@@ -98,31 +99,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let app = Router::new()
-        .route("/", get(web::index_handler))
-        .route("/methodology", get(web::methodology_handler))
-        .route("/bench", get(web::bench_handler))
-        .route("/api/tags", get(api::get_tags))
-        .route("/api/environments", get(api::get_environments))
-        .route("/api/tests", get(api::get_tests))
-        .route("/api/languages", get(api::get_languages))
-        .route("/api/frameworks", get(api::get_frameworks))
-        .route("/api/benchmarks", get(api::get_benchmarks))
-        .route("/api/runs", get(api::get_runs))
-        .route("/api/version", get(api::get_version))
-        .route(
-            "/api/runs/{run_id}/environments/{env}/tests/{test}",
-            get(api::get_run_results),
-        )
-        .route(
-            "/api/runs/{run_id}/environments/{env}/tests/{test}/frameworks/{framework}/raw",
-            get(api::get_run_raw_data),
-        )
-        .with_state(state)
-        .layer(CorsLayer::permissive());
-
-    let app =
-        app.fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(false));
+    let app: Router = build_app(state, assets_dir);
 
     let addr = format!("{}:{}", args.host, args.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;

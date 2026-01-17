@@ -1,0 +1,35 @@
+{% extends "layouts/base.rs.j2" %}
+
+{% import "partials/htmx/macros.rs.j2" as htmx %}
+
+{% block title %}Benchmark Details{% endblock %}
+
+{% block head %}
+{% endblock %}
+
+{% block content %}
+<main class="flex-1 min-h-0 overflow-auto" data-wfb-component="bench-page">
+    <div class="px-4 md:px-6 py-6 space-y-6">
+        {% if bench.is_none() %}
+        {% include "components/bench/empty.rs.j2" %}
+        {% else %}
+        {% set b = bench.as_ref().unwrap() %}
+
+        <div id="bench-detail"
+            data-run="{{ b.run_id }}"
+            data-env="{{ b.env }}"
+            data-test="{{ b.test }}"
+            data-framework="{{ b.framework }}"
+            data-primary-label="{{ b.language }} / {{ b.framework }}"
+            class="space-y-6">
+            {% include "components/bench/detail-card.rs.j2" %}
+
+            <div {{ htmx::bench_charts_lazy_attrs(b.run_id, b.env, b.test, b.framework) }}
+                class="wfb-card px-4 py-4 text-xs text-muted-foreground">
+                Loading charts…
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}

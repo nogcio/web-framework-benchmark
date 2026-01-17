@@ -1,0 +1,47 @@
+{#
+  Environment spec panel.
+
+  Props (implicit via context):
+  - selection: SelectionContext
+
+  Notes:
+  - Uses hx-swap-oob so it updates on HTMX navigation.
+  - Render the element always (hidden when no spec) so OOB swaps can clear it.
+#}
+
+{% set active_env = selection.active_env|env(selection.environments) %}
+
+<aside
+  id="wfb-env-spec"
+  data-wfb-env-spec-panel
+  data-wfb-env-spec-storage-key="wfb.envSpecPanel.closed:{{ active_env.name }}"
+  data-wfb-env-spec-has-spec="{% if active_env.spec.is_some() %}1{% else %}0{% endif %}"
+  hx-swap-oob="true"
+  class="fixed right-4 bottom-16 z-40 hidden xl:block w-[28rem] max-w-[calc(100vw-2rem)] max-h-[50vh] overflow-auto wfb-popover {% if active_env.spec.is_none() %}hidden{% endif %}">
+  {% if let Some(spec) = active_env.spec %}
+    <div class="flex items-start justify-between gap-3">
+      <div class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Environment spec</div>
+      <button
+        type="button"
+        class="wfb-btn wfb-btn-xs border-transparent bg-transparent shadow-none text-muted-foreground hover:text-foreground"
+        data-wfb-env-spec-close
+        aria-label="Close environment spec panel">
+        &times;
+      </button>
+    </div>
+    <pre class="mt-2 whitespace-pre-wrap text-xs leading-5 text-foreground opacity-90">{{ spec }}</pre>
+  {% endif %}
+</aside>
+
+<button
+  id="wfb-env-spec-open"
+  type="button"
+  hx-swap-oob="true"
+  class="fixed right-4 bottom-16 z-40 hidden xl:block wfb-btn bg-popover text-foreground shadow-xl ring-1 ring-black/5 rounded-full h-9 w-9 p-0"
+  data-wfb-env-spec-open
+  data-wfb-env-spec-storage-key="wfb.envSpecPanel.closed:{{ active_env.name }}"
+  data-wfb-env-spec-has-spec="{% if active_env.spec.is_some() %}1{% else %}0{% endif %}"
+  aria-label="Show environment spec panel"
+  title="Show environment spec">
+  <span class="text-sm font-bold leading-none">?</span>
+</button>

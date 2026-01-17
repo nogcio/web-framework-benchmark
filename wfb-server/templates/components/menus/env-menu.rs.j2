@@ -1,0 +1,50 @@
+{% import "partials/htmx/macros.rs.j2" as htmx %}
+{% import "partials/ui/macros.rs.j2" as ui %}
+
+{#
+  Props (implicit via context):
+  - selection: SelectionContext
+  - variant: "header" | "mobile" (optional; default header)
+#}
+
+{% set v = variant|default("header") %}
+{% set active_env = selection.active_env|env(selection.environments) %}
+
+{% if v == "header" %}
+	{% call(env) ui::dropdown(
+		component="env-menu",
+		items=selection.environments,
+		active_icon=active_env.icon,
+		active_title=active_env.title,
+		summary_classes="wfb-summary wfb-btn wfb-btn-md",
+		details_classes="hidden md:block relative",
+		panel_side="right-0",
+		panel_width="w-60",
+		list_classes="",
+		chevron_classes="h-4 w-4 text-muted-foreground"
+	) %}
+		<a {{ htmx::wfb_results_anchor_attrs(selection.active_run_id, env.name, selection.active_test) }}
+			class="wfb-menu-item gap-3 text-sm {% if selection.active_env.as_str() == env.name.as_str() %}wfb-menu-item-active{% else %}wfb-menu-item-inactive{% endif %}">
+			{{ ui::icon(env.icon, "h-4 w-4") }}
+			<span class="truncate">{{ env.title }}</span>
+		</a>
+	{% endcall %}
+{% else %}
+	{% call(env) ui::dropdown(
+		component="env-menu",
+		items=selection.environments,
+		active_icon=active_env.icon,
+		active_title=active_env.title,
+		summary_classes="wfb-summary wfb-btn wfb-btn-xs",
+		panel_side="left-0",
+		panel_width="w-52",
+		list_classes="",
+		chevron_classes="h-3.5 w-3.5 text-muted-foreground"
+	) %}
+		<a {{ htmx::wfb_results_anchor_attrs(selection.active_run_id, env.name, selection.active_test) }}
+			class="wfb-menu-item gap-2 text-xs {% if selection.active_env.as_str() == env.name.as_str() %}wfb-menu-item-active{% else %}wfb-menu-item-inactive{% endif %}">
+			{{ ui::icon(env.icon, "h-4 w-4") }}
+			<span class="truncate">{{ env.title }}</span>
+		</a>
+	{% endcall %}
+{% endif %}

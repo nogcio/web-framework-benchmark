@@ -1,0 +1,13 @@
+{#
+  GitHub stars counter fragment.
+
+  Rendered via HTMX from /partials/github/stars.
+  Must return a selectable element because the <body> uses hx-select="#wfb-page".
+
+  Props (implicit via context):
+  - value: String
+#}
+
+{% import "partials/ui/macros.rs.j2" as ui %}
+
+{{ ui::github_stars_counter(value=value, trigger="every 10m", hx_get="/partials/github/stars") }}

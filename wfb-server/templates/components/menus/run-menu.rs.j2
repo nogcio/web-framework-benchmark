@@ -1,0 +1,32 @@
+{% import "partials/htmx/macros.rs.j2" as htmx %}
+{% import "partials/ui/macros.rs.j2" as ui %}
+
+{#
+  Props (implicit via context):
+  - selection: SelectionContext
+  - variant: "mobile" (optional; default mobile)
+#}
+
+{% set v = variant|default("mobile") %}
+{% set active_run = selection.active_run_id|run(selection.runs) %}
+
+{% if v == "mobile" %}
+
+{% call(run) ui::dropdown(
+  component="run-menu",
+  items=selection.runs,
+  active_icon="activity",
+  active_title="Run " ~ active_run.id,
+  summary_classes="wfb-summary wfb-btn wfb-btn-xs",
+  panel_side="left-0",
+  panel_width="w-44",
+  list_classes="max-h-64 overflow-y-auto",
+  chevron_classes="h-3.5 w-3.5 text-muted-foreground"
+) %}
+	<a {{ htmx::wfb_results_anchor_attrs(run.id, selection.active_env, selection.active_test) }}
+		class="wfb-menu-item justify-between gap-2 text-xs {% if active_run.id.as_str() == run.id.as_str() %}wfb-menu-item-active{% else %}wfb-menu-item-inactive{% endif %}">
+		<span>Run {{ run.id }}</span>
+    <span class="text-[9px] text-muted-foreground opacity-80">{{ run.created_at|format_datetime("%b %d, %Y") }}</span>
+	</a>
+{% endcall %}
+{% endif %}

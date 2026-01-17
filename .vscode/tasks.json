@@ -1,0 +1,99 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "benchmark_slug",
+      "type": "promptString",
+      "description": "Benchmark slug to verify (e.g. rust/axum, go/gin, javascript/fastify)",
+      "default": "rust/axum"
+    },
+    {
+      "id": "env_name",
+      "type": "promptString",
+      "description": "Environment name from config/environments (e.g. local)",
+      "default": "local"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "cargo: check (wfb-server)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["check", "-p", "wfb-server"],
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "cargo: check (wfb-runner)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["check", "-p", "wfb-runner"],
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "cargo: test (wfb-server)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["test", "-p", "wfb-server"],
+      "group": "test",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "cargo: test (wfb-runner)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["test", "-p", "wfb-runner"],
+      "group": "test",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "cargo: test (workspace)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["test", "--workspace"],
+      "group": "test",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "cargo: fmt (workspace)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["fmt", "--all"],
+      "problemMatcher": []
+    },
+    {
+      "label": "cargo: clippy (workspace, deny warnings)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["clippy", "--all-targets", "--", "-D", "warnings"],
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "verify: single benchmark (local)",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "--bin",
+        "wfb-runner",
+        "--",
+        "verify",
+        "--benchmark",
+        "${input:benchmark_slug}",
+        "--env",
+        "${input:env_name}"
+      ],
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "run: wfb-server (release)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["run", "--release", "--bin", "wfb-server"],
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

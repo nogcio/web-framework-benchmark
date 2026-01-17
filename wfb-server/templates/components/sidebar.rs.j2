@@ -1,0 +1,19 @@
+{% import "partials/htmx/macros.rs.j2" as htmx %}
+<aside id="wfb-sidebar" hx-swap-oob="true" class="{% if !chrome.show_header_controls %}hidden {% endif %}wfb-only-desktop-flex flex-col shrink-0 w-36 border-r border-border bg-transparent px-2 py-3" data-wfb-component="sidebar">
+    <div class="px-1.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        Runs
+    </div>
+    <div class="flex-1 overflow-y-auto pr-1 space-y-2">
+        {% for run in selection.runs %}
+            {% set is_active = selection.active_run_id.as_str() == run.id.as_str() %}
+            <a {{ htmx::wfb_results_anchor_attrs(run.id, selection.active_env, selection.active_test) }}
+                class="group wfb-nav-item {% if is_active %}wfb-nav-item-active shadow-[0_10px_20px_-14px_rgba(37,99,235,0.6)]{% else %}wfb-nav-item-inactive{% endif %}">
+                <div class="flex items-center gap-2">
+                    <span class="wfb-nav-dot {% if is_active %}wfb-nav-dot-active shadow-[0_0_0_3px_rgba(59,130,246,0.2)]{% else %}wfb-nav-dot-inactive{% endif %}"></span>
+                    <span class="text-sm leading-tight font-semibold">Run {{ run.id }}</span>
+                </div>
+                <span class="wfb-nav-meta">{{ run.created_at|format_datetime("%b %d, %Y") }}</span>
+            </a>
+        {% endfor %}
+    </div>
+</aside>

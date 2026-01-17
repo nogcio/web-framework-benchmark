@@ -1,0 +1,9 @@
+{% import "partials/htmx/macros.rs.j2" as htmx %}
+<div class="border-b border-border bg-background wfb-only-mobile" data-wfb-component="toolbar">
+	<div class="px-4 md:px-6 py-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+		{% set variant = "mobile" %}
+		{% include "components/menus/run-menu.rs.j2" %}
+		{% include "components/menus/env-menu.rs.j2" %}
+		{% include "components/menus/test-menu.rs.j2" %}
+	</div>
+</div>

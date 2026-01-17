@@ -1,0 +1,13 @@
+{% import "partials/ui/macros.rs.j2" as ui %}
+
+<a href="{{ chrome.repository_url }}"
+    class="wfb-btn wfb-btn-sm"
+    target="_blank" rel="noreferrer" hx-boost="false">
+    <span class="ml-1 flex items-center gap-1 text-muted-foreground">
+        <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="12 2 15 9 22 9 17 14 19 21 12 17 5 21 7 14 2 9 9 9" />
+        </svg>
+        {{ ui::github_stars_counter(value=chrome.github_stars, trigger="every 10m", hx_get=routes.github_stars_url()) }}
+    </span>
+</a>

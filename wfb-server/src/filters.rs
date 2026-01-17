@@ -1,48 +1,84 @@
-use askama::{Result as AskamaResult, Values};
+use askama::{Error as AskamaError, Result as AskamaResult, Values};
 use std::borrow::Borrow;
+use std::error::Error;
+use std::fmt;
 
-use crate::view_models::{EnvironmentView, TestView};
+use crate::assets_manifest;
+use crate::view_models::{EnvironmentView, RunView, TestView};
 
 #[askama::filter_fn]
-pub fn env_title(
-    active_env: impl std::fmt::Display,
+pub fn format_run_date(
+    value: &chrono::DateTime<chrono::Utc>,
     _env: &dyn Values,
-    environments: &[EnvironmentView],
 ) -> AskamaResult<String> {
-    let active_env = active_env.to_string();
-    Ok(environments
-        .iter()
-        .find(|env| env.name == active_env)
-        .map(|env| env.title.clone())
-        .unwrap_or(active_env))
+    Ok(format_datetime_inner(value, "%b %d, %Y"))
 }
 
 #[askama::filter_fn]
-pub fn env_icon(
-    active_env: impl std::fmt::Display,
+pub fn format_datetime(
+    value: &chrono::DateTime<chrono::Utc>,
     _env: &dyn Values,
-    environments: &[EnvironmentView],
+    fmt: &str,
 ) -> AskamaResult<String> {
-    let active_env = active_env.to_string();
-    Ok(environments
-        .iter()
-        .find(|env| env.name == active_env)
-        .map(|env| env.icon.clone())
-        .unwrap_or_else(|| "laptop".to_string()))
+    Ok(format_datetime_inner(value, fmt))
+}
+
+fn format_datetime_inner(value: &chrono::DateTime<chrono::Utc>, fmt: &str) -> String {
+    value.format(fmt).to_string()
 }
 
 #[askama::filter_fn]
-pub fn env_spec(
+pub fn env(
     active_env: impl std::fmt::Display,
     _env: &dyn Values,
     environments: &[EnvironmentView],
-) -> AskamaResult<String> {
+) -> AskamaResult<EnvironmentView> {
     let active_env = active_env.to_string();
     Ok(environments
         .iter()
         .find(|env| env.name == active_env)
-        .and_then(|env| env.spec.clone())
-        .unwrap_or_default())
+        .cloned()
+        .unwrap_or(EnvironmentView {
+            name: active_env.clone(),
+            title: active_env,
+            icon: "laptop".to_string(),
+            spec: None,
+        }))
+}
+
+#[askama::filter_fn]
+pub fn test(
+    active_test: impl std::fmt::Display,
+    _env: &dyn Values,
+    tests: &[TestView],
+) -> AskamaResult<TestView> {
+    let active_test = active_test.to_string();
+    Ok(tests
+        .iter()
+        .find(|test| test.id == active_test)
+        .cloned()
+        .unwrap_or(TestView {
+            id: active_test.clone(),
+            name: active_test,
+            icon: "flask-conical".to_string(),
+        }))
+}
+
+#[askama::filter_fn]
+pub fn run(
+    active_run_id: impl std::fmt::Display,
+    _env: &dyn Values,
+    runs: &[RunView],
+) -> AskamaResult<RunView> {
+    let active_run_id = active_run_id.to_string();
+    Ok(runs
+        .iter()
+        .find(|run| run.id == active_run_id)
+        .cloned()
+        .unwrap_or(RunView {
+            id: active_run_id,
+            created_at: chrono::Utc::now(),
+        }))
 }
 
 #[askama::filter_fn]
@@ -88,47 +124,40 @@ pub fn soften_color(value: impl std::fmt::Display, _env: &dyn Values) -> AskamaR
 }
 
 #[askama::filter_fn]
-pub fn test_name(
-    active_test: impl std::fmt::Display,
-    _env: &dyn Values,
-    tests: &[TestView],
-) -> AskamaResult<String> {
-    let active_test = active_test.to_string();
-    Ok(tests
-        .iter()
-        .find(|test| test.id == active_test)
-        .map(|test| test.name.clone())
-        .unwrap_or(active_test))
-}
+pub fn asset_path(url: &str, _env: &dyn Values) -> AskamaResult<String> {
+    let trimmed = url.trim();
+    let key = trimmed.trim_start_matches('/');
 
-#[askama::filter_fn]
-pub fn test_icon(
-    active_test: impl std::fmt::Display,
-    _env: &dyn Values,
-    tests: &[TestView],
-) -> AskamaResult<String> {
-    let active_test = active_test.to_string();
-    Ok(tests
-        .iter()
-        .find(|test| test.id == active_test)
-        .map(|test| test.icon.clone())
-        .unwrap_or_else(|| "flask-conical".to_string()))
-}
-
-#[askama::filter_fn]
-pub fn asset(url: &str, _env: &dyn Values, version: &str) -> AskamaResult<String> {
-    Ok(asset_inner(url, version))
-}
-
-fn asset_inner(url: &str, version: &str) -> String {
-    if version.trim().is_empty() {
-        return url.to_string();
+    if let Some(mapped) = assets_manifest::resolve(key) {
+        return Ok(format!("/{}", mapped.trim_start_matches('/')));
     }
 
-    // If URL already has query params, append with '&', otherwise start with '?'.
-    let separator = if url.contains('?') { '&' } else { '?' };
-    format!("{url}{separator}q={version}")
+    Err(AskamaError::Custom(Box::new(MissingAssetError {
+        logical_path: key.to_string(),
+    })))
 }
+
+fn asset_path_inner(url: &str) -> String {
+    let trimmed = url.trim();
+    let key = trimmed.trim_start_matches('/');
+
+    let mapped = assets_manifest::resolve(key)
+        .unwrap_or_else(|| panic!("asset_path missing in manifest: {key}"));
+    format!("/{}", mapped.trim_start_matches('/'))
+}
+
+#[derive(Debug)]
+struct MissingAssetError {
+    logical_path: String,
+}
+
+impl fmt::Display for MissingAssetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "asset_path missing in manifest: {}", self.logical_path)
+    }
+}
+
+impl Error for MissingAssetError {}
 
 fn format_number_inner(value: f64) -> String {
     if !value.is_finite() {
@@ -238,7 +267,7 @@ pub fn icon(name: impl std::fmt::Display, _env: &dyn Values, class: &str) -> Ask
     }
     // Use CSS mask to allow coloring via currentColor (bg-current)
     let base_url = format!("/images/icons/{}.svg", name);
-    let url = asset_inner(&base_url, env!("CARGO_PKG_VERSION"));
+    let url = asset_path_inner(&base_url);
     Ok(format!(
         r#"<span class="inline-block {}" style="background-color: currentColor; -webkit-mask-image: url('{}'); mask-image: url('{}'); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; -webkit-mask-size: contain; mask-size: contain;" aria-hidden="true"></span>"#,
         class, url, url

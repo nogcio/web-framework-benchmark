@@ -1,0 +1,11 @@
+{% import "partials/htmx/macros.rs.j2" as htmx %}
+
+<div {{ htmx::bench_charts_root_attrs() }} class="wfb-card px-4 py-4 space-y-3">
+    <div class="text-xs uppercase tracking-[0.35em] text-muted-foreground">Charts</div>
+
+    <div data-wfb-bench-chart class="w-full">
+        <div data-wfb-chart-root class="w-full h-64"></div>
+        <div data-wfb-chart-legend class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground"></div>
+        <script type="application/json" data-wfb-chart-data>{{ chart_data|json|safe }}</script>
+    </div>
+</div>

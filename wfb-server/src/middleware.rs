@@ -131,25 +131,22 @@ fn request_is_https<B>(req: &Request<B>) -> bool {
     }
 
     // Common reverse proxy header.
-    if let Some(v) = req.headers().get("x-forwarded-proto") {
-        if let Ok(s) = v.to_str() {
-            // Can be a comma-separated list (client, proxy1, proxy2).
-            if s.split(',').any(|p| p.trim().eq_ignore_ascii_case("https")) {
-                return true;
-            }
+    if let Some(v) = req.headers().get("x-forwarded-proto")
+        && let Ok(s) = v.to_str()
+    {
+        // Can be a comma-separated list (client, proxy1, proxy2).
+        if s.split(',').any(|p| p.trim().eq_ignore_ascii_case("https")) {
+            return true;
         }
     }
 
     // RFC 7239 Forwarded: for=...;proto=https;host=...
-    if let Some(v) = req.headers().get("forwarded") {
-        if let Ok(s) = v.to_str() {
-            if s.split(';')
-                .map(|part| part.trim())
-                .any(|part| part.eq_ignore_ascii_case("proto=https"))
-            {
-                return true;
-            }
-        }
+    if let Some(v) = req.headers().get("forwarded")
+        && let Ok(s) = v.to_str()
+        && s.split(';')
+            .any(|part| part.trim().eq_ignore_ascii_case("proto=https"))
+    {
+        return true;
     }
 
     false

@@ -1,14 +1,14 @@
 use super::render::HtmlTemplate;
 use askama::Template;
-use axum::extract::State;
 use axum::extract::Extension;
+use axum::extract::State;
 use axum::response::IntoResponse;
 use serde::Serialize;
 use std::sync::Arc;
 
+use crate::middleware::CspNonce;
 use crate::routes;
 use crate::state::AppState;
-use crate::middleware::CspNonce;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct BenchChartClientData {

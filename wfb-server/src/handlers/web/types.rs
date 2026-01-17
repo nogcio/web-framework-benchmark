@@ -11,6 +11,7 @@ pub struct ChromeContext {
     pub render_duration: super::render::RenderDuration,
     pub show_header_controls: bool,
     pub repository_url: &'static str,
+    pub page_url: String,
     pub contact_email: &'static str,
     pub github_stars: String,
 }

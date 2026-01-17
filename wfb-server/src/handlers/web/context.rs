@@ -11,12 +11,16 @@ pub fn chrome_context(
     render_started: Instant,
     show_header_controls: bool,
     github_stars: String,
+    page_path: &str,
 ) -> ChromeContext {
+    let page_url = crate::public_url::page_url(page_path);
+
     ChromeContext {
         backend_version: BACKEND_VERSION,
         render_duration: super::render::RenderDuration::new(render_started),
         show_header_controls,
         repository_url: REPOSITORY_URL,
+        page_url,
         contact_email: CONTACT_EMAIL,
         github_stars,
     }

@@ -10,7 +10,7 @@ use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinSet;
-use wfb_storage::{DatabaseKind, Environment};
+use wfb_storage::Environment;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -31,17 +31,36 @@ async fn main() -> Result<(), anyhow::Error> {
                 .get_environment(&env)
                 .ok_or_else(|| anyhow::anyhow!("Environment '{}' not found in config", env))?
                 .clone();
+            let storage = wfb_storage::Storage::new("data")?;
+
+            let mut benchmarks_to_run = Vec::new();
+            for b in benchmarks {
+                let lang = config
+                    .get_lang(&b.language)
+                    .ok_or_else(|| anyhow::anyhow!("Language '{}' not found", b.language))?;
+
+                let mut missing_tests = Vec::new();
+                for test in &b.tests {
+                    if !storage.has_test_result(&run_id, &env_config, lang, b, *test) {
+                        missing_tests.push(*test);
+                    }
+                }
+
+                if !missing_tests.is_empty() {
+                    let mut b_clone = b.clone();
+                    b_clone.tests = missing_tests;
+                    benchmarks_to_run.push(b_clone);
+                }
+            }
 
             let m = MultiProgress::new();
-            let unique_dbs = vec![
-                DatabaseKind::Postgres,
-                DatabaseKind::Mysql,
-                DatabaseKind::Mariadb,
-                DatabaseKind::Mongodb,
-                DatabaseKind::Mssql,
-            ];
+            let unique_dbs = benchmarks_to_run
+                .iter()
+                .flat_map(|b| b.database)
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
 
-            let storage = wfb_storage::Storage::new("data")?;
             let run_id_clone = run_id.clone();
             let env_config_clone = env_config.clone();
             let config_clone = config.clone();
@@ -75,15 +94,15 @@ async fn main() -> Result<(), anyhow::Error> {
                     let app_config = ssh_config
                         .app
                         .as_ref()
-                        .expect("SSH Config: app section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: app section missing"))?;
                     let db_config = ssh_config
                         .db
                         .as_ref()
-                        .expect("SSH Config: db section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: db section missing"))?;
                     let wrkr_config = ssh_config
                         .wrkr
                         .as_ref()
-                        .expect("SSH Config: wrkr section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: wrkr section missing"))?;
 
                     let app_executor = exec::ssh::SshExecutor::from_config(app_config);
                     let db_executor = exec::ssh::SshExecutor::from_config(db_config);
@@ -140,33 +159,14 @@ async fn main() -> Result<(), anyhow::Error> {
                 res??;
             }
 
-            let mut benchmarks_to_run = Vec::new();
-            for b in benchmarks {
-                let lang = config
-                    .get_lang(&b.language)
-                    .ok_or_else(|| anyhow::anyhow!("Language '{}' not found", b.language))?;
-
-                let mut missing_tests = Vec::new();
-                for test in &b.tests {
-                    if !storage.has_test_result(&run_id, &env_config, lang, b, *test) {
-                        missing_tests.push(*test);
-                    }
-                }
-
-                if !missing_tests.is_empty() {
-                    let mut b_clone = b.clone();
-                    b_clone.tests = missing_tests;
-                    benchmarks_to_run.push(b_clone);
-                }
-            }
-
             let pb = m.add(ProgressBar::new(benchmarks_to_run.len() as u64));
-            pb.set_style(
-                ProgressStyle::default_bar()
-                    .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
-                    .unwrap()
-                    .progress_chars("#>-"),
-            );
+            let style = match ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
+            {
+                Ok(style) => style.progress_chars("#>-"),
+                Err(_) => ProgressStyle::default_bar().progress_chars("#>-"),
+            };
+            pb.set_style(style);
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message("Running benchmarks...");
 
@@ -237,13 +237,12 @@ async fn main() -> Result<(), anyhow::Error> {
                 .clone();
 
             let m = MultiProgress::new();
-            let unique_dbs = vec![
-                DatabaseKind::Postgres,
-                DatabaseKind::Mysql,
-                DatabaseKind::Mariadb,
-                DatabaseKind::Mongodb,
-                DatabaseKind::Mssql,
-            ];
+            let unique_dbs = benchmarks
+                .iter()
+                .flat_map(|b| b.database)
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
 
             let storage = wfb_storage::Storage::new("data")?;
             let run_id_clone = "verify".to_string();
@@ -279,15 +278,15 @@ async fn main() -> Result<(), anyhow::Error> {
                     let app_config = ssh_config
                         .app
                         .as_ref()
-                        .expect("SSH Config: app section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: app section missing"))?;
                     let db_config = ssh_config
                         .db
                         .as_ref()
-                        .expect("SSH Config: db section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: db section missing"))?;
                     let wrkr_config = ssh_config
                         .wrkr
                         .as_ref()
-                        .expect("SSH Config: wrkr section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: wrkr section missing"))?;
 
                     let app_executor = exec::ssh::SshExecutor::from_config(app_config);
                     let db_executor = exec::ssh::SshExecutor::from_config(db_config);
@@ -326,12 +325,13 @@ async fn main() -> Result<(), anyhow::Error> {
             runner.build_database_images(unique_dbs, &m).await?;
 
             let pb = m.add(ProgressBar::new(benchmarks.len() as u64));
-            pb.set_style(
-                ProgressStyle::default_bar()
-                    .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
-                    .unwrap()
-                    .progress_chars("#>-"),
-            );
+            let style = match ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {msg}")
+            {
+                Ok(style) => style.progress_chars("#>-"),
+                Err(_) => ProgressStyle::default_bar().progress_chars("#>-"),
+            };
+            pb.set_style(style);
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message("Verifying benchmarks...");
 
@@ -399,15 +399,15 @@ async fn main() -> Result<(), anyhow::Error> {
                     let app_config = ssh_config
                         .app
                         .as_ref()
-                        .expect("SSH Config: app section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: app section missing"))?;
                     let db_config = ssh_config
                         .db
                         .as_ref()
-                        .expect("SSH Config: db section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: db section missing"))?;
                     let wrkr_config = ssh_config
                         .wrkr
                         .as_ref()
-                        .expect("SSH Config: wrkr section missing");
+                        .ok_or_else(|| anyhow::anyhow!("SSH Config: wrkr section missing"))?;
 
                     let app_executor = exec::ssh::SshExecutor::from_config(app_config);
                     let db_executor = exec::ssh::SshExecutor::from_config(db_config);

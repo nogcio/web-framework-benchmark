@@ -11,18 +11,22 @@ ignorePaths:
 dictionaryDefinitions: []
 dictionaries: []
 words:
+  - Askama
   - chrono
   - clippy
   - cpus
   - Deque
   - dotenv
   - dotenvy
+  - HEALTHCHECK
+  - HTMX
   - indicatif
   - nogcio
   - rngs
   - serde
   - stdev
   - thiserror
+  - Twinland
   - wrkr
 ignoreWords: []
 import: []

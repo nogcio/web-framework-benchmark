@@ -11,33 +11,25 @@ def plaintext(request):
     return HttpResponse("Hello, World!", content_type="text/plain")
 
 def json_aggregate(request):
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-    
-    try:
-        # orjson.loads accepts bytes directly
-        orders = orjson.loads(request.body)
-    except orjson.JSONDecodeError:
-        return HttpResponse(status=400)
+    # orjson.loads accepts bytes directly
+    orders = orjson.loads(request.body)
 
     processed_orders = 0
     country_results = {}
     category_stats = {}
 
     for order in orders:
-        if order.get('status') == 'completed':
+        if order['status'] == 'completed':
             processed_orders += 1
-            
-            country = order.get('country')
-            amount = order.get('amount', 0) 
-            if country:
-                country_results[country] = country_results.get(country, 0) + amount
-            
-            for item in order.get('items', []):
-                category = item.get('category')
-                quantity = item.get('quantity', 0)
-                if category:
-                    category_stats[category] = category_stats.get(category, 0) + quantity
+
+            country = order['country']
+            amount = order['amount']
+            country_results[country] = country_results.get(country, 0) + amount
+
+            for item in order['items']:
+                category = item['category']
+                quantity = item['quantity']
+                category_stats[category] = category_stats.get(category, 0) + quantity
 
     response_data = {
         "processedOrders": processed_orders,

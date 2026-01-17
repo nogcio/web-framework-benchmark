@@ -21,11 +21,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         let mut handles = vec![];
         for db in db_kinds {
             let pb = mb.add(ProgressBar::new_spinner());
-            pb.set_style(
-                ProgressStyle::default_spinner()
-                    .template("{spinner:.blue} {prefix} {msg}")
-                    .unwrap(),
-            );
+            let style =
+                match ProgressStyle::default_spinner().template("{spinner:.blue} {prefix} {msg}") {
+                    Ok(style) => style,
+                    Err(_) => ProgressStyle::default_spinner(),
+                };
+            pb.set_style(style);
             pb.set_prefix(format!("[{:?}]", db));
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_message(format!("Building: {:?}", db));
@@ -33,7 +34,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             let runner = self.clone();
             handles.push(tokio::spawn(async move {
                 let res = runner.build_database_image(&db, &pb).await;
-                pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+                let style = match ProgressStyle::default_spinner().template("{msg}") {
+                    Ok(style) => style,
+                    Err(_) => ProgressStyle::default_spinner(),
+                };
+                pb.set_style(style);
                 match res {
                     Ok(_) => {
                         pb.finish_with_message(format!("{} {:?}", console::style("✔").green(), db));
@@ -60,11 +65,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
     pub async fn deploy_wrkr_impl(&self, mb: &MultiProgress) -> anyhow::Result<()> {
         let pb = mb.add(ProgressBar::new_spinner());
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.blue} {prefix} {msg}")
-                .unwrap(),
-        );
+        let style =
+            match ProgressStyle::default_spinner().template("{spinner:.blue} {prefix} {msg}") {
+                Ok(style) => style,
+                Err(_) => ProgressStyle::default_spinner(),
+            };
+        pb.set_style(style);
         pb.set_prefix("[wrkr]");
         pb.enable_steady_tick(Duration::from_millis(100));
 
@@ -109,19 +115,24 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
                 pb.set_message("Copying wrkr image to remote");
                 pb.set_style(
-                    ProgressStyle::default_spinner()
+                    match ProgressStyle::default_spinner()
                         .template("{spinner:.blue} {prefix} [{bar:40.cyan/blue}] {msg}")
-                        .unwrap()
-                        .progress_chars("#>-"),
+                    {
+                        Ok(style) => style.progress_chars("#>-"),
+                        Err(_) => ProgressStyle::default_spinner().progress_chars("#>-"),
+                    },
                 );
                 self.wrkr_executor
                     .cp(tar_path, &remote_tar_path, &pb)
                     .await?;
 
                 pb.set_style(
-                    ProgressStyle::default_spinner()
+                    match ProgressStyle::default_spinner()
                         .template("{spinner:.blue} {prefix} {msg}")
-                        .unwrap(),
+                    {
+                        Ok(style) => style,
+                        Err(_) => ProgressStyle::default_spinner(),
+                    },
                 );
 
                 pb.set_message("Loading wrkr image on remote");
@@ -138,7 +149,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         }
         .await;
 
-        pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+        let style = match ProgressStyle::default_spinner().template("{msg}") {
+            Ok(style) => style,
+            Err(_) => ProgressStyle::default_spinner(),
+        };
+        pb.set_style(style);
 
         match res {
             Ok(_) => {
@@ -214,10 +229,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         executor.mkdir(temp_dir).await?;
         let original_style = pb.style().clone();
         pb.set_style(
-            ProgressStyle::default_bar()
+            match ProgressStyle::default_bar()
                 .template("{spinner:.green} {prefix} [{bar:40.cyan/blue}] {msg}")
-                .unwrap()
-                .progress_chars("#>-"),
+            {
+                Ok(style) => style.progress_chars("#>-"),
+                Err(_) => ProgressStyle::default_bar().progress_chars("#>-"),
+            },
         );
         pb.set_length(100);
 

@@ -1,3 +1,5 @@
+#![deny(clippy::expect_used, clippy::unwrap_used)]
+
 use anyhow::bail;
 use axum::Router;
 use clap::Parser;
@@ -14,6 +16,7 @@ mod file_watcher;
 mod filters;
 mod handlers;
 mod middleware;
+mod public_url;
 mod routes;
 mod state;
 mod view_models;
@@ -44,8 +47,10 @@ async fn main() -> anyhow::Result<()> {
         .with_target(false)
         .with_level(true)
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+            match tracing_subscriber::EnvFilter::try_from_default_env() {
+                Ok(filter) => filter,
+                Err(_) => tracing_subscriber::EnvFilter::new("info"),
+            },
         )
         .init();
     let args = Args::parse();
@@ -78,7 +83,8 @@ async fn main() -> anyhow::Result<()> {
                     tracing::info!("Config changed, reloading...");
                     tokio::time::sleep(Duration::from_millis(500)).await;
 
-                    let mut config_guard = config_clone.write().unwrap();
+                    let mut config_guard =
+                        config_clone.write().unwrap_or_else(|err| err.into_inner());
                     if let Err(e) = config_guard.reload(&config_path_clone) {
                         tracing::error!("Failed to reload config: {}", e);
                     } else {

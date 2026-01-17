@@ -9,9 +9,6 @@ defmodule WfbPhoenixWeb.JsonController do
     do_aggregate(conn, orders)
   end
 
-  # Fallback for invalid input
-  def aggregate(conn, _), do: send_resp(conn, 400, "Bad Request")
-
   defp do_aggregate(conn, orders) do
     initial_acc = %{
       processedOrders: 0,

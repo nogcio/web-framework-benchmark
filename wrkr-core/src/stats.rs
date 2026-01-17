@@ -21,16 +21,21 @@ pub struct Stats {
 
 impl Stats {
     pub fn new() -> Self {
+        let latency_histogram = Histogram::new(3)
+            .or_else(|_| Histogram::new(2))
+            .or_else(|_| Histogram::new(1))
+            .unwrap_or_else(|err| {
+                // Should be unreachable for sane sigfigs; keep it explicit and non-unwrap.
+                panic!("Failed to create hdrhistogram histogram: {err}")
+            });
+
         Self {
             connections: AtomicU64::new(0),
             total_requests: AtomicU64::new(0),
             total_errors: AtomicU64::new(0),
             total_bytes_received: AtomicU64::new(0),
             errors_map: DashMap::new(),
-            latency_histogram: Arc::new(Mutex::new(Histogram::new(3).unwrap_or_else(|_| {
-                eprintln!("Failed to create histogram, using default");
-                Histogram::new(2).expect("Failed to create fallback histogram")
-            }))),
+            latency_histogram: Arc::new(Mutex::new(latency_histogram)),
         }
     }
 
@@ -87,9 +92,10 @@ impl Stats {
             latency_histogram: if let Ok(hist) = self.latency_histogram.lock() {
                 hist.clone()
             } else {
-                Histogram::new(3).unwrap_or_else(|_| {
-                    Histogram::new(2).expect("Failed to create fallback histogram")
-                })
+                Histogram::new(3)
+                    .or_else(|_| Histogram::new(2))
+                    .or_else(|_| Histogram::new(1))
+                    .unwrap_or_else(|err| panic!("Failed to create hdrhistogram histogram: {err}"))
             },
             rps_samples,
         }

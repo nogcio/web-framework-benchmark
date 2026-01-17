@@ -75,13 +75,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pb = if let Some(mp) = &mp {
         let pb = mp.add(ProgressBar::new(args.duration));
-        pb.set_style(
-            ProgressStyle::with_template(
-                "{spinner:.green} {msg} [{elapsed_precise}] [{bar:40.cyan/blue}]",
-            )
-            .unwrap()
-            .progress_chars("=>-"),
-        );
+        let style = match ProgressStyle::with_template(
+            "{spinner:.green} {msg} [{elapsed_precise}] [{bar:40.cyan/blue}]",
+        ) {
+            Ok(style) => style.progress_chars("=>-"),
+            Err(_) => ProgressStyle::default_bar().progress_chars("=>-"),
+        };
+        pb.set_style(style);
         Some(pb)
     } else {
         None
@@ -130,12 +130,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         );
                         pb.set_message(msg);
 
-                        let mut bars = error_bars_clone.lock().unwrap();
+                        let mut bars = error_bars_clone.lock().unwrap_or_else(|e| e.into_inner());
                         if let Some(mp) = &mp_clone {
                             for (err, count) in p.errors {
                                 if !bars.contains_key(&err) {
                                     let bar = mp.insert(0, ProgressBar::new(0));
-                                    bar.set_style(ProgressStyle::with_template("{msg}").unwrap());
+                                    let style = match ProgressStyle::with_template("{msg}") {
+                                        Ok(style) => style,
+                                        Err(_) => ProgressStyle::default_spinner(),
+                                    };
+                                    bar.set_style(style);
                                     bars.insert(err.clone(), bar);
                                 }
                                 if let Some(bar) = bars.get(&err) {
@@ -220,7 +224,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             req_per_sec_max: rps_max,
                             req_per_sec_stdev_pct: rps_stdev_pct,
                         };
-                        println!("{}", serde_json::to_string(&json_stats).unwrap());
+                        match serde_json::to_string(&json_stats) {
+                            Ok(s) => println!("{}", s),
+                            Err(e) => eprintln!("Failed to serialize JsonStats: {e}"),
+                        }
                     }
                 }
             }
@@ -234,7 +241,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let bars = error_bars.lock().unwrap();
+        let bars = error_bars.lock().unwrap_or_else(|e| e.into_inner());
         for bar in bars.values() {
             bar.finish_and_clear();
         }

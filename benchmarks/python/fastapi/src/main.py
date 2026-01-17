@@ -27,33 +27,26 @@ async def plaintext():
 async def json_aggregate(request: Request):
     # Parse JSON manually to avoid Pydantic overhead
     # This matches the behavior of Django, Rails, Express, etc.
-    try:
-        orders = await request.json()
-    except Exception:
-        return PlainTextResponse("Invalid JSON", status_code=400)
+    orders = await request.json()
 
     processed_orders = 0
     results: Dict[str, int] = {}
     category_stats: Dict[str, int] = {}
 
     for order in orders:
-        if order.get("status") == "completed":
+        if order["status"] == "completed":
             processed_orders += 1
-            
+
             # results: country -> amount
-            country = order.get("country")
-            amount = order.get("amount", 0)
-            if country:
-                 results[country] = results.get(country, 0) + amount
-            
+            country = order["country"]
+            amount = order["amount"]
+            results[country] = results.get(country, 0) + amount
+
             # category_stats: category -> quantity
-            items = order.get("items")
-            if items:
-                for item in items:
-                    category = item.get("category")
-                    quantity = item.get("quantity", 0)
-                    if category:
-                        category_stats[category] = category_stats.get(category, 0) + quantity
+            for item in order["items"]:
+                category = item["category"]
+                quantity = item["quantity"]
+                category_stats[category] = category_stats.get(category, 0) + quantity
 
     return {
         "processedOrders": processed_orders,

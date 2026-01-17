@@ -32,6 +32,12 @@ if (process.env.BUN_WORKER_ID === undefined) {
   // Worker process
   const app = new Hono()
 
+  const mapToObject = (map: Map<string, number>) => {
+    const obj: Record<string, number> = Object.create(null)
+    for (const [key, value] of map) obj[key] = value
+    return obj
+  }
+
   app.get('/health', (c) => c.text('OK'))
   app.get('/', (c) => c.text('Hello, World!'))
   app.get('/plaintext', (c) => c.text('Hello, World!'))
@@ -62,31 +68,30 @@ if (process.env.BUN_WORKER_ID === undefined) {
   app.post('/json/aggregate', async (c) => {
     const orders = await c.req.json()
     let processedOrders = 0
-    const results: Record<string, number> = {}
-    const categoryStats: Record<string, number> = {}
+    const results = new Map<string, number>()
+    const categoryStats = new Map<string, number>()
 
-    if (Array.isArray(orders)) {
-      for (const order of orders) {
-        if (order.status === 'completed') {
-          processedOrders++
+    for (const order of orders) {
+      if (order.status !== 'completed') continue
+      processedOrders++
 
-          // results: country -> amount
-          results[order.country] = (results[order.country] || 0) + order.amount
+      const country = order.country
+      const prevAmount = results.get(country)
+      results.set(country, prevAmount === undefined ? order.amount : prevAmount + order.amount)
 
-          // categoryStats: category -> quantity
-          if (Array.isArray(order.items)) {
-            for (const item of order.items) {
-              categoryStats[item.category] = (categoryStats[item.category] || 0) + item.quantity
-            }
-          }
-        }
+      const items = order.items
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        const category = item.category
+        const prevQty = categoryStats.get(category)
+        categoryStats.set(category, prevQty === undefined ? item.quantity : prevQty + item.quantity)
       }
     }
 
     return c.json({
       processedOrders,
-      results,
-      categoryStats
+      results: mapToObject(results),
+      categoryStats: mapToObject(categoryStats)
     })
   })
 

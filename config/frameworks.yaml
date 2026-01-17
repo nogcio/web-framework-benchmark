@@ -53,6 +53,12 @@ url: https://fastapi.tiangolo.com/
 
 ---
 type: framework
+name: aiohttp
+language: Python
+url: https://docs.aiohttp.org/
+
+---
+type: framework
 name: ktor
 language: Kotlin
 url: https://ktor.io/

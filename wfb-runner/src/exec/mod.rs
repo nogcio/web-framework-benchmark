@@ -49,7 +49,7 @@ impl OutputLogger {
 
     pub fn on_stdout(&self, line: &str) {
         {
-            let mut lines = self.last_lines.lock().unwrap();
+            let mut lines = self.last_lines.lock().unwrap_or_else(|e| e.into_inner());
             if lines.len() >= 6 {
                 lines.pop_front();
             }
@@ -64,7 +64,7 @@ impl OutputLogger {
 
     pub fn on_stderr(&self, line: &str) {
         {
-            let mut lines = self.last_lines.lock().unwrap();
+            let mut lines = self.last_lines.lock().unwrap_or_else(|e| e.into_inner());
             if lines.len() >= 6 {
                 lines.pop_front();
             }
@@ -74,7 +74,7 @@ impl OutputLogger {
                 style(line).black().bright()
             ));
 
-            let mut log = self.stderr_log.lock().unwrap();
+            let mut log = self.stderr_log.lock().unwrap_or_else(|e| e.into_inner());
             log.push_str(line);
             log.push('\n');
         }
@@ -86,7 +86,7 @@ impl OutputLogger {
         let gray_lines = self
             .last_lines
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .iter()
             .cloned()
             .collect::<Vec<_>>()
@@ -95,6 +95,9 @@ impl OutputLogger {
     }
 
     pub fn get_stderr(&self) -> String {
-        self.stderr_log.lock().unwrap().clone()
+        self.stderr_log
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 }

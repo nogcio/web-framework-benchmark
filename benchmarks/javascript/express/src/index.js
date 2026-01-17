@@ -21,6 +21,12 @@ if (cluster.isPrimary) {
   app.disable('x-powered-by');
   app.disable('etag');
 
+  const mapToObject = (map) => {
+    const obj = Object.create(null);
+    for (const [key, value] of map) obj[key] = value;
+    return obj;
+  };
+
   // Static files
   const staticDir = process.env.DATA_DIR || path.join(process.cwd(), 'benchmarks_data');
   app.use('/files', express.static(staticDir));
@@ -41,32 +47,31 @@ if (cluster.isPrimary) {
 
   app.post('/json/aggregate', express.json({ limit: '50mb' }), (req, res) => {
     const orders = req.body;
-    let processed_orders = 0;
-    const results = {};
-    const category_stats = {};
+    let processedOrders = 0;
+    const results = new Map();
+    const categoryStats = new Map();
 
-    if (Array.isArray(orders)) {
-      for (const order of orders) {
-        if (order.status === 'completed') {
-          processed_orders++;
+    for (const order of orders) {
+      if (order.status !== 'completed') continue;
+      processedOrders++;
 
-          // results: country -> amount
-          results[order.country] = (results[order.country] || 0) + order.amount;
+      const country = order.country;
+      const prevAmount = results.get(country);
+      results.set(country, prevAmount === undefined ? order.amount : prevAmount + order.amount);
 
-          // category_stats: category -> quantity
-          if (Array.isArray(order.items)) {
-            for (const item of order.items) {
-              category_stats[item.category] = (category_stats[item.category] || 0) + item.quantity;
-            }
-          }
-        }
+      const items = order.items;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const category = item.category;
+        const prevQty = categoryStats.get(category);
+        categoryStats.set(category, prevQty === undefined ? item.quantity : prevQty + item.quantity);
       }
     }
 
     res.json({
-      processedOrders: processed_orders,
-      results,
-      categoryStats: category_stats
+      processedOrders,
+      results: mapToObject(results),
+      categoryStats: mapToObject(categoryStats)
     });
   });
 

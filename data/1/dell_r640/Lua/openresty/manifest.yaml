@@ -2,7 +2,7 @@ language_version: '5.1'
 framework_version: 1.27.1.2
 tags:
   type: proxy
-  runtime: native
   arch: event-loop
+  runtime: native
 database: null
 path: benchmarks/lua/nginx

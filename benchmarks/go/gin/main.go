@@ -30,10 +30,7 @@ func main() {
 
 	r.POST("/json/aggregate", func(c *gin.Context) {
 		var orders []Order
-		if err := c.ShouldBindJSON(&orders); err != nil {
-			c.Status(http.StatusBadRequest)
-			return
-		}
+		_ = c.ShouldBindJSON(&orders)
 
 		processedOrders := 0
 		results := make(map[string]int64)

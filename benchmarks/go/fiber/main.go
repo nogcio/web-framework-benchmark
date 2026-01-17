@@ -28,9 +28,7 @@ func main() {
 
 	app.Post("/json/aggregate", func(c *fiber.Ctx) error {
 		var orders []Order
-		if err := c.BodyParser(&orders); err != nil {
-			return c.SendStatus(fiber.StatusBadRequest)
-		}
+		_ = c.BodyParser(&orders)
 
 		processedOrders := 0
 		results := make(map[string]int64)

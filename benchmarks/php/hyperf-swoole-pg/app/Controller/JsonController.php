@@ -12,32 +12,21 @@ class JsonController
     public function aggregate(RequestInterface $request, ResponseInterface $response)
     {
         $orders = $request->getParsedBody();
-        if (!is_array($orders)) {
-             return $response->json([]);
-        }
 
         $processedOrders = 0;
         $results = [];
         $categoryStats = [];
 
         foreach ($orders as $order) {
-            if (isset($order['status']) && $order['status'] === 'completed') {
+            if ($order['status'] === 'completed') {
                 $processedOrders++;
 
-                $country = $order['country'] ?? '';
-                if (!isset($results[$country])) {
-                    $results[$country] = 0;
-                }
-                $results[$country] += $order['amount'] ?? 0;
+                $country = $order['country'];
+                $results[$country] = ($results[$country] ?? 0) + $order['amount'];
 
-                if (isset($order['items']) && is_array($order['items'])) {
-                    foreach ($order['items'] as $item) {
-                        $category = $item['category'] ?? '';
-                        if (!isset($categoryStats[$category])) {
-                            $categoryStats[$category] = 0;
-                        }
-                        $categoryStats[$category] += $item['quantity'] ?? 0;
-                    }
+                foreach ($order['items'] as $item) {
+                    $category = $item['category'];
+                    $categoryStats[$category] = ($categoryStats[$category] ?? 0) + $item['quantity'];
                 }
             }
         }

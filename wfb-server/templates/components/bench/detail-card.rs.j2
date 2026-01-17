@@ -28,8 +28,8 @@
             </div>
             {% endif %}
         </div>
-        {% if b.repo_url.is_some() %}
-        <a href="{{ b.repo_url.as_ref().unwrap() }}" target="_blank" rel="noreferrer"
+        {% if let Some(url) = b.repo_url.as_ref() %}
+        <a href="{{ url }}" target="_blank" rel="noreferrer"
             class="wfb-btn px-3 py-2 text-xs">
             {{ ui::icon("github", "h-4 w-4") }}
             View code

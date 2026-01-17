@@ -18,7 +18,7 @@ pub async fn get_version() -> Json<VersionInfo> {
 }
 
 pub async fn get_tags(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
-    let config = state.config.read().unwrap();
+    let config = state.config_read();
     let mut tags = std::collections::HashSet::new();
     for b in config.benchmarks() {
         for key in b.tags.keys() {
@@ -31,7 +31,7 @@ pub async fn get_tags(State(state): State<Arc<AppState>>) -> Json<Vec<String>> {
 }
 
 pub async fn get_environments(State(state): State<Arc<AppState>>) -> Json<Vec<EnvironmentInfo>> {
-    let data = state.storage.data.read().unwrap();
+    let data = state.storage.data_read();
     let mut used_envs = std::collections::HashSet::new();
     for run_data in data.values() {
         for env_name in run_data.keys() {
@@ -39,7 +39,7 @@ pub async fn get_environments(State(state): State<Arc<AppState>>) -> Json<Vec<En
         }
     }
 
-    let config = state.config.read().unwrap();
+    let config = state.config_read();
     let envs = config
         .environments()
         .iter()
@@ -59,7 +59,7 @@ pub async fn get_tests() -> Json<Vec<TestInfo>> {
 }
 
 pub async fn get_languages(State(state): State<Arc<AppState>>) -> Json<Vec<LanguageInfo>> {
-    let config = state.config.read().unwrap();
+    let config = state.config_read();
     let langs = config
         .languages()
         .iter()
@@ -73,7 +73,7 @@ pub async fn get_languages(State(state): State<Arc<AppState>>) -> Json<Vec<Langu
 }
 
 pub async fn get_frameworks(State(state): State<Arc<AppState>>) -> Json<Vec<FrameworkInfo>> {
-    let config = state.config.read().unwrap();
+    let config = state.config_read();
     let frameworks = config
         .frameworks()
         .iter()
@@ -87,7 +87,7 @@ pub async fn get_frameworks(State(state): State<Arc<AppState>>) -> Json<Vec<Fram
 }
 
 pub async fn get_benchmarks(State(state): State<Arc<AppState>>) -> Json<Vec<BenchmarkInfo>> {
-    let config = state.config.read().unwrap();
+    let config = state.config_read();
     let benchmarks = config
         .benchmarks()
         .iter()
@@ -114,8 +114,8 @@ pub async fn get_benchmarks(State(state): State<Arc<AppState>>) -> Json<Vec<Benc
 }
 
 pub async fn get_runs(State(state): State<Arc<AppState>>) -> Json<Vec<RunSummary>> {
-    let data = state.storage.data.read().unwrap();
-    let runs_manifests = state.storage.runs.read().unwrap();
+    let data = state.storage.data_read();
+    let runs_manifests = state.storage.runs_read();
     Json(common::get_all_runs(&data, &runs_manifests))
 }
 
@@ -124,7 +124,7 @@ pub async fn get_run_results(
     params: routes::ApiRunResultsPath,
 ) -> Json<Vec<RunResult>> {
     let routes::ApiRunResultsPath { run_id, env, test } = params;
-    let data = state.storage.data.read().unwrap();
+    let data = state.storage.data_read();
     let mut results = Vec::new();
     if let Some(env_data) = data.get(&run_id).and_then(|run_data| run_data.get(&env)) {
         for (lang, lang_data) in env_data {
@@ -191,7 +191,7 @@ pub async fn get_run_raw_data(
         l
     } else {
         // Try to find language
-        let data = state.storage.data.read().unwrap();
+        let data = state.storage.data_read();
         let mut found_lang = None;
         if let Some(env_data) = data.get(&run_id).and_then(|run_data| run_data.get(&env)) {
             for (l, lang_data) in env_data {

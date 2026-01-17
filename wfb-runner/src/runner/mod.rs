@@ -57,11 +57,13 @@ pub struct Runner<E: Executor> {
 impl<E: Executor + Clone + Send + Sync + 'static> BenchmarkRunner for Runner<E> {
     async fn prepare(&self, mb: &MultiProgress) -> anyhow::Result<()> {
         let pb = mb.add(ProgressBar::new_spinner());
-        pb.set_style(
-            indicatif::ProgressStyle::default_spinner()
-                .template("{spinner:.blue} [{prefix}] {msg}")
-                .unwrap(),
-        );
+        let style = match indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.blue} [{prefix}] {msg}")
+        {
+            Ok(style) => style,
+            Err(_) => indicatif::ProgressStyle::default_spinner(),
+        };
+        pb.set_style(style);
         pb.enable_steady_tick(Duration::from_millis(100));
         pb.set_prefix("prepare");
         pb.set_message("Preparing remote environment...");
@@ -81,11 +83,11 @@ impl<E: Executor + Clone + Send + Sync + 'static> BenchmarkRunner for Runner<E> 
         self.db_executor.mkdir(consts::REMOTE_DB_PATH).await?;
         self.wrkr_executor.mkdir(consts::REMOTE_WRKR_PATH).await?;
 
-        pb.set_style(
-            indicatif::ProgressStyle::default_spinner()
-                .template("{msg}")
-                .unwrap(),
-        );
+        let style = match indicatif::ProgressStyle::default_spinner().template("{msg}") {
+            Ok(style) => style,
+            Err(_) => indicatif::ProgressStyle::default_spinner(),
+        };
+        pb.set_style(style);
         pb.finish_with_message("Remote environment prepared");
         Ok(())
     }

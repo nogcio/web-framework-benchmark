@@ -37,11 +37,12 @@ async fn bench_render(
     state: Arc<AppState>,
     params: routes::BenchViewPath,
 ) -> axum::response::Response {
+    let page_path = params.to_uri().to_string();
     let render_started = Instant::now();
     let github_stars = github_stars_value_string().await;
-    let data = state.storage.data.read().unwrap();
-    let runs_manifests = state.storage.runs.read().unwrap();
-    let config = state.config.read().unwrap();
+    let data = state.storage.data_read();
+    let runs_manifests = state.storage.runs_read();
+    let config = state.config_read();
 
     let selection_query = super::types::IndexQuery {
         run: Some(params.run.clone()),
@@ -112,7 +113,7 @@ async fn bench_render(
     }
 
     HtmlTemplate(BenchTemplate {
-        chrome: chrome_context(render_started, false, github_stars),
+        chrome: chrome_context(render_started, false, github_stars, &page_path),
         selection,
         bench: bench_detail,
         routes: Routes,

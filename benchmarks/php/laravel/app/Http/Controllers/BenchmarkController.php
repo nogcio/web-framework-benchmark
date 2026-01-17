@@ -23,32 +23,22 @@ class BenchmarkController extends Controller
         $categoryStats = [];
 
         foreach ($orders as $order) {
-            if (($order['status'] ?? '') !== 'completed') {
+            if ($order['status'] !== 'completed') {
                 continue;
             }
 
             $processedOrders++;
 
-            $country = $order['country'] ?? 'unknown';
-            $amount = $order['amount'] ?? 0;
-            
-            if (isset($results[$country])) {
-                $results[$country] += $amount;
-            } else {
-                $results[$country] = $amount;
-            }
-            
-            if (isset($order['items']) && is_array($order['items'])) {
-                foreach ($order['items'] as $item) {
-                     $category = $item['category'] ?? 'unknown';
-                     $quantity = $item['quantity'] ?? 0;
-                     
-                     if (isset($categoryStats[$category])) {
-                         $categoryStats[$category] += $quantity;
-                     } else {
-                         $categoryStats[$category] = $quantity;
-                     }
-                }
+            $country = $order['country'];
+            $amount = $order['amount'];
+
+            $results[$country] = ($results[$country] ?? 0) + $amount;
+
+            foreach ($order['items'] as $item) {
+                $category = $item['category'];
+                $quantity = $item['quantity'];
+
+                $categoryStats[$category] = ($categoryStats[$category] ?? 0) + $quantity;
             }
         }
         

@@ -8,9 +8,20 @@
 
 <meta name="htmx-config" content='{"allowEval":false}'>
 
+<link rel="canonical" href="{{ chrome.page_url }}">
+
+<script type="application/ld+json">
+{
+	"@context": "https://schema.org",
+	"@type": "WebPage",
+	"name": "Web Framework Benchmarks",
+	"url": "{{ chrome.page_url }}"
+}
+</script>
+
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content="website">
-<meta property="og:url" content="{{ chrome.repository_url }}">
+<meta property="og:url" content="{{ chrome.page_url }}">
 <meta property="og:title" content="Web Framework Benchmarks">
 <meta property="og:description" content="Comprehensive performance benchmarks for web frameworks across various languages including Rust, C#, Go, Python, and more.">
 <meta property="og:image" content="{{ "/images/preview.png"|asset_path }}">
@@ -21,7 +32,7 @@
 
 <!-- Twitter -->
 <meta property="twitter:card" content="summary_large_image">
-<meta property="twitter:url" content="{{ chrome.repository_url }}">
+<meta property="twitter:url" content="{{ chrome.page_url }}">
 <meta property="twitter:title" content="Web Framework Benchmarks">
 <meta property="twitter:description" content="Comprehensive performance benchmarks for web frameworks across various languages including Rust, C#, Go, Python, and more.">
 <meta property="twitter:image" content="{{ "/images/preview.png"|asset_path }}">

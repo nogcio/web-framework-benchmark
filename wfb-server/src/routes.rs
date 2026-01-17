@@ -90,6 +90,9 @@ define_routes! {
     // --- Web routes ---
     pub IndexRoot => "/";
 
+    pub RobotsTxt => "/robots.txt";
+    pub SitemapXml => "/sitemap.xml";
+
     pub GithubStarsPartials => "/partials/github/stars" [tpl github_stars_url];
 
     pub IndexViewPath => "/runs/{run}/env/{env}/test/{test}" {
@@ -150,6 +153,8 @@ pub fn build_app(state: Arc<AppState>, assets_dir: PathBuf) -> Router {
     let app = Router::new()
         // Web
         .route(IndexRoot::PATH, get(web::root_handler))
+        .route(RobotsTxt::PATH, get(web::robots_txt_handler))
+        .route(SitemapXml::PATH, get(web::sitemap_xml_handler))
         .route(IndexViewPath::PATH, get(web::index_path_handler))
         .route(
             IndexPartialsViewPath::PATH,

@@ -6,6 +6,7 @@ use super::types::{BenchmarkView, ChromeContext, IndexQuery, Routes, SelectionCo
 use askama::Template;
 use axum::extract::State;
 use axum::response::IntoResponse;
+use axum_extra::routing::TypedPath;
 use std::sync::Arc;
 use std::time::Instant;
 use wfb_storage::BenchmarkTests;
@@ -25,18 +26,22 @@ struct IndexTemplate {
     routes: Routes,
 }
 
-async fn render_index(state: Arc<AppState>, query: IndexQuery) -> HtmlTemplate<IndexTemplate> {
+async fn render_index(
+    state: Arc<AppState>,
+    query: IndexQuery,
+    page_path: &str,
+) -> HtmlTemplate<IndexTemplate> {
     let render_started = Instant::now();
     let github_stars = github_stars_value_string().await;
-    let data = state.storage.data.read().unwrap();
-    let runs_manifests = state.storage.runs.read().unwrap();
-    let config = state.config.read().unwrap();
+    let data = state.storage.data_read();
+    let runs_manifests = state.storage.runs_read();
+    let config = state.config_read();
 
     let selection = select_common(&data, &runs_manifests, &config, &query);
 
     if selection.runs.is_empty() {
         return HtmlTemplate(IndexTemplate {
-            chrome: chrome_context(render_started, true, github_stars),
+            chrome: chrome_context(render_started, true, github_stars, page_path),
             selection: empty_selection_context(),
             benchmarks: vec![],
             routes: Routes,
@@ -106,7 +111,7 @@ async fn render_index(state: Arc<AppState>, query: IndexQuery) -> HtmlTemplate<I
     });
 
     HtmlTemplate(IndexTemplate {
-        chrome: chrome_context(render_started, true, github_stars),
+        chrome: chrome_context(render_started, true, github_stars, page_path),
         selection,
         benchmarks,
         routes: Routes,
@@ -121,6 +126,7 @@ pub async fn root_handler(State(state): State<Arc<AppState>>) -> impl IntoRespon
             env: None,
             test: None,
         },
+        routes::IndexRoot::PATH,
     )
     .await
 }
@@ -129,12 +135,13 @@ pub async fn index_path_handler(
     State(state): State<Arc<AppState>>,
     params: routes::IndexViewPath,
 ) -> impl IntoResponse {
+    let page_path = params.to_uri().to_string();
     let query = IndexQuery {
         run: Some(params.run),
         env: Some(params.env),
         test: Some(params.test),
     };
-    render_index(state, query).await
+    render_index(state, query, &page_path).await
 }
 
 #[derive(Template)]
@@ -149,17 +156,18 @@ struct IndexUpdateTemplate {
 async fn render_index_update(
     state: Arc<AppState>,
     query: IndexQuery,
+    page_path: &str,
 ) -> HtmlTemplate<IndexUpdateTemplate> {
     let render_started = Instant::now();
     let github_stars = github_stars_value_string().await;
-    let data = state.storage.data.read().unwrap();
-    let runs_manifests = state.storage.runs.read().unwrap();
-    let config = state.config.read().unwrap();
+    let data = state.storage.data_read();
+    let runs_manifests = state.storage.runs_read();
+    let config = state.config_read();
 
     let selection = select_common(&data, &runs_manifests, &config, &query);
     if selection.runs.is_empty() {
         return HtmlTemplate(IndexUpdateTemplate {
-            chrome: chrome_context(render_started, true, github_stars),
+            chrome: chrome_context(render_started, true, github_stars, page_path),
             selection: empty_selection_context(),
             benchmarks: vec![],
             routes: Routes,
@@ -227,7 +235,7 @@ async fn render_index_update(
     });
 
     HtmlTemplate(IndexUpdateTemplate {
-        chrome: chrome_context(render_started, true, github_stars),
+        chrome: chrome_context(render_started, true, github_stars, page_path),
         selection,
         benchmarks,
         routes: Routes,
@@ -238,10 +246,11 @@ pub async fn index_update_path_handler(
     State(state): State<Arc<AppState>>,
     params: routes::IndexPartialsViewPath,
 ) -> impl IntoResponse {
+    let page_path = params.to_uri().to_string();
     let query = IndexQuery {
         run: Some(params.run),
         env: Some(params.env),
         test: Some(params.test),
     };
-    render_index_update(state, query).await
+    render_index_update(state, query, &page_path).await
 }

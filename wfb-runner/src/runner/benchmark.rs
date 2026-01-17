@@ -116,11 +116,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         mb: &MultiProgress,
     ) -> anyhow::Result<()> {
         let pb = mb.add(ProgressBar::new_spinner());
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.blue} {prefix} {msg}")
-                .unwrap(),
-        );
+        let style =
+            match ProgressStyle::default_spinner().template("{spinner:.blue} {prefix} {msg}") {
+                Ok(style) => style,
+                Err(_) => ProgressStyle::default_spinner(),
+            };
+        pb.set_style(style);
         pb.set_prefix(format!("[{}]", benchmark.name));
         pb.enable_steady_tick(Duration::from_millis(100));
         pb.set_message(format!("Verifying {}", benchmark.name));
@@ -147,7 +148,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
         self.cleanup(benchmark, &pb).await.ok();
 
-        pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+        let style = match ProgressStyle::default_spinner().template("{msg}") {
+            Ok(style) => style,
+            Err(_) => ProgressStyle::default_spinner(),
+        };
+        pb.set_style(style);
 
         match result {
             Ok(_) => {
@@ -179,11 +184,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         mb: &MultiProgress,
     ) -> anyhow::Result<()> {
         let pb = mb.add(ProgressBar::new_spinner());
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.blue} {prefix} {msg}")
-                .unwrap(),
-        );
+        let style =
+            match ProgressStyle::default_spinner().template("{spinner:.blue} {prefix} {msg}") {
+                Ok(style) => style,
+                Err(_) => ProgressStyle::default_spinner(),
+            };
+        pb.set_style(style);
         pb.set_prefix(format!("[{}]", benchmark.name));
         pb.enable_steady_tick(Duration::from_millis(100));
         pb.set_message(format!("Running {}", benchmark.name));
@@ -214,7 +220,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         }
         .await;
 
-        pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+        let style = match ProgressStyle::default_spinner().template("{msg}") {
+            Ok(style) => style,
+            Err(_) => ProgressStyle::default_spinner(),
+        };
+        pb.set_style(style);
 
         match result {
             Ok(_) => {
@@ -243,11 +253,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         mb: &MultiProgress,
     ) -> anyhow::Result<()> {
         let pb = mb.add(ProgressBar::new_spinner());
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.blue} {prefix} {msg}")
-                .unwrap(),
-        );
+        let style =
+            match ProgressStyle::default_spinner().template("{spinner:.blue} {prefix} {msg}") {
+                Ok(style) => style,
+                Err(_) => ProgressStyle::default_spinner(),
+            };
+        pb.set_style(style);
         pb.set_prefix(format!("[{}]", benchmark.name));
         pb.enable_steady_tick(Duration::from_millis(100));
         pb.set_message(format!("Starting {} in dev mode", benchmark.name));
@@ -263,7 +274,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         self.run_app(benchmark, &pb).await?;
         self.wait_for_app_ready(benchmark, &pb).await?;
 
-        pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+        let style = match ProgressStyle::default_spinner().template("{msg}") {
+            Ok(style) => style,
+            Err(_) => ProgressStyle::default_spinner(),
+        };
+        pb.set_style(style);
         pb.finish_with_message(format!(
             "{} {} Started. URL: {}",
             console::style("✔").green(),
@@ -306,12 +321,13 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
         for test in &benchmark.tests {
             let pb = mb.add(ProgressBar::new_spinner());
-            pb.set_style(
-                ProgressStyle::default_spinner()
-                    .template("{spinner:.blue} {prefix} [{bar:40.cyan/blue}] {msg}")
-                    .unwrap()
-                    .progress_chars("#>-"),
-            );
+            let style = match ProgressStyle::default_spinner()
+                .template("{spinner:.blue} {prefix} [{bar:40.cyan/blue}] {msg}")
+            {
+                Ok(style) => style.progress_chars("#>-"),
+                Err(_) => ProgressStyle::default_spinner().progress_chars("#>-"),
+            };
+            pb.set_style(style);
             pb.set_prefix(format!("[{}/{}]", benchmark.name, test));
             pb.enable_steady_tick(Duration::from_millis(100));
             pb.set_length(consts::BENCHMARK_DURATION_PER_TEST_SECS);
@@ -350,10 +366,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             {
                 let warmup_pb = mb.add(ProgressBar::new(consts::BENCHMARK_WARMUP_DURATION_SECS));
                 warmup_pb.set_style(
-                    ProgressStyle::default_bar()
-                        .template("{spinner:.yellow} {prefix:.yellow} [{bar:40.yellow/white}] {msg:.yellow}")
-                        .unwrap()
-                        .progress_chars("=>-"),
+                    match ProgressStyle::default_bar().template(
+                        "{spinner:.yellow} {prefix:.yellow} [{bar:40.yellow/white}] {msg:.yellow}",
+                    ) {
+                        Ok(style) => style.progress_chars("=>-"),
+                        Err(_) => ProgressStyle::default_bar().progress_chars("=>-"),
+                    },
                 );
                 warmup_pb.set_prefix(format!("[{}/{}/warmup]", benchmark.name, test));
                 warmup_pb.enable_steady_tick(Duration::from_millis(100));
@@ -411,7 +429,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             // --- END WARMUP PHASE ---
 
             let run_pb = mb.add(ProgressBar::new(100));
-            run_pb.set_style(ProgressStyle::default_bar().template("{msg}").unwrap());
+            let style = match ProgressStyle::default_bar().template("{msg}") {
+                Ok(style) => style,
+                Err(_) => ProgressStyle::default_bar(),
+            };
+            run_pb.set_style(style);
 
             let duration = format!("{}", consts::BENCHMARK_DURATION_PER_TEST_SECS);
             let step_duration = format!("{}", consts::BENCHMARK_STEP_DURATION_SECS);
@@ -526,11 +548,14 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
             monitor_handle.abort();
 
-            let raw_data = raw_data_collection.lock().unwrap().clone();
+            let raw_data = raw_data_collection
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
 
             let final_resource_usage = resource_usage
                 .lock()
-                .unwrap()
+                .unwrap_or_else(|e| e.into_inner())
                 .iter()
                 .max_by(|a, b| a.0.cmp(&b.0))
                 .cloned()
@@ -571,7 +596,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             run_pb.finish_and_clear();
             mb.remove(&run_pb);
 
-            pb.set_style(ProgressStyle::default_spinner().template("{msg}").unwrap());
+            let style = match ProgressStyle::default_spinner().template("{msg}") {
+                Ok(style) => style,
+                Err(_) => ProgressStyle::default_spinner(),
+            };
+            pb.set_style(style);
 
             if let Some(summary) = &summary {
                 pb.finish_with_message(format!(
@@ -643,7 +672,7 @@ fn find_max_stable_performance(
         // Not enough data for window, fallback to max RPS
         let best = data
             .iter()
-            .max_by(|a, b| a.requests_per_sec.partial_cmp(&b.requests_per_sec).unwrap())?;
+            .max_by(|a, b| a.requests_per_sec.total_cmp(&b.requests_per_sec))?;
         let mut summary = raw_to_summary(best, final_memory_usage, final_cpu_usage);
 
         // Use final cumulative values from the last sample

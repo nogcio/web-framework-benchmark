@@ -1,0 +1,8 @@
+language_version: 3.14.2
+framework_version: 3.13.2
+tags:
+  type: micro-framework
+  runtime: python-asyncio
+  arch: async
+database: null
+path: benchmarks/python/aiohttp

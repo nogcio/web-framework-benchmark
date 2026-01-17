@@ -17,8 +17,8 @@ const analyticsProto = grpc.loadPackageDefinition(packageDefinition);
 
 function aggregateOrders(call, callback) {
     let processedOrders = 0;
-    const amountByCountry = {};
-    const quantityByCategory = {};
+    const amountByCountry = new Map();
+    const quantityByCategory = new Map();
     
     // Header
     const clientIdMap = call.metadata.get('x-client-id');
@@ -34,29 +34,34 @@ function aggregateOrders(call, callback) {
             
             let orderTotal = 0;
 
-            if (order.items) {
-                const items = order.items;
-                for (let j = 0; j < items.length; j++) {
-                    const item = items[j];
-                    const qty = item.quantity;
-                    const price = item.price_cents; 
-                    
-                    orderTotal += price * qty;
-                    
-                    const cat = item.category;
-                    quantityByCategory[cat] = (quantityByCategory[cat] || 0) + qty;
-                }
+            const items = order.items;
+            for (let j = 0; j < items.length; j++) {
+                const item = items[j];
+                const qty = item.quantity;
+                const price = item.price_cents;
+
+                orderTotal += price * qty;
+
+                const cat = item.category;
+                const prevQty = quantityByCategory.get(cat);
+                quantityByCategory.set(cat, prevQty === undefined ? qty : prevQty + qty);
             }
              
             const country = order.country;
-            amountByCountry[country] = (amountByCountry[country] || 0) + orderTotal;
+            const prevAmount = amountByCountry.get(country);
+            amountByCountry.set(country, prevAmount === undefined ? orderTotal : prevAmount + orderTotal);
         }
     }
 
+    const amountByCountryObj = Object.create(null);
+    for (const [key, value] of amountByCountry) amountByCountryObj[key] = value;
+    const quantityByCategoryObj = Object.create(null);
+    for (const [key, value] of quantityByCategory) quantityByCategoryObj[key] = value;
+
     callback(null, {
         processed_orders: processedOrders,
-        amount_by_country: amountByCountry,
-        quantity_by_category: quantityByCategory,
+        amount_by_country: amountByCountryObj,
+        quantity_by_category: quantityByCategoryObj,
         echoed_client_id: clientId
     });
 }

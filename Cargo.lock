@@ -1617,6 +1617,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2633,7 +2642,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-runner"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2653,7 +2662,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-server"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "askama",
@@ -2664,6 +2673,7 @@ dependencies = [
  "clap",
  "mime_guess",
  "notify",
+ "quick-xml",
  "rand 0.8.5",
  "reqwest",
  "serde",
@@ -2681,7 +2691,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-storage"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "chrono",
  "serde",
@@ -3013,7 +3023,7 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
 name = "wrkr"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "clap",
  "hdrhistogram",
@@ -3031,14 +3041,14 @@ dependencies = [
 
 [[package]]
 name = "wrkr-api"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "wrkr-core"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "bytes",
  "csv",

@@ -28,7 +28,7 @@ impl fmt::Display for BenchmarkTests {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseKind {

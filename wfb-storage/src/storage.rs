@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::benchmark::{Benchmark, BenchmarkManifest, BenchmarkTests};
 use crate::environment::Environment;
@@ -35,6 +35,22 @@ pub struct BenchmarkResult {
 }
 
 impl Storage {
+    pub fn data_read(&self) -> RwLockReadGuard<'_, StorageData> {
+        self.data.read().unwrap_or_else(|err| err.into_inner())
+    }
+
+    pub fn runs_read(&self) -> RwLockReadGuard<'_, HashMap<String, RunManifest>> {
+        self.runs.read().unwrap_or_else(|err| err.into_inner())
+    }
+
+    pub fn data_write(&self) -> RwLockWriteGuard<'_, StorageData> {
+        self.data.write().unwrap_or_else(|err| err.into_inner())
+    }
+
+    pub fn runs_write(&self) -> RwLockWriteGuard<'_, HashMap<String, RunManifest>> {
+        self.runs.write().unwrap_or_else(|err| err.into_inner())
+    }
+
     pub fn new(base_path: impl Into<PathBuf>) -> Result<Self> {
         let base_path = base_path.into();
         let (data, runs) = Self::load_all(&base_path)?;
@@ -198,7 +214,7 @@ impl Storage {
     ) -> Result<()> {
         // Update memory
         {
-            let mut data = self.data.write().unwrap();
+            let mut data = self.data_write();
             let run_data = data.entry(run_id.to_string()).or_default();
             let env_data = run_data.entry(environment.name().to_string()).or_default();
             let lang_data = env_data.entry(language.name.to_string()).or_default();
@@ -236,10 +252,7 @@ impl Storage {
             serde_yaml::to_writer(file, &manifest)?;
 
             // Update memory
-            self.runs
-                .write()
-                .unwrap()
-                .insert(run_id.to_string(), manifest);
+            self.runs_write().insert(run_id.to_string(), manifest);
         }
 
         // Save manifest if it doesn't exist
@@ -273,7 +286,7 @@ impl Storage {
         benchmark: &str,
         testcase: &str,
     ) -> Option<Vec<TestCaseRaw>> {
-        let data = self.data.read().unwrap();
+        let data = self.data_read();
         data.get(run_id)
             .and_then(|env| env.get(environment))
             .and_then(|lang| lang.get(language))
@@ -287,7 +300,7 @@ impl Storage {
         run_id: &str,
         environment: &Environment,
     ) -> Result<HashMap<String, HashMap<String, BenchmarkResult>>> {
-        let data = self.data.read().unwrap();
+        let data = self.data_read();
         if let Some(env_data) = data
             .get(run_id)
             .and_then(|run_data| run_data.get(environment.name()))
@@ -305,7 +318,7 @@ impl Storage {
         benchmark: &Benchmark,
         testcase: BenchmarkTests,
     ) -> bool {
-        let data = self.data.read().unwrap();
+        let data = self.data_read();
         data.get(run_id)
             .and_then(|run_data| run_data.get(environment.name()))
             .and_then(|env_data| env_data.get(&language.name))
@@ -317,10 +330,10 @@ impl Storage {
     pub fn reload(&self) -> Result<()> {
         let (new_data, new_runs) = Self::load_all(&self.base_path)?;
 
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data_write();
         *data = new_data;
 
-        let mut runs = self.runs.write().unwrap();
+        let mut runs = self.runs_write();
         *runs = new_runs;
 
         Ok(())

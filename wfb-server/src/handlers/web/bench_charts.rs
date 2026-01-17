@@ -114,7 +114,7 @@ fn find_language_for_framework(
     test: &str,
     framework: &str,
 ) -> Option<String> {
-    let data = state.storage.data.read().ok()?;
+    let data = state.storage.data_read();
     let run_data = data.get(run)?;
     let env_data = run_data.get(env)?;
 

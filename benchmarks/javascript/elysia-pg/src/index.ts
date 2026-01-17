@@ -20,6 +20,12 @@ const sql = postgres({
   max: DB_POOL_SIZE
 })
 
+const mapToObject = (map: Map<string, number>) => {
+  const obj: Record<string, number> = Object.create(null)
+  for (const [key, value] of map) obj[key] = value
+  return obj
+}
+
 const app = new Elysia()
   // Health check
   .get('/health', async ({ set }) => {
@@ -39,25 +45,31 @@ const app = new Elysia()
   .post('/json/aggregate', ({ body }) => {
     const orders = body as any[]
     let processedOrders = 0
-    const results: Record<string, number> = {}
-    const categoryStats: Record<string, number> = {}
+    const results = new Map<string, number>()
+    const categoryStats = new Map<string, number>()
 
     for (const order of orders) {
       if (order.status === 'completed') {
         processedOrders++
         
-        results[order.country] = (results[order.country] || 0) + order.amount
+        const country = order.country
+        const prevAmount = results.get(country)
+        results.set(country, prevAmount === undefined ? order.amount : prevAmount + order.amount)
         
-        for (const item of order.items) {
-          categoryStats[item.category] = (categoryStats[item.category] || 0) + item.quantity
+        const items = order.items
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          const category = item.category
+          const prevQty = categoryStats.get(category)
+          categoryStats.set(category, prevQty === undefined ? item.quantity : prevQty + item.quantity)
         }
       }
     }
 
     return {
       processedOrders,
-      results,
-      categoryStats
+      results: mapToObject(results),
+      categoryStats: mapToObject(categoryStats)
     }
   })
   

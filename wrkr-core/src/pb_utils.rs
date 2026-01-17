@@ -30,7 +30,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("bool", |_, this, (tag, val): (u32, bool)| {
             if val {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::Varint, &mut *buf);
                 encode_varint(val as u64, &mut *buf);
             }
@@ -39,7 +39,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("float", |_, this, (tag, val): (u32, f32)| {
             if val != 0.0 {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::ThirtyTwoBit, &mut *buf);
                 buf.extend_from_slice(&val.to_le_bytes());
             }
@@ -48,7 +48,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("double", |_, this, (tag, val): (u32, f64)| {
             if val != 0.0 {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::SixtyFourBit, &mut *buf);
                 buf.extend_from_slice(&val.to_le_bytes());
             }
@@ -57,7 +57,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("sint32", |_, this, (tag, val): (u32, i32)| {
             if val != 0 {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::Varint, &mut *buf);
                 let encoded = (val as u32) << 1 ^ (val >> 31) as u32; // ZigZag
                 encode_varint(encoded as u64, &mut *buf);
@@ -67,7 +67,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("sint64", |_, this, (tag, val): (u32, i64)| {
             if val != 0 {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::Varint, &mut *buf);
                 let encoded = (val as u64) << 1 ^ (val >> 63) as u64; // ZigZag
                 encode_varint(encoded, &mut *buf);
@@ -77,7 +77,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("int32", |_, this, (tag, val): (u32, i32)| {
             if val != 0 {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::Varint, &mut *buf);
                 encode_varint(val as u64, &mut *buf);
             }
@@ -86,7 +86,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("int64", |_, this, (tag, val): (u32, i64)| {
             if val != 0 {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::Varint, &mut *buf);
                 encode_varint(val as u64, &mut *buf);
             }
@@ -95,7 +95,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("string", |_, this, (tag, val): (u32, String)| {
             if !val.is_empty() {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 encode_key(tag, WireType::LengthDelimited, &mut *buf);
                 encode_varint(val.len() as u64, &mut *buf);
                 buf.extend_from_slice(val.as_bytes());
@@ -105,7 +105,7 @@ impl UserData for PbBuilder {
 
         methods.add_method("bytes", |_, this, (tag, val): (u32, mlua::String)| {
             if !val.as_bytes().is_empty() {
-                let mut buf = this.buffer.lock().unwrap();
+                let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
                 let bytes = val.as_bytes();
                 encode_key(tag, WireType::LengthDelimited, &mut *buf);
                 encode_varint(bytes.len() as u64, &mut *buf);
@@ -115,7 +115,7 @@ impl UserData for PbBuilder {
         });
 
         methods.add_method("raw_bytes", |_, this, val: mlua::String| {
-            let mut buf = this.buffer.lock().unwrap();
+            let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
             buf.extend_from_slice(&val.as_bytes());
             Ok(this.clone())
         });
@@ -131,7 +131,7 @@ impl UserData for PbBuilder {
             // If we encode a message field, and it has no content, it is just tag + len(0).
             // Let's allow empty messages.
 
-            let mut buf = this.buffer.lock().unwrap();
+            let mut buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
             let bytes = val.as_bytes();
             encode_key(tag, WireType::LengthDelimited, &mut *buf);
             encode_varint(bytes.len() as u64, &mut *buf);
@@ -140,17 +140,18 @@ impl UserData for PbBuilder {
         });
 
         methods.add_method("as_bytes", |lua, this, ()| {
-            let buf = this.buffer.lock().unwrap();
+            let buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
             lua.create_string(&*buf)
         });
 
         methods.add_method("as_grpc_frame", |lua, this, compressed: Option<bool>| {
-            let buf = this.buffer.lock().unwrap();
+            let buf = this.buffer.lock().unwrap_or_else(|err| err.into_inner());
 
             let (flag, payload_bytes) = if compressed.unwrap_or(false) {
                 let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-                encoder.write_all(&buf).expect("gzip encode failed");
-                (1u8, encoder.finish().expect("gzip finish failed"))
+                encoder.write_all(&buf).map_err(mlua::Error::external)?;
+                let payload = encoder.finish().map_err(mlua::Error::external)?;
+                (1u8, payload)
             } else {
                 (0u8, buf.clone())
             };
@@ -285,7 +286,9 @@ impl UserData for PbScanner {
                     "Not enough bytes for float".into(),
                 ));
             }
-            let arr: [u8; 4] = b[0..4].try_into().unwrap();
+            let arr: [u8; 4] = b[0..4]
+                .try_into()
+                .map_err(|_| mlua::Error::RuntimeError("Invalid float bytes".into()))?;
             Ok(f32::from_le_bytes(arr))
         });
 
@@ -296,7 +299,9 @@ impl UserData for PbScanner {
                     "Not enough bytes for double".into(),
                 ));
             }
-            let arr: [u8; 8] = b[0..8].try_into().unwrap();
+            let arr: [u8; 8] = b[0..8]
+                .try_into()
+                .map_err(|_| mlua::Error::RuntimeError("Invalid double bytes".into()))?;
             Ok(f64::from_le_bytes(arr))
         });
 

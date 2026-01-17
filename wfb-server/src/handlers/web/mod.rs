@@ -8,6 +8,7 @@ mod github;
 mod helpers;
 mod index;
 mod render;
+mod seo;
 mod types;
 
 pub use bench::bench_path_handler;
@@ -16,3 +17,5 @@ pub use github::github_stars_partials_handler;
 pub use index::index_path_handler;
 pub use index::index_update_path_handler;
 pub use index::root_handler;
+pub use seo::robots_txt_handler;
+pub use seo::sitemap_xml_handler;

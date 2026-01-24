@@ -106,7 +106,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
     pub async fn run_tests(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
         for test in &benchmark.tests {
             if matches!(test, BenchmarkTests::StaticFiles) {
-                pb.println("static_files is currently disabled; skipping".to_string());
+                pb.println("static_files is currently disabled; skipping");
                 continue;
             }
 

@@ -1,8 +1,8 @@
 language_version: '10.0'
 framework_version: '10.0'
 tags:
-  type: framework
   runtime: dotnet
   arch: async
+  type: framework
 database: null
 path: benchmarks/csharp/aspnetcore-grpc

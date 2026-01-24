@@ -1,8 +1,8 @@
 language_version: '17'
 framework_version: 1.57.0
 tags:
-  arch: callback
   type: micro-framework
   runtime: native
+  arch: callback
 database: null
 path: benchmarks/cpp/grpc-callback

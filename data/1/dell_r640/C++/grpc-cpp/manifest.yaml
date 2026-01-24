@@ -1,8 +1,8 @@
 language_version: '17'
 framework_version: 1.57.0
 tags:
+  runtime: native
   arch: async
   type: micro-framework
-  runtime: native
 database: null
 path: benchmarks/cpp/grpc

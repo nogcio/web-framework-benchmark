@@ -11,9 +11,6 @@ COPY Cargo.toml Cargo.lock ./
 COPY wfb-runner ./wfb-runner
 COPY wfb-server ./wfb-server
 COPY wfb-storage ./wfb-storage
-COPY wrkr ./wrkr
-COPY wrkr-api ./wrkr-api
-COPY wrkr-core ./wrkr-core
 
 # Build wfb targets
 RUN RUSTFLAGS="-C link-arg=-lgcc" cargo build --release -p wfb-runner -p wfb-server

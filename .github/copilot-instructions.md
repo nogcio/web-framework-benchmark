@@ -7,7 +7,7 @@ Use these instructions as the default rules when proposing changes.
 ## Where you are in the monorepo
 
 - Editing `benchmarks/**` → see [copilot/benchmarks.md](./copilot/benchmarks.md)
-- Editing Rust crates (`wfb-*`, `wrkr*`) → see [copilot/rust-workspace.md](./copilot/rust-workspace.md)
+- Editing Rust crates (`wfb-*`) → see [copilot/rust-workspace.md](./copilot/rust-workspace.md)
 - Editing UI/templates/assets (`wfb-server/templates/**`, `wfb-server/assets/**`) → see [copilot/ui-templates.md](./copilot/ui-templates.md)
 - Editing `config/**` or `docs/**` → see [copilot/config-docs.md](./copilot/config-docs.md)
 - How to verify changes → see [copilot/verification.md](./copilot/verification.md)
@@ -18,7 +18,7 @@ When in doubt: search by route/symbol and follow existing patterns.
 ## Quick decision tree
 
 - Changing only `benchmarks/**` (framework app / Docker context) → read [copilot/benchmarks.md](./copilot/benchmarks.md), verify via Docker loop in [copilot/verification.md](./copilot/verification.md)
-- Changing Rust crates (`wfb-*`, `wrkr*`) → read [copilot/rust-workspace.md](./copilot/rust-workspace.md), verify via [copilot/verification.md](./copilot/verification.md)
+- Changing Rust crates (`wfb-*`) → read [copilot/rust-workspace.md](./copilot/rust-workspace.md), verify via [copilot/verification.md](./copilot/verification.md)
 - Changing UI/templates/assets → read [copilot/ui-templates.md](./copilot/ui-templates.md), verify via `cargo check -p wfb-server` (see [copilot/verification.md](./copilot/verification.md))
 - Changing config/specs/docs → read [copilot/config-docs.md](./copilot/config-docs.md), call out breaking changes; verify the affected benchmark/spec via [copilot/verification.md](./copilot/verification.md) when relevant
 
@@ -38,9 +38,8 @@ If unsure where something lives, search by symbol/route name and confirm with th
 - `wfb-runner/`: CLI orchestrator. Builds/runs benchmark containers, manages DB services, runs verification and load tests.
 - `wfb-server/`: Web server + dashboard/API. Also contains templates/assets for the UI.
 - `wfb-storage/`: Shared library for configuration, storage, and data models used by runner/server.
-- `wrkr/`: Load generator binary (Rust) used to drive traffic and validate responses.
-- `wrkr-core/`: Core load-testing logic (library + benches).
-- `wrkr-api/`: API/structs used by the load generator and runner.
+- `scripts/`: Lua scenarios executed by the external load generator.
+- Load generator: [nogcio/wrkr](https://github.com/nogcio/wrkr) (Docker image) mounted with `./scripts:/scripts`.
 
 Non-Rust runtime assets:
 
@@ -104,7 +103,7 @@ Per-benchmark folder contents:
 - Treat benchmark implementations as contract-driven; don’t add “extra safety” in the hot path.
 - Must listen on `8080`, include `HEALTHCHECK`, and implement endpoints required by `docs/specs/*.md`.
 
-### Rust crates (`wfb-*`, `wrkr*`)
+### Rust crates (`wfb-*`)
 
 - Never read env/config per-request; parse once at startup or cache via `OnceLock`.
 - If you change an API/contract, update all call sites in the same change.

@@ -2,7 +2,7 @@ language_version: 3.14.2
 framework_version: 0.127.0
 tags:
   arch: async
-  type: micro-framework
   runtime: python-asyncio
+  type: micro-framework
 database: postgres
 path: benchmarks/python/fastapi-pg

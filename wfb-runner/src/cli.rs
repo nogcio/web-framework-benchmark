@@ -23,7 +23,7 @@ pub enum Commands {
         #[arg(short, long, default_value = "local")]
         env: String,
 
-        /// Skip building and deploying wrkr
+        /// Skip pulling/deploying the load generator (nogcio/wrkr) and scripts
         #[arg(long, default_value_t = false)]
         skip_wrkr_build: bool,
 

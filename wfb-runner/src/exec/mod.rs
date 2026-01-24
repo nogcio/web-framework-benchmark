@@ -33,6 +33,7 @@ pub struct OutputLogger {
     pb: ProgressBar,
     cmd: String,
     last_lines: Arc<Mutex<VecDeque<String>>>,
+    last_lines_plain: Arc<Mutex<VecDeque<String>>>,
     stderr_log: Arc<Mutex<String>>,
 }
 
@@ -43,6 +44,7 @@ impl OutputLogger {
             pb,
             cmd,
             last_lines: Arc::new(Mutex::new(VecDeque::with_capacity(6))),
+            last_lines_plain: Arc::new(Mutex::new(VecDeque::with_capacity(20))),
             stderr_log: Arc::new(Mutex::new(String::new())),
         }
     }
@@ -58,6 +60,15 @@ impl OutputLogger {
                 style("===>").black().bright(),
                 style(line).black().bright()
             ));
+
+            let mut plain = self
+                .last_lines_plain
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if plain.len() >= 20 {
+                plain.pop_front();
+            }
+            plain.push_back(format!("stdout: {}", line));
         }
         self.update_state();
     }
@@ -73,6 +84,15 @@ impl OutputLogger {
                 style("===>").red(),
                 style(line).black().bright()
             ));
+
+            let mut plain = self
+                .last_lines_plain
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if plain.len() >= 20 {
+                plain.pop_front();
+            }
+            plain.push_back(format!("stderr: {}", line));
 
             let mut log = self.stderr_log.lock().unwrap_or_else(|e| e.into_inner());
             log.push_str(line);
@@ -99,5 +119,15 @@ impl OutputLogger {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone()
+    }
+
+    pub fn get_last_lines_plain(&self) -> String {
+        self.last_lines_plain
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }

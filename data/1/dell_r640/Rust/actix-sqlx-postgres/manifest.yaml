@@ -1,8 +1,8 @@
 language_version: '1.92'
 framework_version: 4.12.1
 tags:
-  arch: async
   type: micro-framework
+  arch: async
   runtime: native
 database: postgres
 path: benchmarks/rust/actix-sqlx-postgres

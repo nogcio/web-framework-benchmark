@@ -38,7 +38,7 @@ Modern architectures often choose between REST and gRPC. WFB offers mirrored spe
 
 ### 3. 🛡️ Strict Validation
 Speed is meaningless if the data is wrong.
-Our custom load generator `wrkr` validates every single response. If a framework returns an incorrect sum in an analytics report or misses a field in a JSON object, the test fails. No caching shortcuts allowed.
+Our load generator ([nogcio/wrkr](https://github.com/nogcio/wrkr) via Docker) validates every single response. If a framework returns an incorrect sum in an analytics report or misses a field in a JSON object, the test fails. No caching shortcuts allowed.
 
 ### 4. 🛠️ Developer Experience
 Running benchmarks shouldn't require complex ops.
@@ -49,8 +49,8 @@ WFB is a self-contained **Rust** workspace. The single CLI tool manages Docker c
 We believe benchmarks should be transparent and reproducible.
 
 - **Warmup Phase**: Every test includes a **30-second warmup** to allow JIT compilers (Java, C#, JS, Lua) to optimize hot paths before measurement begins.
-- **Connection Stepping**: We test multiple concurrency levels (e.g., 64, 128, 256, 512 connections) to show how frameworks scale under load, rather than picking a single "magic number".
-- **Realistic Client**: The `wrkr` load generator implementation uses production-grade async Rust networking (Tokio/Hyper/Reqwest) to ensure HTTP/2 and HTTP/1.1 compliance. We do not use "pipeline-optimized" synthetic clients that break spec.
+- **Ramping VUs**: We ramp up to a configured max concurrency (VUs) to show scaling behaviour rather than picking a single "magic number".
+- **Realistic Client**: Load is driven by [nogcio/wrkr](https://github.com/nogcio/wrkr) running in Docker, executing Lua scenarios under `scripts/`.
 - **Latency Distribution**: We capture high-resolution latency histograms (p50, p90, p99, max) to identify "hiccups" caused by GC pauses or improper async blocking.
 
 ## 🧪 Test Suite
@@ -61,7 +61,9 @@ We believe benchmarks should be transparent and reproducible.
 | **[JSON Analytics](docs/specs/json_aggregate_spec.md)** | CPU & Memory efficiency | Data Processing Microservices |
 | **[Database Complex](docs/specs/db_complex_spec.md)** | ORM overhead, Async flows | User Dashboards, CMS |
 | **[gRPC Aggregate](docs/specs/grpc_aggregate_spec.md)** | Protocol Efficiency | Inter-service Communication |
-| **[Static Files](docs/specs/static_files_spec.md)** | Network I / O, Sendfile | CDNs, Asset Servers |
+| **[Static Files](docs/specs/static_files_spec.md)** | Network I / O, Sendfile (currently disabled) | CDNs, Asset Servers |
+
+Note: `static_files` is currently disabled in the runner.
 
 ## 🏗 Architecture
 
@@ -70,7 +72,7 @@ The project is organized as a Rust workspace:
 1.  **wfb-runner**: The CLI tool that orchestrates Docker containers and runs benchmarks.
 2.  **wfb-server**: The API server that provides access to benchmark data.
 3.  **wfb-storage**: Shared library for configuration, storage logic, and data models.
-4.  **wrkr**: Custom high-performance, asynchronous load generator.
+4.  **Load generator**: [nogcio/wrkr](https://github.com/nogcio/wrkr) (Docker image) + WFB Lua scripts under `scripts/`.
 
 ## 🏁 Quick Start
 

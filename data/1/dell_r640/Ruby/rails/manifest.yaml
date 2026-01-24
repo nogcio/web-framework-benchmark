@@ -1,8 +1,8 @@
 language_version: '4.0'
 framework_version: '8.0'
 tags:
-  type: full-stack
   runtime: vm
   orm: active-record
+  type: full-stack
 database: postgres
 path: benchmarks/ruby/rails

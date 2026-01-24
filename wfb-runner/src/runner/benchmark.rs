@@ -5,11 +5,57 @@ use crate::runner::Runner;
 use anyhow::{Context, bail};
 use humanize_bytes::humanize_bytes_binary;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::time::Duration;
 use wfb_storage::{Benchmark, BenchmarkTests, DatabaseKind};
-use wrkr_api::JsonStats;
 
 impl<E: Executor + Clone + Send + 'static> Runner<E> {
+    fn scripts_mount_host_path(&self) -> anyhow::Result<String> {
+        if self.config.is_remote {
+            Ok(format!("{}/scripts", consts::REMOTE_WRKR_PATH))
+        } else {
+            let cwd = std::env::current_dir().context("Failed to resolve current_dir")?;
+            Ok(cwd.join("scripts").to_string_lossy().to_string())
+        }
+    }
+
+    fn wrkr_env_for_test(
+        &self,
+        _test: BenchmarkTests,
+        mode: &str,
+        duration: &str,
+        max_vus: u64,
+    ) -> Vec<(&'static str, String)> {
+        vec![
+            ("WFB_MODE", mode.to_string()),
+            ("WFB_DURATION", duration.to_string()),
+            ("WFB_MAX_VUS", max_vus.to_string()),
+            ("BASE_URL", self.config.app_host_url.clone()),
+        ]
+    }
+
+    fn max_vus_for_test(test: BenchmarkTests) -> u64 {
+        match test {
+            BenchmarkTests::PlainText => consts::UVS_PLAINTEXT,
+            BenchmarkTests::JsonAggregate => consts::UVS_JSON,
+            BenchmarkTests::DbComplex => consts::UVS_DB_COMPLEX,
+            BenchmarkTests::GrpcAggregate => consts::UVS_GRPC,
+            BenchmarkTests::StaticFiles => consts::UVS_STATIC,
+        }
+    }
+
+    fn warmup_vus_for_test(test: BenchmarkTests) -> u64 {
+        let max_vus = Self::max_vus_for_test(test);
+
+        // Keep warmup much lighter than the real run:
+        //  - scale down to ~1/16 of target VUs (rounding up)
+        //  - cap to a small absolute maximum
+        let scaled = max_vus.div_ceil(16);
+        let capped = scaled.min(consts::BENCHMARK_WARMUP_MAX_VUS);
+        capped.max(1)
+    }
+
     pub async fn run_app(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
         let mut cmd = self
             .app_docker
@@ -59,6 +105,11 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
     pub async fn run_tests(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
         for test in &benchmark.tests {
+            if matches!(test, BenchmarkTests::StaticFiles) {
+                pb.println("static_files is currently disabled; skipping".to_string());
+                continue;
+            }
+
             let script_path = match test {
                 BenchmarkTests::PlainText => consts::SCRIPT_PLAINTEXT,
                 BenchmarkTests::JsonAggregate => consts::SCRIPT_JSON,
@@ -69,21 +120,73 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
             pb.set_message(format!("Running test {:?} - {}", test, benchmark.name));
 
-            let script_content = std::fs::read_to_string(script_path)
-                .with_context(|| format!("Failed to read script file: {}", script_path))?;
+            // Verify run: short constant VUs to validate correctness.
+            let scripts_mount = self.scripts_mount_host_path()?;
+            let duration_str = format!("{}s", consts::VERIFY_DURATION_SECS);
+            let envs = self.wrkr_env_for_test(
+                *test,
+                "verify",
+                duration_str.as_str(),
+                consts::VERIFY_MAX_VUS,
+            );
 
-            let config = wrkr_core::WrkConfig {
-                script_content,
-                host_url: self.config.app_public_host_url.clone(),
-                http2: matches!(test, BenchmarkTests::GrpcAggregate),
+            let mut cmd = self
+                .wrkr_docker
+                .run_command(consts::WRKR_IMAGE, "wrkr-verify")
+                .detach(false)
+                .ulimit("nofile=1000000:1000000")
+                .volume(scripts_mount.as_str(), "/scripts")
+                .arg("run")
+                .arg(script_path)
+                .arg("--output")
+                .arg("json");
+
+            for (k, v) in envs {
+                cmd = cmd.env(k, v);
+            }
+
+            let last_line: std::sync::Arc<std::sync::Mutex<Option<WrkrJsonProgressLine>>> =
+                std::sync::Arc::new(std::sync::Mutex::new(None));
+            let last_line_clone = last_line.clone();
+            let run_res = self
+                .wrkr_docker
+                .execute_run_with_std_out(
+                    cmd,
+                    move |line| {
+                        if let Ok(v) = serde_json::from_str::<WrkrJsonProgressLine>(line)
+                            && let Ok(mut guard) = last_line_clone.lock()
+                        {
+                            *guard = Some(v);
+                        }
+                    },
+                    &ProgressBar::hidden(),
+                )
+                .await;
+
+            self.wrkr_docker
+                .stop_and_remove("wrkr-verify", &ProgressBar::hidden())
+                .await;
+
+            let run_err = run_res.err();
+
+            let stats = last_line.lock().unwrap_or_else(|e| e.into_inner()).clone();
+            let stats = match stats {
+                Some(v) => v,
+                None => {
+                    if let Some(e) = run_err {
+                        bail!("wrkr verify run failed: {}", e);
+                    }
+                    bail!(
+                        "wrkr produced no JSON progress lines during verify for {:?}; check script/runtime",
+                        test
+                    );
+                }
             };
 
-            pb.set_message(format!("Running test {:?} - {}", test, benchmark.name));
-            let stats = wrkr_core::run_once(config.clone()).await?;
-
-            if stats.total_errors > 0 {
-                let errors = stats
-                    .errors
+            let checks_failed_total = stats.checks_failed_total;
+            if checks_failed_total > 0 {
+                let errors_str = stats
+                    .checks_failed
                     .iter()
                     .map(|(code, count)| format!("{}: {}", code, count))
                     .collect::<Vec<_>>()
@@ -91,9 +194,21 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 bail!(
                     "Test {:?} failed with {} errors\n{}",
                     test,
-                    stats.total_errors,
-                    errors
+                    checks_failed_total,
+                    errors_str
                 );
+            }
+
+            if checks_failed_total > 0 {
+                bail!(
+                    "Test {:?} failed: checks_failed_total={}",
+                    test,
+                    checks_failed_total
+                );
+            }
+
+            if let Some(e) = run_err {
+                bail!("wrkr verify run failed: {}", e);
             }
         }
         Ok(())
@@ -320,6 +435,16 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             .ok_or_else(|| anyhow::anyhow!("Language '{}' not found", benchmark.language))?;
 
         for test in &benchmark.tests {
+            if matches!(test, BenchmarkTests::StaticFiles) {
+                let pb = mb.add(ProgressBar::new_spinner());
+                pb.finish_with_message(format!(
+                    "   {} {:?} - Skipped (static_files disabled)",
+                    console::style("-").yellow(),
+                    test
+                ));
+                continue;
+            }
+
             let pb = mb.add(ProgressBar::new_spinner());
             let style = match ProgressStyle::default_spinner()
                 .template("{spinner:.blue} {prefix} [{bar:40.cyan/blue}] {msg}")
@@ -340,26 +465,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             self.run_app(benchmark, &pb).await?;
             self.wait_for_app_ready(benchmark, &pb).await?;
 
-            let (script_path, step_connections) = match test {
-                BenchmarkTests::PlainText => (
-                    consts::SCRIPT_PLAINTEXT,
-                    consts::BENCHMARK_STEP_CONNECTIONS_PLAINTEXT,
-                ),
-                BenchmarkTests::JsonAggregate => {
-                    (consts::SCRIPT_JSON, consts::BENCHMARK_STEP_CONNECTIONS_JSON)
-                }
-                BenchmarkTests::StaticFiles => (
-                    consts::SCRIPT_STATIC,
-                    consts::BENCHMARK_STEP_CONNECTIONS_STATIC,
-                ),
-                BenchmarkTests::DbComplex => (
-                    consts::SCRIPT_DB_COMPLEX,
-                    consts::BENCHMARK_STEP_CONNECTIONS_DB_COMPLEX,
-                ),
-                BenchmarkTests::GrpcAggregate => (
-                    consts::SCRIPT_GRPC_AGGREGATE,
-                    consts::BENCHMARK_STEP_CONNECTIONS_GRPC_AGGREGATE,
-                ),
+            let script_path = match test {
+                BenchmarkTests::PlainText => consts::SCRIPT_PLAINTEXT,
+                BenchmarkTests::JsonAggregate => consts::SCRIPT_JSON,
+                BenchmarkTests::StaticFiles => consts::SCRIPT_STATIC,
+                BenchmarkTests::DbComplex => consts::SCRIPT_DB_COMPLEX,
+                BenchmarkTests::GrpcAggregate => consts::SCRIPT_GRPC_AGGREGATE,
             };
 
             // --- WARMUP PHASE ---
@@ -376,26 +487,29 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 warmup_pb.set_prefix(format!("[{}/{}/warmup]", benchmark.name, test));
                 warmup_pb.enable_steady_tick(Duration::from_millis(100));
 
-                let warmup_duration = format!("{}", consts::BENCHMARK_WARMUP_DURATION_SECS);
+                let scripts_mount = self.scripts_mount_host_path()?;
+                let warmup_vus = Self::warmup_vus_for_test(*test);
+                let warmup_duration_str = format!("{}s", consts::BENCHMARK_WARMUP_DURATION_SECS);
+                let envs = self.wrkr_env_for_test(
+                    *test,
+                    "warmup",
+                    warmup_duration_str.as_str(),
+                    warmup_vus,
+                );
 
                 let mut cmd = self
                     .wrkr_docker
                     .run_command(consts::WRKR_IMAGE, "wrkr-warmup")
                     .detach(false)
                     .ulimit("nofile=1000000:1000000")
-                    .arg("-s")
+                    .volume(scripts_mount.as_str(), "/scripts")
+                    .arg("run")
                     .arg(script_path)
-                    .arg("--url")
-                    .arg(&self.config.app_host_url)
-                    .arg("--duration")
-                    .arg(&warmup_duration)
-                    .arg("--connections")
-                    .arg("8")
                     .arg("--output")
                     .arg("json");
 
-                if matches!(test, BenchmarkTests::GrpcAggregate) {
-                    cmd = cmd.arg("--http2");
+                for (k, v) in envs {
+                    cmd = cmd.env(k, v);
                 }
 
                 let warmup_pb_clone = warmup_pb.clone();
@@ -404,7 +518,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     .execute_run_with_std_out(
                         cmd,
                         move |line| {
-                            if let Ok(stats) = serde_json::from_str::<JsonStats>(line) {
+                            if let Ok(stats) = serde_json::from_str::<WrkrJsonProgressLine>(line) {
                                 warmup_pb_clone.set_position(
                                     stats
                                         .elapsed_secs
@@ -413,8 +527,8 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                                 warmup_pb_clone.set_message(format!(
                                     "RPS: {:.0} | Latency: {} | Errors: {}",
                                     stats.requests_per_sec,
-                                    format_latency(stats.latency_p99),
-                                    stats.total_errors
+                                    format_latency_ms(stats.latency_p99),
+                                    stats.checks_failed_total
                                 ));
                             }
                         },
@@ -436,7 +550,7 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             run_pb.set_style(style);
 
             let duration = format!("{}", consts::BENCHMARK_DURATION_PER_TEST_SECS);
-            let step_duration = format!("{}", consts::BENCHMARK_STEP_DURATION_SECS);
+            let duration_str = format!("{}s", duration);
 
             let resource_usage = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
             let resource_usage_clone = resource_usage.clone();
@@ -467,26 +581,23 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 }
             });
 
+            let scripts_mount = self.scripts_mount_host_path()?;
+
             let mut cmd = self
                 .wrkr_docker
                 .run_command(consts::WRKR_IMAGE, "wrkr-runner")
                 .detach(false)
                 .ulimit("nofile=1000000:1000000")
-                .arg("-s")
+                .volume(scripts_mount.as_str(), "/scripts")
+                .arg("run")
                 .arg(script_path)
-                .arg("--url")
-                .arg(&self.config.app_host_url)
-                .arg("--duration")
-                .arg(&duration)
-                .arg("--step-connections")
-                .arg(step_connections)
-                .arg("--step-duration")
-                .arg(&step_duration)
                 .arg("--output")
                 .arg("json");
 
-            if matches!(test, BenchmarkTests::GrpcAggregate) {
-                cmd = cmd.arg("--http2");
+            let max_vus = Self::max_vus_for_test(*test);
+            let envs = self.wrkr_env_for_test(*test, "run", &duration_str, max_vus);
+            for (k, v) in envs {
+                cmd = cmd.env(k, v);
             }
 
             let raw_data_collection = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -495,31 +606,41 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             let pb_clone = pb.clone();
             let resource_usage_read = resource_usage.clone();
             let _output = self.wrkr_docker.execute_run_with_std_out(cmd, move |line| {
-                if let Ok(stats) = serde_json::from_str::<JsonStats>(line) {
+                if let Ok(stats) = serde_json::from_str::<WrkrJsonProgressLine>(line) {
+                    let total_errors = stats.checks_failed.values().copied().sum();
+
                     let (mem_bytes, cpu_usage) = if let Ok(guard) = resource_usage_read.lock() {
                         guard.last().cloned().unwrap_or((0, 0.0))
                     } else {
                         (0, 0.0)
                     };
 
+                    let latency_mean_us = stats.latency_mean * 1000.0;
+                    let latency_stdev_us = stats.latency_stdev * 1000.0;
+                    let latency_max_us = stats.latency_max.saturating_mul(1000);
+                    let latency_p50_us = stats.latency_p50.saturating_mul(1000);
+                    let latency_p75_us = stats.latency_p75.saturating_mul(1000);
+                    let latency_p90_us = stats.latency_p90.saturating_mul(1000);
+                    let latency_p99_us = stats.latency_p99.saturating_mul(1000);
+
                     let raw_item = wfb_storage::TestCaseRaw {
                         elapsed_secs: stats.elapsed_secs,
                         connections: stats.connections,
                         requests_per_sec: stats.requests_per_sec,
-                        bytes_per_sec: stats.bytes_per_sec,
+                        bytes_per_sec: stats.bytes_received_per_sec + stats.bytes_sent_per_sec,
                         total_requests: stats.total_requests,
-                        total_bytes: stats.total_bytes,
-                        total_errors: stats.total_errors,
-                        latency_mean: stats.latency_mean,
-                        latency_stdev: stats.latency_stdev,
-                        latency_max: stats.latency_max,
-                        latency_p50: stats.latency_p50,
-                        latency_p75: stats.latency_p75,
-                        latency_p90: stats.latency_p90,
-                        latency_p99: stats.latency_p99,
+                        total_bytes: stats.total_bytes_received + stats.total_bytes_sent,
+                        total_errors,
+                        latency_mean: latency_mean_us,
+                        latency_stdev: latency_stdev_us,
+                        latency_max: latency_max_us,
+                        latency_p50: latency_p50_us,
+                        latency_p75: latency_p75_us,
+                        latency_p90: latency_p90_us,
+                        latency_p99: latency_p99_us,
                         latency_stdev_pct: stats.latency_stdev_pct,
-                        latency_distribution: stats.latency_distribution.clone(),
-                        errors: stats.errors.clone(),
+                        latency_distribution: Vec::new(),
+                        errors: stats.checks_failed.clone(),
                         memory_usage_bytes: mem_bytes,
                         cpu_usage_percent: cpu_usage,
                         req_per_sec_avg: stats.req_per_sec_avg,
@@ -537,9 +658,9 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                         "[{}] RPS: {:.0} | TPS: {} | Latency: {} | Errors: {} | Mem: {} | CPU: {:.2}%",
                         stats.connections,
                         stats.requests_per_sec,
-                        humanize_bytes_binary!(stats.bytes_per_sec),
-                        format_latency(stats.latency_p99),
-                        stats.total_errors,
+                        humanize_bytes_binary!(stats.bytes_received_per_sec + stats.bytes_sent_per_sec),
+                        format_latency(latency_p99_us),
+                        total_errors,
                         humanize_bytes_binary!(mem_bytes),
                         cpu_usage
                     ));
@@ -552,6 +673,13 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .clone();
+
+            if raw_data.is_empty() {
+                bail!(
+                    "wrkr produced no JSON progress lines for {:?}; check that --output json is supported and the script is valid",
+                    test
+                );
+            }
 
             let final_resource_usage = resource_usage
                 .lock()
@@ -633,6 +761,42 @@ fn format_latency(micros: u64) -> String {
     } else {
         format!("{:.2}us", micros)
     }
+}
+
+fn format_latency_ms(ms: u64) -> String {
+    format_latency(ms.saturating_mul(1000))
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct WrkrJsonProgressLine {
+    pub elapsed_secs: u64,
+    pub connections: u64,
+
+    pub requests_per_sec: f64,
+    pub bytes_received_per_sec: u64,
+    pub bytes_sent_per_sec: u64,
+
+    pub total_requests: u64,
+    pub total_bytes_received: u64,
+    pub total_bytes_sent: u64,
+    pub checks_failed_total: u64,
+
+    // Latency metrics are in milliseconds in nogcio/wrkr output.
+    pub latency_mean: f64,
+    pub latency_stdev: f64,
+    pub latency_max: u64,
+    pub latency_p50: u64,
+    pub latency_p75: u64,
+    pub latency_p90: u64,
+    pub latency_p99: u64,
+    pub latency_stdev_pct: f64,
+
+    pub checks_failed: HashMap<String, u64>,
+
+    pub req_per_sec_avg: f64,
+    pub req_per_sec_stdev: f64,
+    pub req_per_sec_max: f64,
+    pub req_per_sec_stdev_pct: f64,
 }
 
 fn parse_docker_memory(s: &str) -> u64 {

@@ -1,8 +1,6 @@
 use crate::consts;
 use crate::db_config::get_db_config;
-use crate::docker::DockerManager;
 use crate::exec::Executor;
-use crate::exec::local::LocalExecutor;
 use crate::runner::Runner;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::time::Duration;
@@ -77,72 +75,21 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
         pb.set_message("Deploying wrkr...");
 
         let res = async {
+            // We no longer build a local wrkr image. We pull `nogcio/wrkr:latest` and mount our scripts directory.
+            pb.set_message("Pulling wrkr image (nogcio/wrkr:latest)...");
+            self.wrkr_docker
+                .pull(consts::WRKR_IMAGE, "latest", &pb)
+                .await?;
+
+            // For remote environments, copy scripts to the wrkr host so we can mount them.
             if self.config.is_remote {
-                let local_exec = LocalExecutor::new();
-                let local_docker = DockerManager::new(local_exec.clone(), false);
-
-                let image_name = consts::WRKR_IMAGE;
-                let tar_path = "/tmp/wrkr.tar";
-                let remote_tar_path = format!("{}/wrkr.tar", consts::REMOTE_WRKR_PATH);
-
-                pb.set_message("Detecting remote architecture...");
-                let uname = self.wrkr_executor.execute("uname -m", &pb).await?;
-                let arch = uname.trim();
-                let platform = match arch {
-                    "x86_64" => "linux/amd64",
-                    "aarch64" | "arm64" => "linux/arm64",
-                    _ => {
-                        pb.set_message(format!(
-                            "Unknown architecture: {}, defaulting to linux/amd64",
-                            arch
-                        ));
-                        "linux/amd64"
-                    }
-                };
-
-                pb.set_message(format!("Building wrkr image locally for {}", platform));
-
-                local_docker
-                    .build_with_platform_and_output(
-                        Some("Dockerfile.wrkr"),
-                        image_name,
-                        ".",
-                        platform,
-                        &format!("type=docker,dest={}", tar_path),
-                        &pb,
-                    )
-                    .await?;
-
-                pb.set_message("Copying wrkr image to remote");
-                pb.set_style(
-                    match ProgressStyle::default_spinner()
-                        .template("{spinner:.blue} {prefix} [{bar:40.cyan/blue}] {msg}")
-                    {
-                        Ok(style) => style.progress_chars("#>-"),
-                        Err(_) => ProgressStyle::default_spinner().progress_chars("#>-"),
-                    },
-                );
+                pb.set_message("Copying scripts to remote wrkr host...");
+                let remote_scripts_dir = format!("{}/scripts", consts::REMOTE_WRKR_PATH);
+                // Ensure parent exists (prepare() creates REMOTE_WRKR_PATH already).
+                self.wrkr_executor.rm(&remote_scripts_dir).await.ok();
+                self.wrkr_executor.mkdir(&remote_scripts_dir).await.ok();
                 self.wrkr_executor
-                    .cp(tar_path, &remote_tar_path, &pb)
-                    .await?;
-
-                pb.set_style(
-                    match ProgressStyle::default_spinner()
-                        .template("{spinner:.blue} {prefix} {msg}")
-                    {
-                        Ok(style) => style,
-                        Err(_) => ProgressStyle::default_spinner(),
-                    },
-                );
-
-                pb.set_message("Loading wrkr image on remote");
-                self.wrkr_docker.load(&remote_tar_path, &pb).await?;
-            } else {
-                let local_exec = LocalExecutor::new();
-                let local_docker = DockerManager::new(local_exec.clone(), false);
-                pb.set_message("Building wrkr image locally");
-                local_docker
-                    .build(Some("Dockerfile.wrkr"), consts::WRKR_IMAGE, ".", &pb)
+                    .cp("scripts", &remote_scripts_dir, &pb)
                     .await?;
             }
             Ok::<(), anyhow::Error>(())

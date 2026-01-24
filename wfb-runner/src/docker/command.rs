@@ -117,6 +117,30 @@ impl<'a> fmt::Display for DockerLoadCommand<'a> {
     }
 }
 
+pub struct DockerPullCommand<'a> {
+    sudo: bool,
+    image: &'a str,
+    tag: &'a str,
+}
+
+impl<'a> DockerPullCommand<'a> {
+    pub fn new(sudo: bool, image: &'a str, tag: &'a str) -> Self {
+        Self { sudo, image, tag }
+    }
+}
+
+impl<'a> fmt::Display for DockerPullCommand<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} pull {}:{}",
+            docker_cmd(self.sudo),
+            self.image,
+            self.tag
+        )
+    }
+}
+
 pub struct DockerStopCommand<'a> {
     sudo: bool,
     container_name: &'a str,

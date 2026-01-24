@@ -8,7 +8,7 @@ This project is a Rust workspace plus a large set of Dockerized benchmark implem
   - Builds and runs benchmark containers.
   - Starts/stops supporting DB containers.
   - Runs verification against the specs in `docs/specs/`.
-  - Runs load tests via `wrkr` and aggregates results.
+  - Runs load tests via [nogcio/wrkr](https://github.com/nogcio/wrkr) (Docker) and aggregates results.
 
 - `wfb-server`: Dashboard/API server.
   - Serves the UI (templates/assets) and exposes benchmark data.
@@ -17,12 +17,10 @@ This project is a Rust workspace plus a large set of Dockerized benchmark implem
   - Loads YAML config from `config/`.
   - Defines shared types/models used by runner and server.
 
-- `wrkr`: Load generator binary.
-  - Sends HTTP/gRPC traffic and validates response correctness.
+## Load generator
 
-- `wrkr-core`: Shared load-testing logic.
-
-- `wrkr-api`: Shared API/types for the load generator and runner.
+- [nogcio/wrkr](https://github.com/nogcio/wrkr) (Docker image): executes the load tests.
+- `scripts/`: Lua scenarios used by the runner (mounted into the [nogcio/wrkr](https://github.com/nogcio/wrkr) container).
 
 ## Non-Rust layout
 

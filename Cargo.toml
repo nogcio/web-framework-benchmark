@@ -1,16 +1,9 @@
 [workspace]
 resolver = "3"
-members = [
-    "wfb-runner",
-    "wfb-storage",
-    "wrkr",
-    "wrkr-core",
-    "wrkr-api",
-    "wfb-server",
-]
+members = ["wfb-runner", "wfb-storage", "wfb-server"]
 
 [workspace.package]
-version = "0.8.2"
+version = "0.9.0"
 edition = "2024"
 authors = ["Andrew Sumskoy <getansum@nogc.io>"]
 license = "MIT"

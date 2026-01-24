@@ -1,6 +1,6 @@
-# Rust Workspace (runner/server/storage/wrkr)
+# Rust Workspace (runner/server/storage)
 
-Applies when editing Rust code under: `wfb-runner/`, `wfb-server/`, `wfb-storage/`, `wrkr/`, `wrkr-core/`, `wrkr-api/`.
+Applies when editing Rust code under: `wfb-runner/`, `wfb-server/`, `wfb-storage/`.
 
 ## Performance rule: avoid per-request env reads
 

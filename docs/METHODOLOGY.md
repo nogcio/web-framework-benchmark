@@ -16,7 +16,7 @@ For each benchmark implementation and each test case:
 2. If the test needs a database, start and wait for the database.
 3. Start the application container and wait for `/health`.
 4. Run a correctness verification against the spec.
-5. Run the load test using `wrkr` inside Docker.
+5. Run the load test using [nogcio/wrkr](https://github.com/nogcio/wrkr) inside Docker.
 
 > Note: `wfb-runner dev` is a developer convenience mode that starts the containers and tails logs. It does **not** execute correctness verification or load.
 
@@ -31,28 +31,27 @@ For each benchmark implementation and each test case:
 ### Measurement
 
 - Test duration (per test case): **240s**.
-- Step duration: **20s**.
-- Stepping: the load is applied as discrete connection (VU) steps to show scaling behaviour.
+- Load shape: `ramping-vus` (ramp up → hold → ramp down) to a per-test max VU target.
 
-Connection steps per test case:
+Max VUs per test case:
 
-- `plain_text`: `32,64,128,256,512,1024`
-- `json_aggregate`: `32,64,128,256,512`
-- `static_files`: `16,32,64,128,256`
-- `db_complex`: `32,64,128,256,512`
-- `grpc_aggregate`: `64,128,256,512,1024`
+- `plain_text`: `1024`
+- `json_aggregate`: `512`
+- `db_complex`: `512`
+- `grpc_aggregate`: `1024`
+- `static_files`: disabled (skipped by the runner)
 
 ### Transport & Client
 
-- The load generator is `wrkr` (async Rust, Tokio + Reqwest).
-- HTTP/2 is enabled for gRPC (`--http2`).
-- The runner sets `ulimit nofile=1000000:1000000` for the `wrkr` container.
+- The load generator is [nogcio/wrkr](https://github.com/nogcio/wrkr) running in Docker.
+- The runner mounts `./scripts` into the container and executes `scripts/wfb_*.lua` scenarios.
+- The runner sets `ulimit nofile=1000000:1000000` for the [nogcio/wrkr](https://github.com/nogcio/wrkr) container.
 
 ## Correctness / Validation
 
 WFB treats correctness as a first-class requirement.
 
-During load, `wrkr` executes Lua scenarios that:
+During load, [nogcio/wrkr](https://github.com/nogcio/wrkr) executes Lua scenarios that:
 
 - send requests to the target endpoint,
 - parse responses,
@@ -71,7 +70,8 @@ Examples of what is validated:
 
 ### Latency
 
-- Latency is measured **per request** in the load generator as wall-clock elapsed time and recorded in **microseconds**.
+- Latency is measured **per request** in the load generator as wall-clock elapsed time.
+- Storage is recorded in **microseconds** (the runner converts the load generator JSON output, which is in milliseconds).
 - Aggregation uses an HDRHistogram.
 - Reported percentiles include p50, p75, p90, p99, and max.
 
@@ -82,8 +82,8 @@ Examples of what is validated:
 
 ### Errors
 
-By default, `wrkr` counts any HTTP status outside `[200..399]` as an error.
-Some scenarios intentionally disable status-code tracking to allow expected negative cases (e.g., the DB test includes 404s by design).
+Errors are reported as failed checks from the load generator.
+Some scenarios intentionally allow expected negative cases (e.g., `db_complex` includes 404s by design and does not treat them as failures).
 
 ## Reproducibility
 
@@ -98,13 +98,20 @@ The `run` command executes the configured suite; for focused work on one impleme
 
 - `cargo run --release --bin wfb-runner -- dev <benchmark_name> --env local`
 
-2. In a second terminal, run `wrkr` directly against the app URL (local runner publishes the app on `http://localhost:54320` by default):
+2. In a second terminal, run [nogcio/wrkr](https://github.com/nogcio/wrkr) directly against the app URL.
 
-- `cargo run --release --bin wrkr -- -s scripts/wrkr_plaintext.lua --url http://localhost:54320 --duration 60 --connections 128`
+On macOS, the easiest way is to run the load generator in Docker and target `host.docker.internal`.
 
-For step load (matches the runner’s shape):
+Docker image: [nogcio/wrkr](https://github.com/nogcio/wrkr) (`nogcio/wrkr:latest`).
 
-- `cargo run --release --bin wrkr -- -s scripts/wrkr_json_aggregate.lua --url http://localhost:54320 --duration 240 --step-connections 32,64,128,256,512 --step-duration 20 --output json`
+```bash
+docker run --rm \
+	-v "$PWD/scripts:/scripts:ro" \
+	-e BASE_URL="http://host.docker.internal:54320" \
+	-e WFB_DURATION="60s" \
+	-e WFB_MAX_VUS="128" \
+	nogcio/wrkr:latest run /scripts/wfb_plaintext.lua --output json
+```
 
 If you want correctness checks only (no load), use:
 

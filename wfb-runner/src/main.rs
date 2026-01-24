@@ -296,7 +296,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         db_port: consts::DB_PORT_EXTERNAL.to_string(),
                         app_host_url: format!(
                             "http://{}:{}",
-                            app_config.ip,
+                            app_config.internal_ip,
                             consts::APP_PORT_EXTERNAL
                         ),
                         app_public_host_url: format!(
@@ -321,6 +321,7 @@ async fn main() -> Result<(), anyhow::Error> {
             };
 
             runner.prepare(&m).await?;
+            runner.deploy_wrkr(&m).await?;
 
             runner.build_database_images(unique_dbs, &m).await?;
 

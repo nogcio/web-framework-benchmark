@@ -1,8 +1,8 @@
 language_version: '10.0'
 framework_version: 9.0.0
 tags:
-  runtime: dotnet
   type: framework
   arch: async
+  runtime: dotnet
 database: postgres
 path: benchmarks/csharp/aspnetcore-npgsql

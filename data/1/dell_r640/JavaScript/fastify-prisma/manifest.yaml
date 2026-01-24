@@ -1,9 +1,9 @@
 language_version: 25.2.1
 framework_version: 5.6.2
 tags:
-  type: micro-framework
   runtime: nodejs
-  arch: event-loop
   orm: prisma
+  arch: event-loop
+  type: micro-framework
 database: postgres
 path: benchmarks/javascript/fastify-prisma

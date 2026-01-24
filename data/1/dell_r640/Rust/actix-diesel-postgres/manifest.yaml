@@ -1,9 +1,9 @@
 language_version: '1.92'
 framework_version: 4.12.1
 tags:
-  runtime: native
-  arch: async
-  orm: diesel
   type: micro-framework
+  runtime: native
+  orm: diesel
+  arch: async
 database: postgres
 path: benchmarks/rust/actix-diesel-postgres

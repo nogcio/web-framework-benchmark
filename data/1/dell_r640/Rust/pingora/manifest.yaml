@@ -1,8 +1,8 @@
 language_version: '1.92'
 framework_version: '0.6'
 tags:
-  type: proxy
   runtime: native
   arch: async
+  type: proxy
 database: null
 path: benchmarks/rust/pingora

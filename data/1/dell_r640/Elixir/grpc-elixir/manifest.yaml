@@ -1,8 +1,8 @@
 language_version: '1.18'
 framework_version: 0.9.0
 tags:
-  type: micro-framework
   runtime: beam
+  type: micro-framework
   arch: actor-model
 database: null
 path: benchmarks/elixir/grpc

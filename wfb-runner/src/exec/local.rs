@@ -160,18 +160,21 @@ impl Executor for LocalExecutor {
 
         if !status.success() {
             let stderr = logger.get_stderr();
+            let last_lines = logger.get_last_lines_plain();
             if !stderr.is_empty() {
                 return Err(anyhow::anyhow!(
-                    "Command failed with status: {}\nCommand: {}\nStderr:\n{}",
+                    "Command failed with status: {}\nCommand: {}\nStderr:\n{}\nRecent output:\n{}",
                     status,
                     script,
-                    stderr
+                    stderr,
+                    last_lines
                 ));
             }
             return Err(anyhow::anyhow!(
-                "Command failed with status: {}\nCommand: {}",
+                "Command failed with status: {}\nCommand: {}\nRecent output:\n{}",
                 status,
-                script
+                script,
+                last_lines
             ));
         }
 

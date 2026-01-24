@@ -10,7 +10,7 @@ Because it mostly measures minimal HTTP overhead. WFB focuses on workloads that 
 
 ## How do you ensure correctness?
 
-`wrkr` validates every response against the test requirements during load (not only before the benchmark). Incorrect aggregates, missing fields, wrong headers, unstable file bytes, etc. are treated as failures.
+[nogcio/wrkr](https://github.com/nogcio/wrkr) (via our Lua scenarios under `scripts/`) validates every response against the test requirements during load (not only before the benchmark). Incorrect aggregates, missing fields, wrong headers, unstable file bytes, etc. are treated as failures.
 
 ## What is the warmup and why is it needed?
 
@@ -18,11 +18,11 @@ Every test includes a 30s warmup phase to reduce cold-start / JIT bias.
 
 ## What do “connections” mean here?
 
-Connections are virtual users (VUs) maintained by `wrkr`. Tests are executed with step loads (e.g. 32 → 64 → 128 …) and each step is held for a fixed duration.
+Connections are virtual users (VUs). Tests are executed with a `ramping-vus` profile up to a configured max VU target.
 
 ## What does latency measure and in what units?
 
-Latency is measured in the load generator as wall-clock elapsed time per request and recorded in microseconds. Percentiles are reported from an HDRHistogram.
+Latency is measured in the load generator as wall-clock elapsed time per request and stored in microseconds (the runner converts from the load generator’s milliseconds). Percentiles are reported from an HDRHistogram.
 
 ## Is keep-alive used?
 
@@ -54,7 +54,9 @@ For single-benchmark development / debugging:
 
 `dev` starts the app (and DB if needed) and tails logs; it does **not** run the benchmark load.
 
-If you want to run load against a single benchmark locally, start it with `dev` and then run `wrkr` manually against the printed URL.
+If you want to run load against a single benchmark locally, start it with `dev` and then run [nogcio/wrkr](https://github.com/nogcio/wrkr) manually against the printed URL.
+
+Note: `static_files` is currently disabled (skipped by the runner).
 
 ## I think a benchmark is unfair / wrong. What should I do?
 

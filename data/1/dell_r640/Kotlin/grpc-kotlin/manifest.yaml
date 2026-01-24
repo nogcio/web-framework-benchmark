@@ -2,7 +2,7 @@ language_version: 2.3.0
 framework_version: 1.4.1
 tags:
   type: micro-framework
-  arch: coroutine
   runtime: jvm
+  arch: coroutine
 database: null
 path: benchmarks/kotlin/grpc

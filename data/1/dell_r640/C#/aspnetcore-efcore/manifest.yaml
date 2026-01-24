@@ -1,9 +1,9 @@
 language_version: '10.0'
 framework_version: 9.0.0
 tags:
-  orm: efcore
-  runtime: dotnet
-  arch: async
   type: framework
+  arch: async
+  runtime: dotnet
+  orm: efcore
 database: postgres
 path: benchmarks/csharp/aspnetcore-efcore

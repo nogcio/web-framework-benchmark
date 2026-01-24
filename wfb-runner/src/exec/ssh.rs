@@ -266,18 +266,21 @@ impl Executor for SshExecutor {
             let exit_status = channel.exit_status()?;
             if exit_status != 0 {
                 let stderr = logger.get_stderr();
+                let last_lines = logger.get_last_lines_plain();
                 if !stderr.is_empty() {
-                    eprintln!("{}", stderr);
                     return Err(anyhow::anyhow!(
-                        "Command failed with status: {}\nCommand: {}",
+                        "Command failed with status: {}\nCommand: {}\nStderr:\n{}\nRecent output:\n{}",
                         exit_status,
-                        script
+                        script,
+                        stderr,
+                        last_lines
                     ));
                 }
                 return Err(anyhow::anyhow!(
-                    "Command failed with status: {}\nCommand: {}",
+                    "Command failed with status: {}\nCommand: {}\nRecent output:\n{}",
                     exit_status,
-                    script
+                    script,
+                    last_lines
                 ));
             }
 

@@ -1,8 +1,8 @@
 language_version: '1.92'
 framework_version: 0.8.8
 tags:
-  type: micro-framework
-  arch: async
   runtime: native
+  arch: async
+  type: micro-framework
 database: postgres
 path: benchmarks/rust/axum-sqlx-postgres

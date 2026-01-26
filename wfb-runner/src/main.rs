@@ -71,7 +71,10 @@ async fn main() -> Result<(), anyhow::Error> {
                     let config = runner::RunnerConfig {
                         db_host: "host.docker.internal".to_string(),
                         db_port: consts::DB_PORT_EXTERNAL.to_string(),
-                        app_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
+                        app_host_url: format!(
+                            "http://host.docker.internal:{}",
+                            consts::APP_PORT_EXTERNAL
+                        ),
                         app_public_host_url: format!(
                             "http://localhost:{}",
                             consts::APP_PORT_EXTERNAL
@@ -255,7 +258,10 @@ async fn main() -> Result<(), anyhow::Error> {
                     let config = runner::RunnerConfig {
                         db_host: "host.docker.internal".to_string(),
                         db_port: consts::DB_PORT_EXTERNAL.to_string(),
-                        app_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
+                        app_host_url: format!(
+                            "http://host.docker.internal:{}",
+                            consts::APP_PORT_EXTERNAL
+                        ),
                         app_public_host_url: format!(
                             "http://localhost:{}",
                             consts::APP_PORT_EXTERNAL
@@ -377,7 +383,10 @@ async fn main() -> Result<(), anyhow::Error> {
                     let config = runner::RunnerConfig {
                         db_host: "host.docker.internal".to_string(),
                         db_port: consts::DB_PORT_EXTERNAL.to_string(),
-                        app_host_url: format!("http://localhost:{}", consts::APP_PORT_EXTERNAL),
+                        app_host_url: format!(
+                            "http://host.docker.internal:{}",
+                            consts::APP_PORT_EXTERNAL
+                        ),
                         app_public_host_url: format!(
                             "http://localhost:{}",
                             consts::APP_PORT_EXTERNAL

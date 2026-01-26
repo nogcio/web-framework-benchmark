@@ -56,7 +56,7 @@ For single-benchmark development / debugging:
 
 If you want to run load against a single benchmark locally, start it with `dev` and then run [nogcio/wrkr](https://github.com/nogcio/wrkr) manually against the printed URL.
 
-Note: `static_files` is currently disabled (skipped by the runner).
+Note: `static_files` is now enabled in the runner.
 
 ## I think a benchmark is unfair / wrong. What should I do?
 

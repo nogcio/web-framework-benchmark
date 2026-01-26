@@ -105,11 +105,6 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
     pub async fn run_tests(&self, benchmark: &Benchmark, pb: &ProgressBar) -> anyhow::Result<()> {
         for test in &benchmark.tests {
-            if matches!(test, BenchmarkTests::StaticFiles) {
-                pb.println("static_files is currently disabled; skipping");
-                continue;
-            }
-
             let script_path = match test {
                 BenchmarkTests::PlainText => consts::SCRIPT_PLAINTEXT,
                 BenchmarkTests::JsonAggregate => consts::SCRIPT_JSON,
@@ -145,18 +140,32 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                 cmd = cmd.env(k, v);
             }
 
-            let last_line: std::sync::Arc<std::sync::Mutex<Option<WrkrJsonProgressLine>>> =
+            let last_progress: std::sync::Arc<std::sync::Mutex<Option<WrkrJsonProgressLine>>> =
                 std::sync::Arc::new(std::sync::Mutex::new(None));
-            let last_line_clone = last_line.clone();
+            let last_summary: std::sync::Arc<std::sync::Mutex<Option<WrkrJsonSummaryLine>>> =
+                std::sync::Arc::new(std::sync::Mutex::new(None));
+
+            let last_progress_clone = last_progress.clone();
+            let last_summary_clone = last_summary.clone();
             let run_res = self
                 .wrkr_docker
                 .execute_run_with_std_out(
                     cmd,
                     move |line| {
-                        if let Ok(v) = serde_json::from_str::<WrkrJsonProgressLine>(line)
-                            && let Ok(mut guard) = last_line_clone.lock()
-                        {
-                            *guard = Some(v);
+                        let Ok(v) = serde_json::from_str::<WrkrJsonLine>(line) else {
+                            return;
+                        };
+                        match v {
+                            WrkrJsonLine::Progress(p) => {
+                                if let Ok(mut guard) = last_progress_clone.lock() {
+                                    *guard = Some(p);
+                                }
+                            }
+                            WrkrJsonLine::Summary(s) => {
+                                if let Ok(mut guard) = last_summary_clone.lock() {
+                                    *guard = Some(s);
+                                }
+                            }
                         }
                     },
                     &ProgressBar::hidden(),
@@ -169,24 +178,38 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
 
             let run_err = run_res.err();
 
-            let stats = last_line.lock().unwrap_or_else(|e| e.into_inner()).clone();
-            let stats = match stats {
-                Some(v) => v,
-                None => {
-                    if let Some(e) = run_err {
-                        bail!("wrkr verify run failed: {}", e);
+            let summary = last_summary
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+            let progress = last_progress
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+
+            let (checks_failed_total, checks_failed) = if let Some(s) = summary {
+                let mut merged: HashMap<String, u64> = HashMap::new();
+                for scenario in &s.scenarios {
+                    for (k, v) in &scenario.checks_failed {
+                        *merged.entry(k.clone()).or_insert(0) =
+                            merged.get(k).copied().unwrap_or(0).saturating_add(*v);
                     }
-                    bail!(
-                        "wrkr produced no JSON progress lines during verify for {:?}; check script/runtime",
-                        test
-                    );
                 }
+                (s.totals.checks_failed_total, merged)
+            } else if let Some(p) = progress {
+                (p.checks_failed_total, p.checks_failed)
+            } else {
+                if let Some(e) = run_err {
+                    bail!("wrkr verify run failed: {}", e);
+                }
+                bail!(
+                    "wrkr produced no JSON progress/summary lines during verify for {:?}; check script/runtime",
+                    test
+                );
             };
 
-            let checks_failed_total = stats.checks_failed_total;
             if checks_failed_total > 0 {
-                let errors_str = stats
-                    .checks_failed
+                let errors_str = checks_failed
                     .iter()
                     .map(|(code, count)| format!("{}: {}", code, count))
                     .collect::<Vec<_>>()
@@ -435,16 +458,6 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             .ok_or_else(|| anyhow::anyhow!("Language '{}' not found", benchmark.language))?;
 
         for test in &benchmark.tests {
-            if matches!(test, BenchmarkTests::StaticFiles) {
-                let pb = mb.add(ProgressBar::new_spinner());
-                pb.finish_with_message(format!(
-                    "   {} {:?} - Skipped (static_files disabled)",
-                    console::style("-").yellow(),
-                    test
-                ));
-                continue;
-            }
-
             let pb = mb.add(ProgressBar::new_spinner());
             let style = match ProgressStyle::default_spinner()
                 .template("{spinner:.blue} {prefix} [{bar:40.cyan/blue}] {msg}")
@@ -518,19 +531,24 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                     .execute_run_with_std_out(
                         cmd,
                         move |line| {
-                            if let Ok(stats) = serde_json::from_str::<WrkrJsonProgressLine>(line) {
-                                warmup_pb_clone.set_position(
-                                    stats
-                                        .elapsed_secs
-                                        .min(consts::BENCHMARK_WARMUP_DURATION_SECS),
-                                );
-                                warmup_pb_clone.set_message(format!(
-                                    "RPS: {:.0} | Latency: {} | Errors: {}",
-                                    stats.requests_per_sec,
-                                    format_latency_ms(stats.latency_p99),
-                                    stats.checks_failed_total
-                                ));
-                            }
+                            let Ok(line) = serde_json::from_str::<WrkrJsonLine>(line) else {
+                                return;
+                            };
+                            let WrkrJsonLine::Progress(stats) = line else {
+                                return;
+                            };
+
+                            warmup_pb_clone.set_position(
+                                stats
+                                    .elapsed_secs
+                                    .min(consts::BENCHMARK_WARMUP_DURATION_SECS),
+                            );
+                            warmup_pb_clone.set_message(format!(
+                                "RPS: {:.0} | Latency: {} | Errors: {}",
+                                stats.requests_per_sec,
+                                format_latency(stats.latency_p99),
+                                stats.checks_failed_total
+                            ));
                         },
                         &ProgressBar::hidden(),
                     )
@@ -606,7 +624,12 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
             let pb_clone = pb.clone();
             let resource_usage_read = resource_usage.clone();
             let _output = self.wrkr_docker.execute_run_with_std_out(cmd, move |line| {
-                if let Ok(stats) = serde_json::from_str::<WrkrJsonProgressLine>(line) {
+                let Ok(line) = serde_json::from_str::<WrkrJsonLine>(line) else {
+                    return;
+                };
+                let WrkrJsonLine::Progress(stats) = line else {
+                    return;
+                };
                     let total_errors = stats.checks_failed.values().copied().sum();
 
                     let (mem_bytes, cpu_usage) = if let Ok(guard) = resource_usage_read.lock() {
@@ -615,13 +638,13 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                         (0, 0.0)
                     };
 
-                    let latency_mean_us = stats.latency_mean * 1000.0;
-                    let latency_stdev_us = stats.latency_stdev * 1000.0;
-                    let latency_max_us = stats.latency_max.saturating_mul(1000);
-                    let latency_p50_us = stats.latency_p50.saturating_mul(1000);
-                    let latency_p75_us = stats.latency_p75.saturating_mul(1000);
-                    let latency_p90_us = stats.latency_p90.saturating_mul(1000);
-                    let latency_p99_us = stats.latency_p99.saturating_mul(1000);
+                    let latency_mean_us = stats.latency_mean;
+                    let latency_stdev_us = stats.latency_stdev;
+                    let latency_max_us = stats.latency_max;
+                    let latency_p50_us = stats.latency_p50;
+                    let latency_p75_us = stats.latency_p75;
+                    let latency_p90_us = stats.latency_p90;
+                    let latency_p99_us = stats.latency_p99;
 
                     let raw_item = wfb_storage::TestCaseRaw {
                         elapsed_secs: stats.elapsed_secs,
@@ -664,7 +687,6 @@ impl<E: Executor + Clone + Send + 'static> Runner<E> {
                         humanize_bytes_binary!(mem_bytes),
                         cpu_usage
                     ));
-                }
             }, &run_pb).await?;
 
             monitor_handle.abort();
@@ -763,12 +785,20 @@ fn format_latency(micros: u64) -> String {
     }
 }
 
-fn format_latency_ms(ms: u64) -> String {
-    format_latency(ms.saturating_mul(1000))
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum WrkrJsonLine {
+    Progress(WrkrJsonProgressLine),
+    Summary(WrkrJsonSummaryLine),
 }
 
 #[derive(Debug, Deserialize, Clone)]
 struct WrkrJsonProgressLine {
+    // Newer `wrkr` includes interval timing.
+    // We don't currently use it, but we accept it to keep parsing robust.
+    #[allow(dead_code)]
+    pub interval_secs: f64,
+
     pub elapsed_secs: u64,
     pub connections: u64,
 
@@ -781,7 +811,7 @@ struct WrkrJsonProgressLine {
     pub total_bytes_sent: u64,
     pub checks_failed_total: u64,
 
-    // Latency metrics are in milliseconds in nogcio/wrkr output.
+    // Latency metrics are in microseconds in `wrkr` >= 0.0.7.
     pub latency_mean: f64,
     pub latency_stdev: f64,
     pub latency_max: u64,
@@ -797,6 +827,49 @@ struct WrkrJsonProgressLine {
     pub req_per_sec_stdev: f64,
     pub req_per_sec_max: f64,
     pub req_per_sec_stdev_pct: f64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct WrkrJsonSummaryLine {
+    pub scenarios: Vec<WrkrJsonScenarioSummary>,
+    pub totals: WrkrJsonTotals,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct WrkrJsonScenarioSummary {
+    #[allow(dead_code)]
+    pub scenario: String,
+
+    #[allow(dead_code)]
+    pub requests_total: u64,
+    #[allow(dead_code)]
+    pub failed_requests_total: u64,
+    #[allow(dead_code)]
+    pub bytes_received_total: u64,
+    #[allow(dead_code)]
+    pub bytes_sent_total: u64,
+    #[allow(dead_code)]
+    pub iterations_total: u64,
+
+    #[allow(dead_code)]
+    pub checks_failed_total: u64,
+    pub checks_failed: HashMap<String, u64>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct WrkrJsonTotals {
+    #[allow(dead_code)]
+    pub requests_total: u64,
+    #[allow(dead_code)]
+    pub failed_requests_total: u64,
+    #[allow(dead_code)]
+    pub bytes_received_total: u64,
+    #[allow(dead_code)]
+    pub bytes_sent_total: u64,
+    #[allow(dead_code)]
+    pub iterations_total: u64,
+
+    pub checks_failed_total: u64,
 }
 
 fn parse_docker_memory(s: &str) -> u64 {
@@ -950,4 +1023,86 @@ fn raw_to_summary(
 fn parse_docker_cpu(s: &str) -> f64 {
     let s = s.trim().trim_end_matches('%');
     s.parse::<f64>().unwrap_or(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WrkrJsonLine;
+
+    #[test]
+    fn wrkr_progress_line_new_format_is_us() {
+        // Matches wrkr >= 0.0.7: has `kind` and latency values are microseconds.
+        let js = r#"{
+            "kind": "progress",
+            "interval_secs": 1.0,
+            "elapsed_secs": 1,
+            "connections": 4,
+            "requests_per_sec": 1000.0,
+            "bytes_received_per_sec": 10,
+            "bytes_sent_per_sec": 20,
+            "total_requests": 1000,
+            "total_bytes_received": 100,
+            "total_bytes_sent": 200,
+            "checks_failed_total": 0,
+            "latency_mean": 250.0,
+            "latency_stdev": 10.0,
+            "latency_max": 1000,
+            "latency_p50": 200,
+            "latency_p75": 300,
+            "latency_p90": 400,
+            "latency_p99": 500,
+            "latency_stdev_pct": 0.0,
+            "checks_failed": {},
+            "req_per_sec_avg": 900.0,
+            "req_per_sec_stdev": 1.0,
+            "req_per_sec_max": 1100.0,
+            "req_per_sec_stdev_pct": 0.1
+        }"#;
+
+        let v: WrkrJsonLine = serde_json::from_str(js).expect("parse");
+        match v {
+            WrkrJsonLine::Progress(p) => {
+                assert_eq!(p.latency_p99, 500);
+                assert!((p.latency_mean - 250.0).abs() < 1e-9);
+            }
+            WrkrJsonLine::Summary(_) => panic!("expected progress"),
+        }
+    }
+
+    #[test]
+    fn wrkr_summary_line_parses() {
+        let js = r#"{
+            "kind": "summary",
+            "scenarios": [
+                {
+                    "scenario": "Default",
+                    "requests_total": 10,
+                    "failed_requests_total": 0,
+                    "bytes_received_total": 100,
+                    "bytes_sent_total": 200,
+                    "iterations_total": 10,
+                    "checks_failed_total": 2,
+                    "checks_failed": {"status is 200": 2}
+                }
+            ],
+            "totals": {
+                "requests_total": 10,
+                "failed_requests_total": 0,
+                "bytes_received_total": 100,
+                "bytes_sent_total": 200,
+                "iterations_total": 10,
+                "checks_failed_total": 2
+            }
+        }"#;
+
+        let v: WrkrJsonLine = serde_json::from_str(js).expect("parse");
+        match v {
+            WrkrJsonLine::Summary(s) => {
+                assert_eq!(s.totals.checks_failed_total, 2);
+                assert_eq!(s.scenarios.len(), 1);
+                assert_eq!(s.scenarios[0].checks_failed_total, 2);
+            }
+            WrkrJsonLine::Progress(_) => panic!("expected summary"),
+        }
+    }
 }

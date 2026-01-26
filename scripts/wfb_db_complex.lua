@@ -2,7 +2,6 @@ local http = require("wrkr/http")
 local check = require("wrkr/check")
 local json = require("wrkr/json")
 local vu = require("wrkr/vu")
-local env = require("wrkr/env")
 
 local wfb = require("lib.wfb")
 

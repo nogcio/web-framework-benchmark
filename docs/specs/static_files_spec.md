@@ -31,7 +31,7 @@ Response requirements:
 - **Headers**:
   - `Content-Length` must be present and equal to the exact file size
   - `Content-Type` must contain `application/octet-stream`
-- **Body**: must be exactly the file bytes; length must match `Content-Length`
+- **Body**: payload must be exactly the file bytes; length must match `Content-Length`
 
 ### 2. HEAD
 The service must support HEAD for at least `/files/1mb.bin`:
@@ -62,8 +62,8 @@ Response requirements:
 - **Headers**:
   - `Content-Range` must be exactly `bytes 0-1023/1048576`
 - **Body**:
-  - exactly 1024 bytes
-  - bytes must match the first 1024 bytes returned by a full `GET`
+  - the server must return the correct payload for the range
+  - validation is performed via headers (see notes below)
 
 ### 4. Conditional GET (Cache Validation)
 Real static delivery relies heavily on cache validators.
@@ -82,10 +82,18 @@ If the server provides neither `ETag` nor `Last-Modified`, the conditional secti
 The reference test runner performs these checks:
 
 1. For each of the files:
-   - `GET` once, validate status, `Content-Length`, `Content-Type`, and body size.
-   - `GET` again and assert the bytes are identical to the first response.
+  - `GET` once, validate status, `Content-Length`, and `Content-Type`.
+  - `GET` again and assert caching validator stability if present (`ETag` or `Last-Modified`).
 2. For `/files/1mb.bin`:
    - `HEAD` and verify correct `Content-Length`.
-   - `Range` request and verify `206`, `Content-Range`, body length, and body matches the prefix of the full GET.
+  - `Range` request and verify `206`, `Content-Range`, and `Content-Length`.
    - If the server exposes validators (`ETag` or `Last-Modified`), verify it returns `304 Not Modified` to the corresponding conditional request.
+
+## Notes
+
+### Body validation
+
+The load generator used by WFB (wrkr) exposes response bodies to Lua as UTF-8 decoded strings. For `application/octet-stream` responses, the Lua `res.body` may be empty even when the full payload is transferred.
+
+Because of that, the WFB `static_files` verification validates static file correctness via headers and caching semantics (e.g. `Content-Length`, `Content-Range`, `ETag`/`Last-Modified`, and status codes) rather than byte-for-byte comparison of the response body.
 

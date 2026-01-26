@@ -1,20 +1,30 @@
 {% import "partials/ui/macros.rs.j2" as ui %}
 
 <footer id="wfb-footer" hx-swap-oob="true" class="wfb-chrome wfb-chrome-footer" data-wfb-component="footer">
-    <div class="w-full px-4 md:px-6 py-2 flex flex-wrap items-center justify-end gap-4 text-[10px] uppercase tracking-[0.2em] font-semibold text-muted-foreground">
-        <span>v{{ chrome.backend_version }}</span>
-        <span class="flex items-center gap-1 text-[10px]">
-            {{ ui::icon("timer", "h-3 w-3") }}
-            <span>{{ chrome.render_duration }}ms</span>
-        </span>
-        <a href="mailto:{{ chrome.contact_email }}" class="flex items-center gap-1 hover:text-foreground transition-colors">
-            {{ ui::icon("mail", "h-3 w-3") }}
-            <span class="wfb-only-desktop-inline">{{ chrome.contact_email }}</span>
-        </a>
-        <a href="{{ chrome.repository_url }}" target="_blank" rel="noreferrer"
-            class="flex items-center gap-1 hover:text-foreground transition-colors">
-            {{ ui::icon("github", "h-3 w-3") }}
-            <span class="wfb-only-desktop-inline">GitHub</span>
-        </a>
+    <div class="w-full px-4 md:px-6 py-2 flex flex-wrap items-center justify-between gap-4 text-[10px] uppercase tracking-[0.2em] font-semibold text-muted-foreground">
+        <div class="flex items-center gap-4">
+            <a href="https://github.com/nogcio/wrkr" target="_blank" rel="noreferrer"
+                class="flex items-center gap-1 hover:text-foreground transition-colors">
+                {{ ui::icon("github", "h-3 w-3") }}
+                <span>wrkr<span class="wfb-only-desktop-inline"> (load generator)</span></span>
+            </a>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-4">
+            <span>v{{ chrome.backend_version }}</span>
+            <span class="flex items-center gap-1 text-[10px]">
+                {{ ui::icon("timer", "h-3 w-3") }}
+                <span>{{ chrome.render_duration }}ms</span>
+            </span>
+            <a href="mailto:{{ chrome.contact_email }}" class="flex items-center gap-1 hover:text-foreground transition-colors">
+                {{ ui::icon("mail", "h-3 w-3") }}
+                <span class="wfb-only-desktop-inline">{{ chrome.contact_email }}</span>
+            </a>
+            <a href="{{ chrome.repository_url }}" target="_blank" rel="noreferrer"
+                class="flex items-center gap-1 hover:text-foreground transition-colors">
+                {{ ui::icon("github", "h-3 w-3") }}
+                <span class="wfb-only-desktop-inline">GitHub</span>
+            </a>
+        </div>
     </div>
 </footer>

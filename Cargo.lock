@@ -2267,7 +2267,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-runner"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2286,7 +2286,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-server"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "askama",
@@ -2315,7 +2315,7 @@ dependencies = [
 
 [[package]]
 name = "wfb-storage"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "chrono",
  "serde",

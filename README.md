@@ -61,9 +61,7 @@ We believe benchmarks should be transparent and reproducible.
 | **[JSON Analytics](docs/specs/json_aggregate_spec.md)** | CPU & Memory efficiency | Data Processing Microservices |
 | **[Database Complex](docs/specs/db_complex_spec.md)** | ORM overhead, Async flows | User Dashboards, CMS |
 | **[gRPC Aggregate](docs/specs/grpc_aggregate_spec.md)** | Protocol Efficiency | Inter-service Communication |
-| **[Static Files](docs/specs/static_files_spec.md)** | Network I / O, Sendfile (currently disabled) | CDNs, Asset Servers |
-
-Note: `static_files` is currently disabled in the runner.
+| **[Static Files](docs/specs/static_files_spec.md)** | Network I / O, Sendfile | CDNs, Asset Servers |
 
 ## 🏗 Architecture
 

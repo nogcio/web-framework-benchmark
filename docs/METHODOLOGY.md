@@ -39,7 +39,7 @@ Max VUs per test case:
 - `json_aggregate`: `512`
 - `db_complex`: `512`
 - `grpc_aggregate`: `1024`
-- `static_files`: disabled (skipped by the runner)
+- `static_files`: `128`
 
 ### Transport & Client
 

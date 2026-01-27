@@ -785,17 +785,49 @@ fn format_latency(micros: u64) -> String {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "kind", rename_all = "lowercase")]
+#[derive(Debug, Clone)]
 enum WrkrJsonLine {
     Progress(WrkrJsonProgressLine),
     Summary(WrkrJsonSummaryLine),
 }
 
+impl<'de> Deserialize<'de> for WrkrJsonLine {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        // New wrkr output (as of wrkr.ndjson.v1): every line includes schema + camelCase keys.
+        let is_v1 = value
+            .get("schema")
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| s == "wrkr.ndjson.v1");
+
+        if !is_v1 {
+            let schema = value
+                .get("schema")
+                .and_then(|v| v.as_str())
+                .unwrap_or("<missing>");
+            return Err(serde::de::Error::custom(format!(
+                "unsupported wrkr JSON output schema: {schema}; expected wrkr.ndjson.v1. Ensure you are using a recent nogcio/wrkr and `--output json`."
+            )));
+        }
+
+        let v1: WrkrNdjsonV1Line = serde_json::from_value(value)
+            .map_err(|e| serde::de::Error::custom(format!("wrkr v1 parse error: {e}")))?;
+
+        Ok(match v1 {
+            WrkrNdjsonV1Line::Progress(p) => WrkrJsonLine::Progress(p.into_legacy_progress()),
+            WrkrNdjsonV1Line::Summary(s) => WrkrJsonLine::Summary(s.into_legacy_summary()),
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Clone)]
 struct WrkrJsonProgressLine {
-    // Newer `wrkr` includes interval timing.
-    // We don't currently use it, but we accept it to keep parsing robust.
+    // Interval timing in seconds.
+    // We don't currently use it, but we keep it for potential future smoothing.
     #[allow(dead_code)]
     pub interval_secs: f64,
 
@@ -811,7 +843,7 @@ struct WrkrJsonProgressLine {
     pub total_bytes_sent: u64,
     pub checks_failed_total: u64,
 
-    // Latency metrics are in microseconds in `wrkr` >= 0.0.7.
+    // Latency metrics are stored as microseconds.
     pub latency_mean: f64,
     pub latency_stdev: f64,
     pub latency_max: u64,
@@ -870,6 +902,287 @@ struct WrkrJsonTotals {
     pub iterations_total: u64,
 
     pub checks_failed_total: u64,
+}
+
+// --- wrkr.ndjson.v1 (new output schema) ---
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum WrkrNdjsonV1Line {
+    Progress(WrkrNdjsonV1ProgressLine),
+    Summary(WrkrNdjsonV1SummaryLine),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1ProgressLine {
+    #[allow(dead_code)]
+    pub schema: String,
+
+    #[allow(dead_code)]
+    pub tick: u64,
+
+    pub elapsed_seconds: f64,
+    pub interval_seconds: f64,
+
+    #[allow(dead_code)]
+    pub scenario: String,
+    #[allow(dead_code)]
+    pub exec: String,
+
+    pub executor: WrkrNdjsonV1ExecutorProgress,
+    pub metrics: WrkrNdjsonV1ProgressMetrics,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1ExecutorProgress {
+    #[allow(dead_code)]
+    pub kind: String,
+    pub vus_active: u64,
+    #[allow(dead_code)]
+    pub vus_max: Option<u64>,
+    #[allow(dead_code)]
+    pub dropped_iterations_total: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1ProgressMetrics {
+    pub requests_per_sec: f64,
+    pub bytes_received_per_sec: u64,
+    pub bytes_sent_per_sec: u64,
+
+    pub total_requests: u64,
+    #[allow(dead_code)]
+    pub total_failed_requests: u64,
+    #[allow(dead_code)]
+    pub total_iterations: u64,
+    pub total_bytes_received: u64,
+    pub total_bytes_sent: u64,
+    pub checks_failed_total: u64,
+
+    pub latency_seconds: WrkrNdjsonV1LatencySecondsProgress,
+
+    pub req_per_sec_avg: f64,
+    pub req_per_sec_stdev: f64,
+    pub req_per_sec_max: f64,
+    pub req_per_sec_stdev_pct: f64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1LatencySecondsProgress {
+    pub mean: f64,
+    pub stdev: f64,
+    pub max: f64,
+    pub p50: f64,
+    pub p75: f64,
+    pub p90: f64,
+    pub p99: f64,
+    pub stdev_pct: f64,
+}
+
+impl WrkrNdjsonV1ProgressLine {
+    fn into_legacy_progress(self) -> WrkrJsonProgressLine {
+        let mut checks_failed: HashMap<String, u64> = HashMap::new();
+        if self.metrics.checks_failed_total > 0 {
+            checks_failed.insert(
+                "checks_failed_total".to_string(),
+                self.metrics.checks_failed_total,
+            );
+        }
+
+        WrkrJsonProgressLine {
+            interval_secs: self.interval_seconds,
+            elapsed_secs: self.elapsed_seconds.floor().max(0.0) as u64,
+            connections: self.executor.vus_active,
+            requests_per_sec: self.metrics.requests_per_sec,
+            bytes_received_per_sec: self.metrics.bytes_received_per_sec,
+            bytes_sent_per_sec: self.metrics.bytes_sent_per_sec,
+            total_requests: self.metrics.total_requests,
+            total_bytes_received: self.metrics.total_bytes_received,
+            total_bytes_sent: self.metrics.total_bytes_sent,
+            checks_failed_total: self.metrics.checks_failed_total,
+            latency_mean: secs_f64_to_micros_f64(self.metrics.latency_seconds.mean),
+            latency_stdev: secs_f64_to_micros_f64(self.metrics.latency_seconds.stdev),
+            latency_max: secs_f64_to_micros_u64(self.metrics.latency_seconds.max),
+            latency_p50: secs_f64_to_micros_u64(self.metrics.latency_seconds.p50),
+            latency_p75: secs_f64_to_micros_u64(self.metrics.latency_seconds.p75),
+            latency_p90: secs_f64_to_micros_u64(self.metrics.latency_seconds.p90),
+            latency_p99: secs_f64_to_micros_u64(self.metrics.latency_seconds.p99),
+            latency_stdev_pct: self.metrics.latency_seconds.stdev_pct,
+            checks_failed,
+            req_per_sec_avg: self.metrics.req_per_sec_avg,
+            req_per_sec_stdev: self.metrics.req_per_sec_stdev,
+            req_per_sec_max: self.metrics.req_per_sec_max,
+            req_per_sec_stdev_pct: self.metrics.req_per_sec_stdev_pct,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1SummaryLine {
+    #[allow(dead_code)]
+    pub schema: String,
+
+    pub scenarios: Vec<WrkrNdjsonV1ScenarioSummary>,
+    pub totals: WrkrNdjsonV1Totals,
+
+    #[allow(dead_code)]
+    pub thresholds: WrkrNdjsonV1Thresholds,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1ScenarioSummary {
+    pub scenario: String,
+
+    #[allow(dead_code)]
+    pub exec: Option<String>,
+    #[allow(dead_code)]
+    pub executor: Option<serde_json::Value>,
+
+    pub requests_total: u64,
+    pub failed_requests_total: u64,
+    pub bytes_received_total: u64,
+    pub bytes_sent_total: u64,
+    pub iterations_total: u64,
+
+    pub checks: Option<WrkrNdjsonV1ChecksSummary>,
+
+    #[allow(dead_code)]
+    pub latency_seconds: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1ChecksSummary {
+    #[allow(dead_code)]
+    pub total: u64,
+    #[allow(dead_code)]
+    pub passed: u64,
+    pub failed: u64,
+    pub by_series: Vec<WrkrNdjsonV1CheckSeries>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1CheckSeries {
+    pub name: String,
+    pub group: Option<String>,
+    pub tags: HashMap<String, String>,
+    #[allow(dead_code)]
+    pub passed: u64,
+    pub failed: u64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WrkrNdjsonV1Totals {
+    #[allow(dead_code)]
+    pub requests_total: u64,
+    #[allow(dead_code)]
+    pub failed_requests_total: u64,
+    #[allow(dead_code)]
+    pub bytes_received_total: u64,
+    #[allow(dead_code)]
+    pub bytes_sent_total: u64,
+    #[allow(dead_code)]
+    pub iterations_total: u64,
+    pub checks_failed_total: u64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct WrkrNdjsonV1Thresholds {
+    #[allow(dead_code)]
+    pub violations: Vec<serde_json::Value>,
+}
+
+impl WrkrNdjsonV1SummaryLine {
+    fn into_legacy_summary(self) -> WrkrJsonSummaryLine {
+        let scenarios = self
+            .scenarios
+            .into_iter()
+            .map(|s| {
+                let (checks_failed_total, checks_failed) = if let Some(checks) = &s.checks {
+                    (checks.failed, checks_series_to_map(&checks.by_series))
+                } else {
+                    (0, HashMap::new())
+                };
+
+                WrkrJsonScenarioSummary {
+                    scenario: s.scenario,
+                    requests_total: s.requests_total,
+                    failed_requests_total: s.failed_requests_total,
+                    bytes_received_total: s.bytes_received_total,
+                    bytes_sent_total: s.bytes_sent_total,
+                    iterations_total: s.iterations_total,
+                    checks_failed_total,
+                    checks_failed,
+                }
+            })
+            .collect();
+
+        WrkrJsonSummaryLine {
+            scenarios,
+            totals: WrkrJsonTotals {
+                requests_total: self.totals.requests_total,
+                failed_requests_total: self.totals.failed_requests_total,
+                bytes_received_total: self.totals.bytes_received_total,
+                bytes_sent_total: self.totals.bytes_sent_total,
+                iterations_total: self.totals.iterations_total,
+                checks_failed_total: self.totals.checks_failed_total,
+            },
+        }
+    }
+}
+
+fn checks_series_to_map(series: &[WrkrNdjsonV1CheckSeries]) -> HashMap<String, u64> {
+    let mut out = HashMap::new();
+    for s in series {
+        let mut key = String::new();
+        if let Some(group) = &s.group {
+            if !group.is_empty() {
+                key.push_str(group);
+                key.push_str(": ");
+            }
+        }
+        key.push_str(&s.name);
+
+        if !s.tags.is_empty() {
+            let mut tags: Vec<(&String, &String)> = s.tags.iter().collect();
+            tags.sort_by(|a, b| a.0.cmp(b.0));
+            let tags_str = tags
+                .into_iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            key.push_str(" [");
+            key.push_str(&tags_str);
+            key.push(']');
+        }
+
+        if s.failed > 0 {
+            out.insert(key, s.failed);
+        }
+    }
+    out
+}
+
+fn secs_f64_to_micros_u64(secs: f64) -> u64 {
+    if !secs.is_finite() || secs <= 0.0 {
+        return 0;
+    }
+    (secs * 1_000_000.0).round() as u64
+}
+
+fn secs_f64_to_micros_f64(secs: f64) -> f64 {
+    if !secs.is_finite() || secs <= 0.0 {
+        return 0.0;
+    }
+    secs * 1_000_000.0
 }
 
 fn parse_docker_memory(s: &str) -> u64 {
@@ -1030,69 +1343,84 @@ mod tests {
     use super::WrkrJsonLine;
 
     #[test]
-    fn wrkr_progress_line_new_format_is_us() {
-        // Matches wrkr >= 0.0.7: has `kind` and latency values are microseconds.
+    fn wrkr_progress_line_v1_seconds_is_converted_to_us() {
+        // Matches wrkr.ndjson.v1: camelCase keys and latency values are seconds (floats).
         let js = r#"{
+            "schema": "wrkr.ndjson.v1",
             "kind": "progress",
-            "interval_secs": 1.0,
-            "elapsed_secs": 1,
-            "connections": 4,
-            "requests_per_sec": 1000.0,
-            "bytes_received_per_sec": 10,
-            "bytes_sent_per_sec": 20,
-            "total_requests": 1000,
-            "total_bytes_received": 100,
-            "total_bytes_sent": 200,
-            "checks_failed_total": 0,
-            "latency_mean": 250.0,
-            "latency_stdev": 10.0,
-            "latency_max": 1000,
-            "latency_p50": 200,
-            "latency_p75": 300,
-            "latency_p90": 400,
-            "latency_p99": 500,
-            "latency_stdev_pct": 0.0,
-            "checks_failed": {},
-            "req_per_sec_avg": 900.0,
-            "req_per_sec_stdev": 1.0,
-            "req_per_sec_max": 1100.0,
-            "req_per_sec_stdev_pct": 0.1
+            "tick": 1,
+            "elapsedSeconds": 1.9,
+            "intervalSeconds": 1.0,
+            "scenario": "Default",
+            "exec": "Default",
+            "executor": {"kind": "constant-vus", "vusActive": 4, "vusMax": 4, "droppedIterationsTotal": 0},
+            "metrics": {
+                "requestsPerSec": 1000.0,
+                "bytesReceivedPerSec": 10,
+                "bytesSentPerSec": 20,
+                "totalRequests": 1000,
+                "totalFailedRequests": 0,
+                "totalIterations": 1000,
+                "totalBytesReceived": 100,
+                "totalBytesSent": 200,
+                "checksFailedTotal": 2,
+                "latencySeconds": {"mean": 0.00025, "stdev": 0.00001, "max": 0.001, "p50": 0.0002, "p75": 0.0003, "p90": 0.0004, "p99": 0.0005, "stdevPct": 0.0},
+                "reqPerSecAvg": 900.0,
+                "reqPerSecStdev": 1.0,
+                "reqPerSecMax": 1100.0,
+                "reqPerSecStdevPct": 0.1
+            }
         }"#;
 
         let v: WrkrJsonLine = serde_json::from_str(js).expect("parse");
         match v {
             WrkrJsonLine::Progress(p) => {
+                // elapsedSeconds=1.9 -> floor -> 1
+                assert_eq!(p.elapsed_secs, 1);
+                // p99=0.0005s -> 500us
                 assert_eq!(p.latency_p99, 500);
                 assert!((p.latency_mean - 250.0).abs() < 1e-9);
+                assert_eq!(p.checks_failed_total, 2);
             }
             WrkrJsonLine::Summary(_) => panic!("expected progress"),
         }
     }
 
     #[test]
-    fn wrkr_summary_line_parses() {
+    fn wrkr_summary_line_v1_parses_and_extracts_failed_checks() {
         let js = r#"{
+            "schema": "wrkr.ndjson.v1",
             "kind": "summary",
             "scenarios": [
                 {
                     "scenario": "Default",
-                    "requests_total": 10,
-                    "failed_requests_total": 0,
-                    "bytes_received_total": 100,
-                    "bytes_sent_total": 200,
-                    "iterations_total": 10,
-                    "checks_failed_total": 2,
-                    "checks_failed": {"status is 200": 2}
+                    "exec": "Default",
+                    "executor": null,
+                    "requestsTotal": 10,
+                    "failedRequestsTotal": 0,
+                    "bytesReceivedTotal": 100,
+                    "bytesSentTotal": 200,
+                    "iterationsTotal": 10,
+                    "checks": {
+                        "total": 10,
+                        "passed": 8,
+                        "failed": 2,
+                        "bySeries": [
+                            {"name": "status is 200", "group": null, "tags": {"method": "GET"}, "passed": 8, "failed": 2}
+                        ]
+                    },
+                    "latencySeconds": null
                 }
             ],
             "totals": {
-                "requests_total": 10,
-                "failed_requests_total": 0,
-                "bytes_received_total": 100,
-                "bytes_sent_total": 200,
-                "iterations_total": 10,
-                "checks_failed_total": 2
-            }
+                "requestsTotal": 10,
+                "failedRequestsTotal": 0,
+                "bytesReceivedTotal": 100,
+                "bytesSentTotal": 200,
+                "iterationsTotal": 10,
+                "checksFailedTotal": 2
+            },
+            "thresholds": {"violations": []}
         }"#;
 
         let v: WrkrJsonLine = serde_json::from_str(js).expect("parse");
@@ -1101,6 +1429,14 @@ mod tests {
                 assert_eq!(s.totals.checks_failed_total, 2);
                 assert_eq!(s.scenarios.len(), 1);
                 assert_eq!(s.scenarios[0].checks_failed_total, 2);
+                assert_eq!(
+                    s.scenarios[0]
+                        .checks_failed
+                        .get("status is 200 [method=GET]")
+                        .copied()
+                        .unwrap_or(0),
+                    2
+                );
             }
             WrkrJsonLine::Progress(_) => panic!("expected summary"),
         }

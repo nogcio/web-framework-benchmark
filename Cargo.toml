@@ -3,7 +3,7 @@ resolver = "3"
 members = ["wfb-runner", "wfb-storage", "wfb-server"]
 
 [workspace.package]
-version = "0.9.1"
+version = "0.9.2"
 edition = "2024"
 authors = ["Andrew Sumskoy <getansum@nogc.io>"]
 license = "MIT"

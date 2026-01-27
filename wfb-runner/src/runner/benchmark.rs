@@ -818,7 +818,7 @@ impl<'de> Deserialize<'de> for WrkrJsonLine {
             .map_err(|e| serde::de::Error::custom(format!("wrkr v1 parse error: {e}")))?;
 
         Ok(match v1 {
-            WrkrNdjsonV1Line::Progress(p) => WrkrJsonLine::Progress(p.into_legacy_progress()),
+            WrkrNdjsonV1Line::Progress(p) => WrkrJsonLine::Progress((*p).into_legacy_progress()),
             WrkrNdjsonV1Line::Summary(s) => WrkrJsonLine::Summary(s.into_legacy_summary()),
         })
     }
@@ -909,7 +909,7 @@ struct WrkrJsonTotals {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 enum WrkrNdjsonV1Line {
-    Progress(WrkrNdjsonV1ProgressLine),
+    Progress(Box<WrkrNdjsonV1ProgressLine>),
     Summary(WrkrNdjsonV1SummaryLine),
 }
 
@@ -1143,11 +1143,11 @@ fn checks_series_to_map(series: &[WrkrNdjsonV1CheckSeries]) -> HashMap<String, u
     let mut out = HashMap::new();
     for s in series {
         let mut key = String::new();
-        if let Some(group) = &s.group {
-            if !group.is_empty() {
-                key.push_str(group);
-                key.push_str(": ");
-            }
+        if let Some(group) = &s.group
+            && !group.is_empty()
+        {
+            key.push_str(group);
+            key.push_str(": ");
         }
         key.push_str(&s.name);
 

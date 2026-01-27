@@ -6,7 +6,7 @@ local uuid = require("wrkr/uuid")
 local Pool = require("lib.pool")
 local wfb = require("lib.wfb")
 
-options = wfb.ramping_vus_options(wfb.max_vus(50), wfb.duration("10s"))
+Options = wfb.ramping_vus_options(wfb.max_vus(50), wfb.duration("10s"))
 local client = grpc.Client.new()
 
 local countries = { "US", "DE", "FR", "JP" }

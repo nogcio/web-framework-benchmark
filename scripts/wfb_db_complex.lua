@@ -7,7 +7,7 @@ local wfb = require("lib.wfb")
 
 local base = wfb.base_url()
 
-options = wfb.ramping_vus_options(wfb.max_vus(50), wfb.duration("10s"))
+Options = wfb.ramping_vus_options(wfb.max_vus(50), wfb.duration("10s"))
 
 local seeded = false
 

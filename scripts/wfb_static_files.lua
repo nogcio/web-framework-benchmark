@@ -6,7 +6,7 @@ local wfb = require("lib.wfb")
 
 local base = wfb.base_url()
 
-options = wfb.ramping_vus_options(wfb.max_vus(25), wfb.duration("10s"))
+Options = wfb.ramping_vus_options(wfb.max_vus(25), wfb.duration("10s"))
 
 local FILE_15KB = "/files/15kb.bin"
 local FILE_1MB = "/files/1mb.bin"

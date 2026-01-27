@@ -5,7 +5,7 @@ local wfb = require("lib.wfb")
 
 local base = wfb.base_url()
 
-options = wfb.ramping_vus_options(wfb.max_vus(100), wfb.duration("10s"))
+Options = wfb.ramping_vus_options(wfb.max_vus(100), wfb.duration("10s"))
 
 function Default()
   local res = http.get(base .. "/plaintext", {

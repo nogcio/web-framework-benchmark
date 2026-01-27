@@ -8,7 +8,7 @@ local wfb = require("lib.wfb")
 
 local base = wfb.base_url()
 
-options = wfb.ramping_vus_options(wfb.max_vus(50), wfb.duration("10s"))
+Options = wfb.ramping_vus_options(wfb.max_vus(50), wfb.duration("10s"))
 
 local countries = { "US", "DE", "FR", "UK", "JP" }
 local statuses = { "completed", "pending", "failed" }
